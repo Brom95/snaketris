@@ -13,6 +13,22 @@ export function snakeTicksPerCell() {
   return Math.max(MIN_SNAKE_TICKS, pieceTicksPerCell() - SNAKE_SPEED_DELTA);
 }
 
+// Consume the edible cell of any falling piece at (r, c): +1 score, and the
+// cell is removed from the piece (the piece is dropped once fully consumed).
+// Returns true when a cell was eaten.
+function eatPieceAt(r, c) {
+  const hit = findPieceAt(r, c);
+  if (!hit) return false;
+  const p = game.pieces[hit.pieceIdx];
+  p.shape.splice(hit.shapeIdx, 1);
+  game.score += 1;
+  if (p.shape.length === 0) {
+    const idx = game.pieces.indexOf(p);
+    if (idx >= 0) game.pieces.splice(idx, 1);
+  }
+  return true;
+}
+
 export function moveSnake() {
   if (game.state !== PLAYING) return;
   game.dir = { r: game.nextDir.r, c: game.nextDir.c };
@@ -30,18 +46,7 @@ export function moveSnake() {
   }
 
   // Eating: consume the edible cell of any falling piece here, +1 score.
-  let willGrow = false;
-  const hit = findPieceAt(nr, nc);
-  if (hit) {
-    const p = game.pieces[hit.pieceIdx];
-    p.shape.splice(hit.shapeIdx, 1);
-    game.score += 1;
-    willGrow = true;
-    if (p.shape.length === 0) {
-      const idx = game.pieces.indexOf(p);
-      if (idx >= 0) game.pieces.splice(idx, 1);
-    }
-  }
+  const willGrow = eatPieceAt(nr, nc);
 
   // Death: self-collision (tail is vacated only when not growing).
   const bodyToCheck = willGrow ? game.snake : game.snake.slice(0, game.snake.length - 1);
@@ -55,4 +60,20 @@ export function moveSnake() {
   // Classic growth: unshift the head; drop the tail only when not growing.
   game.snake.unshift({ r: nr, c: nc });
   if (!willGrow) game.snake.pop();
+}
+
+// Eat every falling-piece cell that now overlaps the snake (head or body).
+// Runs after the pieces step each tick, so a block that "skips past" the head
+// and lands in the body is still consumed, and a block that falls onto the
+// snake is eaten too. +1 score per cell; the snake grows one segment per cell.
+export function consumePiecesOnSnake() {
+  let eaten = 0;
+  for (const seg of game.snake) {
+    if (eatPieceAt(seg.r, seg.c)) eaten += 1;
+  }
+  for (let i = 0; i < eaten; i += 1) {
+    const tail = game.snake[game.snake.length - 1];
+    game.snake.push({ r: tail.r, c: tail.c });
+  }
+  return eaten;
 }
