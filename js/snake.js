@@ -1,0 +1,58 @@
+// Snake movement + speed model.
+import { COLS, ROWS, SOLID, PLAYING, SNAKE_SPEED_DELTA, MIN_SNAKE_TICKS } from './constants.js';
+import { game, gameOver } from './state.js';
+import { getCell } from './grid.js';
+import { pieceTicksPerCell, findPieceAt } from './pieces.js';
+
+// The snake's step interval, derived from the current piece fall speed:
+// exactly SNAKE_SPEED_DELTA ticks/cell shorter than the piece's interval,
+// clamped to at least MIN_SNAKE_TICKS. Fractional values are fine — the
+// loop's accumulator handles them. The snake always passes a cell in
+// strictly fewer ticks than a falling piece.
+export function snakeTicksPerCell() {
+  return Math.max(MIN_SNAKE_TICKS, pieceTicksPerCell() - SNAKE_SPEED_DELTA);
+}
+
+export function moveSnake() {
+  if (game.state !== PLAYING) return;
+  game.dir = { r: game.nextDir.r, c: game.nextDir.c };
+  const head = game.snake[0];
+  // Discrete step with wrap-around via modulo (applied before any check).
+  let nr = head.r + game.dir.r;
+  let nc = head.c + game.dir.c;
+  nr = ((nr % ROWS) + ROWS) % ROWS;
+  nc = ((nc % COLS) + COLS) % COLS;
+
+  // Death: head touches a solid (landed) block.
+  if (getCell(nr, nc) === SOLID) {
+    gameOver();
+    return;
+  }
+
+  // Eating: consume the edible cell of any falling piece here, +1 score.
+  let willGrow = false;
+  const hit = findPieceAt(nr, nc);
+  if (hit) {
+    const p = game.pieces[hit.pieceIdx];
+    p.shape.splice(hit.shapeIdx, 1);
+    game.score += 1;
+    willGrow = true;
+    if (p.shape.length === 0) {
+      const idx = game.pieces.indexOf(p);
+      if (idx >= 0) game.pieces.splice(idx, 1);
+    }
+  }
+
+  // Death: self-collision (tail is vacated only when not growing).
+  const bodyToCheck = willGrow ? game.snake : game.snake.slice(0, game.snake.length - 1);
+  for (const seg of bodyToCheck) {
+    if (seg.r === nr && seg.c === nc) {
+      gameOver();
+      return;
+    }
+  }
+
+  // Classic growth: unshift the head; drop the tail only when not growing.
+  game.snake.unshift({ r: nr, c: nc });
+  if (!willGrow) game.snake.pop();
+}
