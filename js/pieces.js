@@ -49,7 +49,9 @@ export function spawnPiece() {
   const shape = TETROMINOES[Math.floor(Math.random() * TETROMINOES.length)];
   const col = Math.floor(Math.random() * (COLS - 3)); // fits widest piece
   const row = -5; // above the top of the grid
-  game.pieces.push({ shape, col, row });
+  // Copy the shape: eating splices a falling piece's shape in place, and the
+  // shared TETROMINOES table must stay intact for every future spawn.
+  game.pieces.push({ shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
 }
 
 // Advance one piece by one tick. Lands (snaps to grid as SOLID) if the
