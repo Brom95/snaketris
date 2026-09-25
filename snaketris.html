@@ -14,7 +14,13 @@
       background: #0b0e14;
       font-family: monospace;
     }
-    canvas { display: block; }
+    canvas {
+      display: block;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
     #hint {
       position: fixed;
       bottom: 12px;
@@ -29,7 +35,7 @@
 </head>
 <body>
   <canvas id="game"></canvas>
-  <div id="hint">arrows / WASD to steer &middot; R or click to start / restart</div>
+  <div id="hint">arrows / WASD to steer &middot; swipe or tap to steer &middot; R or tap to start</div>
   <script>
     // snaketris — single-file Snake/Tetris hybrid.
     // All game code lives here; no external assets or dependencies.
@@ -88,6 +94,17 @@
     const ctx = canvas.getContext('2d');
     canvas.width = COLS * CELL;
     canvas.height = ROWS * CELL;
+
+    // Native (logical) board size in CSS pixels. The buffer is never resized;
+    // only the CSS display size is scaled to fit the viewport (fitCanvas).
+    const BOARD_W = COLS * CELL;
+    const BOARD_H = ROWS * CELL;
+
+    function fitCanvas() {
+      const scale = Math.min(window.innerWidth / BOARD_W, window.innerHeight / BOARD_H, 1);
+      canvas.style.width = (BOARD_W * scale) + 'px';
+      canvas.style.height = (BOARD_H * scale) + 'px';
+    }
 
     // ---------- State ----------
     let state = IDLE;
@@ -407,6 +424,15 @@
       }
     }
 
+    // Shared direction path: PLAYING gate + no-reverse rule. Both keyboard and
+    // touch feed here so they obey identical rules.
+    function setDirection(d) {
+      if (state !== PLAYING) return;
+      // No-reverse rule: block the exact opposite of the current direction.
+      if (d.r === -dir.r && d.c === -dir.c) return;
+      nextDir = d;
+    }
+
     function onKey(e) {
       const key = e.key.toLowerCase();
       if (key === 'r') {
@@ -416,22 +442,97 @@
       if (state !== PLAYING) return;
       const d = keyToDir(key);
       if (!d) return;
-      // No-reverse rule: block the exact opposite of the current direction.
-      if (d.r === -dir.r && d.c === -dir.c) return;
-      nextDir = d;
+      setDirection(d);
       e.preventDefault();
     }
 
-    function onClick() {
-      if (state !== PLAYING) restart();
+    // ---------- Pointer input (touch + mouse) ----------
+    const TAP_THRESHOLD = 24; // displacement below one cell classifies as a tap
+    let activePointerId = null;
+    let pointerStart = null; // start position in logical canvas coords
+
+    function toLogical(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (clientX - rect.left) / rect.width * BOARD_W,
+        y: (clientY - rect.top) / rect.height * BOARD_H
+      };
     }
 
+    function onPointerDown(e) {
+      if (activePointerId !== null) return; // ignore second concurrent pointer
+      activePointerId = e.pointerId;
+      canvas.setPointerCapture(e.pointerId);
+      pointerStart = toLogical(e.clientX, e.clientY);
+    }
+
+    function onPointerMove(e) {
+      if (e.pointerId !== activePointerId) return;
+      // Capture keeps the gesture routed to us even off-canvas; only the end
+      // position matters, so no per-move work is needed.
+    }
+
+    function onPointerUp(e) {
+      if (e.pointerId !== activePointerId) return;
+      activePointerId = null;
+      const end = toLogical(e.clientX, e.clientY);
+      const dx = end.x - pointerStart.x;
+      const dy = end.y - pointerStart.y;
+      pointerStart = null;
+
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < TAP_THRESHOLD) {
+        // Tap: displacement below one cell.
+        if (state !== PLAYING) {
+          restart(); // start from IDLE, restart from GAME_OVER (score -> 0)
+          return;
+        }
+        const tapDir = tapToDir(end.x, end.y);
+        if (tapDir) setDirection(tapDir);
+      } else {
+        // Swipe: dominant axis of the displacement.
+        setDirection(swipeToDir(dx, dy));
+      }
+    }
+
+    function onPointerCancel(e) {
+      if (e.pointerId !== activePointerId) return;
+      activePointerId = null;
+      pointerStart = null;
+    }
+
+    // Tap region mapping: dominant offset from the center decides left/right vs
+    // up/down; a dead-center tap is a no-op.
+    function tapToDir(x, y) {
+      const cx = BOARD_W / 2;
+      const cy = BOARD_H / 2;
+      const ox = x - cx;
+      const oy = y - cy;
+      if (Math.abs(ox) < TAP_THRESHOLD && Math.abs(oy) < TAP_THRESHOLD) return null;
+      if (Math.abs(ox) >= Math.abs(oy)) {
+        return ox < 0 ? { r: 0, c: -1 } : { r: 0, c: 1 };
+      }
+      return oy < 0 ? { r: -1, c: 0 } : { r: 1, c: 0 };
+    }
+
+    // Swipe mapping: dominant axis of the displacement.
+    function swipeToDir(dx, dy) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        return dx < 0 ? { r: 0, c: -1 } : { r: 0, c: 1 };
+      }
+      return dy < 0 ? { r: -1, c: 0 } : { r: 1, c: 0 };
+    }
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerCancel);
     canvas.addEventListener('keydown', onKey);
     document.addEventListener('keydown', onKey);
-    canvas.addEventListener('click', onClick);
 
     // ---------- Init ----------
     resetGame();
+    fitCanvas();
+    window.addEventListener('resize', fitCanvas);
     requestAnimationFrame(frame);
   </script>
 </body>
