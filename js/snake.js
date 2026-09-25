@@ -62,18 +62,14 @@ export function moveSnake() {
   if (!willGrow) game.snake.pop();
 }
 
-// Eat every falling-piece cell that now overlaps the snake (head or body).
-// Runs after the pieces step each tick, so a block that "skips past" the head
-// and lands in the body is still consumed, and a block that falls onto the
-// snake is eaten too. +1 score per cell; the snake grows one segment per cell.
-export function consumePiecesOnSnake() {
-  let eaten = 0;
-  for (const seg of game.snake) {
-    if (eatPieceAt(seg.r, seg.c)) eaten += 1;
-  }
-  for (let i = 0; i < eaten; i += 1) {
-    const tail = game.snake[game.snake.length - 1];
-    game.snake.push({ r: tail.r, c: tail.c });
-  }
-  return eaten;
+// Eat any falling-piece cell the snake's HEAD now occupies. Runs after the
+// pieces step each tick, so a block that falls onto the head is eaten too.
+// Only the head eats — the body never consumes a piece. +1 score; the snake
+// grows one segment.
+export function consumePieceAtHead() {
+  const head = game.snake[0];
+  if (!eatPieceAt(head.r, head.c)) return 0;
+  const tail = game.snake[game.snake.length - 1];
+  game.snake.push({ r: tail.r, c: tail.c });
+  return 1;
 }

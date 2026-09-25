@@ -4,7 +4,7 @@
 import { COLS, ROWS, CELL, TICK, SPAWN_INTERVAL } from './constants.js';
 import { game, resetGame } from './state.js';
 import { spawnPiece, stepPiece } from './pieces.js';
-import { moveSnake, snakeTicksPerCell, consumePiecesOnSnake } from './snake.js';
+import { moveSnake, snakeTicksPerCell, consumePieceAtHead } from './snake.js';
 import { initInput, fitCanvas } from './input.js';
 import { initRender, render } from './render.js';
 
@@ -31,9 +31,8 @@ export function update() {
   // Then the pieces fall. slice: pieces can be removed (landed) inside stepPiece.
   for (const p of game.pieces.slice()) stepPiece(p);
 
-  // Any piece cell that now overlaps the snake (head or body) is eaten — this
-  // catches blocks that fell onto the snake as well as the head's sweep.
-  if (game.state === 'PLAYING') consumePiecesOnSnake();
+  // A block that fell onto the snake's head is eaten (only the head eats).
+  if (game.state === 'PLAYING') consumePieceAtHead();
 
   // Sequential spawn: a new piece may spawn only when no piece is falling
   // AND the spawn interval has elapsed. spawnAcc keeps counting while a

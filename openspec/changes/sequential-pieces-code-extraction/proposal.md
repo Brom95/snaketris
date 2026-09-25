@@ -8,7 +8,7 @@ The game currently spawns up to 8 tetrominoes concurrently, and all game code li
 - **Speed model**: piece base fall speed becomes 0.08 cells/tick (was 0.12); the existing ramp (×1.08 per 2 landed blocks, cap 0.9 cells/tick) is kept. The snake's step interval becomes `max(1, 1/fallSpeed − 2)` ticks/cell, derived from the current fall-speed tier — the snake always passes a cell in strictly fewer ticks than a falling piece.
 - **Module extraction**: the inline `<script>` is split into `js/*.js` ES modules (`constants.js`, `grid.js`, `state.js`, `pieces.js`, `snake.js`, `input.js`, `render.js`, `app.js`) loaded via a single `<script type="module" src="js/app.js">`. Vanilla JS only, no build step, no dependencies.
 - **Convention change**: QWEN.md's "one self-contained HTML file, inline script" convention is updated to "snaketris.html + js/ ES modules".
-- **Playtest fixes**: the `J` tetromino definition was disconnected and is corrected to a valid 4-cell shape (mirror of `L`); the tick now runs snake-first (snake steps, then pieces fall) and the snake consumes every falling cell that overlaps it (head or body), so a piece approached from below is eaten through its cells instead of one at a time.
+- **Playtest fixes**: the `J` tetromino definition was disconnected and is corrected to a valid 4-cell shape (mirror of `L`); the tick now runs snake-first (snake steps, then pieces fall) and the snake's **head** consumes the cells it reaches, so a piece approached from below is eaten through its cells instead of one at a time. Only the head eats — the body never consumes a piece.
 
 ## Capabilities
 

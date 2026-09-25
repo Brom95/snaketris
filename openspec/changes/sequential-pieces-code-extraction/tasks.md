@@ -31,4 +31,4 @@
 ## 6. Playtest fixes (user feedback)
 
 - [x] 6.1 Fix the broken `J` tetromino in `js/constants.js` (`[[0,2],[1,2],[2,1],[2,2]]`, the mirror of `L`) — the old definition was disconnected, so generated pieces looked like 2 blocks / had gaps; verify every tetromino is 4 cells and 4-connected
-- [x] 6.2 Fix eating: compute the tick **snake-first** (snake steps, then pieces fall) and consume every falling-piece cell that overlaps the snake (head or body), so a piece approached from below is eaten through its cells (not just the first) and a block that lands on the body is eaten; verify with a headless loop that moving up into a piece eats multiple cells and `game.snake.length === 4 + game.score` still holds
+- [x] 6.2 Fix eating: compute the tick **snake-first** (snake steps, then pieces fall); the snake's **head** consumes the cells it reaches (and a block that falls onto the head), so a piece approached from below is eaten through its cells (not just the first). The body never eats. Verify with a headless loop that moving up into a piece eats multiple cells and `game.snake.length === 4 + game.score` still holds

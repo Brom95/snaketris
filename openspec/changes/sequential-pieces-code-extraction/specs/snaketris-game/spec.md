@@ -29,7 +29,7 @@ The system SHALL increase fall speed every time two more blocks have landed, sta
 - **THEN** pieces fall at 0.08 cells/tick (one cell per 12.5 ticks)
 
 ### Requirement: Eating a piece while it falls
-The system SHALL consume edible pieces cell-by-cell, adding exactly 1 to the running score per cell, with each tick computed **snake-first** (the snake steps, then the pieces fall). The snake consumes every edible cell that passes through its head, and any edible cell that ends up overlapping the snake's body — because the falling piece reached it — is consumed as well. The snake grows one segment per cell consumed.
+The system SHALL consume edible pieces cell-by-cell, adding exactly 1 to the running score per cell, with each tick computed **snake-first** (the snake steps, then the pieces fall). Only the snake's **head** eats: the head consumes the cell it moves into, and a falling piece that drops onto the head is consumed as well. The snake's body never eats. The snake grows one segment per cell consumed.
 
 #### Scenario: Consuming one cell
 - **WHEN** the snake eats a single cell of an edible piece
@@ -37,11 +37,15 @@ The system SHALL consume edible pieces cell-by-cell, adding exactly 1 to the run
 
 #### Scenario: Eating a piece from below
 - **WHEN** the snake moves upward into a falling piece
-- **THEN** it consumes the cells that pass through its head, not only the first one
+- **THEN** it consumes each cell the head reaches, not only the first one
 
-#### Scenario: A block falls onto the snake
-- **WHEN** a falling piece drops onto the snake's head or body
+#### Scenario: A block falls onto the head
+- **WHEN** a falling piece drops onto the snake's head
 - **THEN** that cell is consumed and the snake grows by one segment
+
+#### Scenario: The body does not eat
+- **WHEN** a falling piece overlaps the snake's body but not its head
+- **THEN** nothing is consumed
 
 ## ADDED Requirements
 
