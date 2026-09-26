@@ -77,7 +77,7 @@ function formatDate(iso) {
 // Starting menu: title, the three items (highlighted one), and a hint line.
 function drawMenu() {
   overlayBackground();
-  drawText('snaketris', canvas.width / 2, 200, { font: 'bold 30px monospace' });
+  drawText('snaketris', canvas.width / 2, 120, { font: 'bold 30px monospace' });
   for (let i = 0; i < MENU_ITEMS.length; i++) {
     const highlighted = i === game.menuSelect;
     drawText(
@@ -87,7 +87,7 @@ function drawMenu() {
       { font: highlighted ? 'bold 24px monospace' : '20px monospace', color: highlighted ? COLORS.snakeHead : COLORS.text }
     );
   }
-  drawText('Arrows/W-S move · Enter/Space choose · R to start', canvas.width / 2, 480, { font: '13px monospace', color: COLORS.text });
+  drawText('Arrows/W-S move · Enter/Space choose · R to start', canvas.width / 2, 420, { font: '13px monospace', color: COLORS.text });
 }
 
 // Records view: top-10 leaderboard with dates, or an empty-state message.
@@ -96,7 +96,7 @@ function drawRecords() {
   drawText('Records', canvas.width / 2, 120, { font: 'bold 30px monospace' });
   const board = loadBoard();
   if (board.length === 0) {
-    drawText('No scores yet — play a game!', canvas.width / 2, 300, { font: '18px monospace', color: COLORS.text });
+    drawText('No scores yet — play a game!', canvas.width / 2, 240, { font: '18px monospace', color: COLORS.text });
   } else {
     for (let i = 0; i < board.length; i++) {
       const entry = board[i];
