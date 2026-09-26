@@ -91,7 +91,10 @@ export function initInput(canvasEl) {
 }
 
 export function fitCanvas() {
-  const scale = Math.min(window.innerWidth / BOARD_W, window.innerHeight / BOARD_H, 1);
+  // Contain fit: scale so the whole board fits the viewport, preserving
+  // aspect ratio. No upper cap — the field may enlarge on large screens so
+  // it fills the smaller viewport side (e.g. full height on a desktop).
+  const scale = Math.min(window.innerWidth / BOARD_W, window.innerHeight / BOARD_H);
   canvas.style.width = (BOARD_W * scale) + 'px';
   canvas.style.height = (BOARD_H * scale) + 'px';
 }

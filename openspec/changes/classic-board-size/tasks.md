@@ -17,10 +17,10 @@
 - [x] 3.2 In `js/render.js::drawRecords()`, keep the title `y` at 120 and change the empty-state `y` 300→240; verify the empty-state line is below the title and above the first record line.
 - [x] 3.3 In `js/render.js::drawHelp()`, keep the title `y` at 100 (unchanged); verify with the new `HELP_*` constants that all help text fits within `0..480`.
 
-## 4. Verify the fit behavior is unchanged
-
-- [x] 4.1 Confirm `js/input.js::fitCanvas()` is left unchanged (standard contain, `scale = min(innerWidth/BOARD_W, innerHeight/BOARD_H, 1)`, cap at 1); verify by re-reading the file that it still references `BOARD_W`/`BOARD_H` and caps at `1`.
-- [x] 4.2 Verify the board fits on small viewports with the new 240×480 buffer: in a headless check (or browser) at a 320×480 and a 360×800 viewport, `fitCanvas()` yields a displayed canvas no larger than the viewport and the full board is visible; verify no horizontal/vertical scrolling is required.
+## 4. Verify the fit behavior
+ 
+- [x] 4.1 Refined `js/input.js::fitCanvas()`: removed the cap at 1 so `scale = min(innerWidth/BOARD_W, innerHeight/BOARD_H)` — the field may now enlarge on large screens and inscribe into the smaller viewport side (user-requested post-deploy refinement); verified by re-reading the file and a headless scale check.
+- [x] 4.2 Verify the board fits without scrolling on small viewports (320×480, 360×800) and, on a large viewport, fills the smaller side: headless check at 1920×1080 yields a displayed canvas of 540×1080 (full height); at 360×800 yields 360×720 (full width).
 
 ## 5. Integration and behavior verification
 

@@ -2,7 +2,7 @@
 
 ## Context
 
-The playfield is a fixed logical grid rendered into a canvas buffer that is **never resized at runtime** — only CSS-scaled by `fitCanvas()` (`js/input.js`), which uses the standard "contain" fit: `scale = min(innerWidth/BOARD_W, innerHeight/BOARD_H, 1)`. Today `COLS=24`, `ROWS=30`, `CELL=24` → a 576×720 buffer.
+The playfield is a fixed logical grid rendered into a canvas buffer that is **never resized at runtime** — only CSS-scaled by `fitCanvas()` (`js/input.js`), which uses an unbounded "contain" fit: `scale = min(innerWidth/BOARD_W, innerHeight/BOARD_H)`. The field may enlarge on large screens so it fills the smaller viewport side. Today (before this change) `COLS=24`, `ROWS=30`, `CELL=24` → a 576×720 buffer.
 
 Overlay views (menu, records, help) are painted in **logical canvas coordinates** and their positions are centralized in `js/constants.js`. Only the menu is hit-tested by position (`js/input.js` `onPointerUp` uses `MENU_ITEM_Y` + `MENU_ITEM_HIT_H`); the records/help "Menu" return labels are click-anywhere (state-based), so their y-coordinates are drawing-only.
 
@@ -10,13 +10,13 @@ Overlay views (menu, records, help) are painted in **logical canvas coordinates*
 
 **Goals:**
 - Shrink the logical playfield to classic Tetris proportions (10 wide × 20 tall).
-- Keep the whole board fully visible on every screen via the existing contain fit (unchanged algorithm).
+- Keep the whole board fully visible on every screen via the contain fit (cap removed so it fills the smaller viewport side on large screens).
 - Keep the menu, records, and help views fully on-screen and correctly hit-tested after the board shrinks.
 - Preserve every existing game-mechanic and input behavior byte-for-byte.
 
 **Non-Goals:**
 - Changing the piece fall-speed model, the snake/piece speed relationship, scoring, or death rules.
-- Changing the fit *algorithm* (no "cover", no "fit-to-smaller-side", no enlargement on large screens — the cap-at-1 is preserved).
+- Changing the fit to a "cover" mode or cropping the field (contain is preserved — the field is always fully visible; only the upper cap is removed so it can enlarge).
 - Re-architecting rendering or introducing a new build step / dependency.
 
 ## Decisions
@@ -50,7 +50,7 @@ Overlay views (menu, records, help) are painted in **logical canvas coordinates*
 
 - **Overlay text clipping on the 480-tall buffer** → mitigated by the concrete Y values in Decision 3–4; verified all painted y's are within `0..480` and the 10-line records list ends at 420, above the return label at 455.
 - **Menu hit-testing drifting from painted items** → mitigated by Decision 5 (single source of truth in `constants.js`, shared by paint + hit-test).
-- **Board looks small on large desktops** (cap-at-1 means a 240×480 board is shown at native size on a 1920×1080 screen) → accepted: this matches the existing "not enlarged on larger viewports" behavior the user chose to keep; it is a visual, not functional, trade-off.
+- **CSS upscaling on very large screens** (the 240×480 buffer is scaled up — e.g. to 1080×2160 at 4K — so cells may look soft) → accepted: the buffer is never resized per project invariant; the user asked for the field to fill the smaller side, which requires this CSS scaling.
 - **Records list cramped at 30px spacing** → acceptable for a 10-line top-10 on a small board; the 16px monospace labels remain legible.
 
 ## Migration Plan
@@ -59,4 +59,4 @@ Single, self-contained commit to `main`. No data migration (high scores are stor
 
 ## Open Questions
 
-None — the two material decisions (board size = 10×20, fit rule = standard contain) were confirmed with the user, and all remaining layout values are concrete.
+None — the two material decisions (board size = 10×20, fit rule = contain) were confirmed with the user, and all remaining layout values are concrete. (Post-deploy refinement: the contain cap-at-1 was removed at the user's request so the field fills the smaller viewport side.)
