@@ -29,4 +29,4 @@
 - [x] 5.3 Verify the snake start is in-bounds: a headless import of `state.js` after `resetGame()` shows every snake segment's `r` in `0..19` and `c` in `0..9` (mid = `floor(20/2)` = 10, cols 3–6).
 - [ ] 5.4 Browser verification (desktop): on the 10×20 board the menu, records, and help views each fit fully on-screen; menu items are selectable via keyboard (arrows/W-S, Enter/Space), mouse click, and the highlighted item is correct; the game is playable with keyboard steering and `R` restart. *(e2e — delegated to user)*
 - [ ] 5.5 Browser verification (mobile emulation, ~360px wide): the board fits without scrolling; the game is playable via swipe and tap-zone steering, with a tap starting from the idle screen and restarting after game over; keyboard input still works on desktop. *(e2e — delegated to user)*
-- [ ] 5.6 Push the change to `main`, confirm the GitHub-hosted Pages workflow goes green. *(Live-site desktop+mobile verification delegated to user as e2e.)*
+- [x] 5.6 Push the change to `main`, confirm the GitHub-hosted Pages workflow goes green. *(Live-site desktop+mobile verification delegated to user as e2e.)*
