@@ -1,6 +1,9 @@
 // Keyboard + pointer input, shared direction path, and canvas fitting.
-import { BOARD_W, BOARD_H, PLAYING } from './constants.js';
-import { game, restart } from './state.js';
+import {
+  BOARD_W, BOARD_H, PLAYING, MENU, RECORDS, HELP, GAME_OVER,
+  MENU_ITEMS, MENU_ITEM_Y, MENU_ITEM_HIT_H
+} from './constants.js';
+import { game, toMenu, startGame } from './state.js';
 
 let canvas = null;
 
@@ -25,10 +28,35 @@ export function keyToDir(key) {
 
 export function onKey(e) {
   const key = e.key.toLowerCase();
-  if (key === 'r') {
-    if (game.state !== PLAYING) restart();
+  // MENU: arrows/W-S move the selection, Enter/Space confirms, R starts.
+  if (game.state === MENU) {
+    if (key === 'arrowup' || key === 'w') {
+      game.menuSelect = (game.menuSelect + 2) % 3;
+    } else if (key === 'arrowdown' || key === 's') {
+      game.menuSelect = (game.menuSelect + 1) % 3;
+    } else if (key === 'enter' || key === ' ') {
+      if (game.menuSelect === 0) startGame();
+      else if (game.menuSelect === 1) game.state = RECORDS;
+      else game.state = HELP;
+    } else if (key === 'r') {
+      startGame();
+    }
+    e.preventDefault();
     return;
   }
+  // RECORDS / HELP: return to the menu.
+  if (game.state === RECORDS || game.state === HELP) {
+    if (key === 'enter' || key === ' ' || key === 'escape') toMenu();
+    e.preventDefault();
+    return;
+  }
+  // GAME_OVER: R/Enter/Space back to the menu.
+  if (game.state === GAME_OVER) {
+    if (key === 'r' || key === 'enter' || key === ' ') toMenu();
+    e.preventDefault();
+    return;
+  }
+  // PLAYING: steering, unchanged from before.
   if (game.state !== PLAYING) return;
   const d = keyToDir(key);
   if (!d) return;
@@ -89,12 +117,28 @@ export function onPointerUp(e) {
   const dy = end.y - pointerStart.y;
   pointerStart = null;
 
+  // Non-game states: act on the tap position, no steering classification.
+  if (game.state === MENU) {
+    // Select the item whose hit range contains the tap's logical y.
+    for (let i = 0; i < MENU_ITEMS.length; i++) {
+      if (Math.abs(end.y - MENU_ITEM_Y[i]) <= MENU_ITEM_HIT_H / 2) {
+        game.menuSelect = i;
+        if (i === 0) startGame();
+        else if (i === 1) game.state = RECORDS;
+        else game.state = HELP;
+      }
+    }
+    return;
+  }
+  // RECORDS / HELP / GAME_OVER: return to the menu.
+  if (game.state === RECORDS || game.state === HELP || game.state === GAME_OVER) {
+    toMenu();
+    return;
+  }
+  if (game.state !== PLAYING) return;
+
   if (Math.max(Math.abs(dx), Math.abs(dy)) < TAP_THRESHOLD) {
     // Tap: displacement below one cell.
-    if (game.state !== PLAYING) {
-      restart(); // start from IDLE, restart from GAME_OVER (score -> 0)
-      return;
-    }
     const tapDir = tapToDir(end.x, end.y);
     if (tapDir) setDirection(tapDir);
   } else {

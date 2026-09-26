@@ -1,11 +1,13 @@
 // Game state: ownership of all mutable game state + transitions.
 // Every module imports `game` and mutates it in place, so there is always
 // one source of truth and no stale references across module boundaries.
-import { IDLE, PLAYING, GAME_OVER, ROWS, SPAWN_INTERVAL } from './constants.js';
+import { MENU, PLAYING, GAME_OVER, ROWS, SPAWN_INTERVAL } from './constants.js';
 import { initGrid } from './grid.js';
+import { recordScore } from './highscores.js';
 
 export const game = {
-  state: IDLE,
+  state: MENU,
+  menuSelect: 0,
   snake: [],
   pieces: [],
   score: 0,
@@ -30,7 +32,8 @@ function resetSnake() {
 }
 
 export function resetGame() {
-  game.state = IDLE;
+  game.state = MENU;
+  game.menuSelect = 0;
   initGrid();
   resetSnake();
   game.pieces = [];
@@ -55,6 +58,12 @@ export function restart() {
   startGame();
 }
 
+export function toMenu() {
+  game.state = MENU;
+  game.menuSelect = 0;
+}
+
 export function gameOver() {
+  recordScore(game.score);
   game.state = GAME_OVER;
 }

@@ -12,9 +12,27 @@ export const ROWS = 30;
 export const CELL = 24; // cell size in CSS pixels
 
 // State machine
-export const IDLE = 'IDLE';
+export const MENU = 'MENU';
 export const PLAYING = 'PLAYING';
 export const GAME_OVER = 'GAME_OVER';
+export const RECORDS = 'RECORDS';
+export const HELP = 'HELP';
+
+// Menu layout (logical canvas coordinates), shared by render.js (drawing)
+// and input.js (pointer hit-testing).
+export const MENU_ITEMS = ['Play', 'Records', 'How to Play'];
+export const MENU_ITEM_Y = [280, 340, 400];
+export const MENU_ITEM_HIT_H = 44;
+
+// Records view layout (logical canvas coordinates).
+export const RECORDS_LINE_Y = 180;
+export const RECORDS_LINE_SPACING = 40;
+export const RECORDS_RETURN_Y = 640;
+
+// Help view layout (logical canvas coordinates).
+export const HELP_CONTROLS_Y = 160;
+export const HELP_RULES_Y = 320;
+export const HELP_RETURN_Y = 640;
 
 // Timing (fixed-timestep)
 export const TICK = 1 / 60;        // fixed update step, seconds

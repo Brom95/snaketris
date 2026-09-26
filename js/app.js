@@ -3,6 +3,7 @@
 // so the DOM is parsed by the time it runs.
 import { COLS, ROWS, CELL, TICK, SPAWN_INTERVAL } from './constants.js';
 import { game, resetGame } from './state.js';
+import { loadBoard } from './highscores.js';
 import { spawnPiece, stepPiece } from './pieces.js';
 import { moveSnake, snakeTicksPerCell, consumePieceAtHead } from './snake.js';
 import { initInput, fitCanvas } from './input.js';
