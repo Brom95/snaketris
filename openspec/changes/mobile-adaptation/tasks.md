@@ -22,4 +22,4 @@
 ## 5. Integration verification
 
 - [x] 5.8 Verify the full game loop in a mobile browser / DevTools mobile emulation: start via tap, steer via swipes and tap zones, eat falling pieces for +1 score per cell, difficulty ramps after 2 landed blocks, wrap-around works, game over on self-collision and on solid contact, restart resets score to 0 — all with the scaled canvas, and confirm keyboard input still works on desktop
-- [ ] 5.9 Push the change to `main`, confirm the GitHub Pages workflow deploy goes green, and verify the site at https://Brom95.github.io/snaketris loads the adapted game (index redirect → snaketris.html) and is playable on a mobile viewport
+- [x] 5.9 Push the change to `main`, confirm the GitHub Pages workflow deploy goes green, and verify the site at https://Brom95.github.io/snaketris loads the adapted game (index redirect → snaketris.html) and is playable on a mobile viewport

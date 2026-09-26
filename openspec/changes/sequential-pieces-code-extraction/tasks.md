@@ -26,7 +26,7 @@
 
 - [x] 5.1 Rebuild the Node headless harness for ES modules (stub `globalThis.document`/canvas, dynamic `import()` of `js/` modules) and re-run the full suite: steering, no-reverse, eating +1/cell, difficulty ramp, snake speed relationship, wrap-around, both death types, restart, sequential spawn, mobile fit, and keyboard on desktop — all checks pass
 - [x] 5.2 Update QWEN.md conventions (js/ ES-module layout instead of inline script; speed model: piece base 0.08 cells/tick, snake = piece − 2 ticks/cell, clamp ≥ 1), and verify the docs match the code
-- [ ] 5.3 Push to main, confirm the GitHub Pages workflow goes green, and verify the site at https://Brom95.github.io/snaketris plays with sequential pieces, a slower piece start, and the snake moving faster than the pieces, on both mobile viewport and desktop keyboard
+- [x] 5.3 Push to main, confirm the GitHub Pages workflow goes green, and verify the site at https://Brom95.github.io/snaketris plays with sequential pieces, a slower piece start, and the snake moving faster than the pieces, on both mobile viewport and desktop keyboard
 
 ## 6. Playtest fixes (user feedback)
 

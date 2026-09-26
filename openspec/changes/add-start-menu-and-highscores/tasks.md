@@ -27,9 +27,9 @@
 ## 5. Wiring and integration
 
 - [x] 5.1 In `js/app.js`, import `js/highscores.js` and ensure the app boots to the menu; verify the page loads, boots to the menu, and the highscores module is reachable
-- [ ] 5.2 Verify the full desktop flow in a browser: launch menu → Play → play a game → game over → menu → Records shows the top 10 with dates → menu, and → How to Play shows the controls and rules → menu; confirm scores persist across a page reload, the top-10 cap holds after multiple games, and all existing in-game mechanics (movement, classic growth, wrap-around, +1 per-cell scoring, difficulty ramp, death conditions) are unchanged
-- [ ] 5.3 Verify in a mobile browser / DevTools mobile emulation: the menu, records, and help views are fully visible and selectable by touch (tap to start, tap to view records, tap to view help, tap to return to menu) and in-game touch/swipe steering still works
+- [x] 5.2 Verify the full desktop flow in a browser: launch menu → Play → play a game → game over → menu → Records shows the top 10 with dates → menu, and → How to Play shows the controls and rules → menu; confirm scores persist across a page reload, the top-10 cap holds after multiple games, and all existing in-game mechanics (movement, classic growth, wrap-around, +1 per-cell scoring, difficulty ramp, death conditions) are unchanged
+- [x] 5.3 Verify in a mobile browser / DevTools mobile emulation: the menu, records, and help views are fully visible and selectable by touch (tap to start, tap to view records, tap to view help, tap to return to menu) and in-game touch/swipe steering still works
 
 ## 6. Deploy
 
-- [ ] 6.1 Push the change to `main`, confirm the GitHub Pages workflow deploy goes green, and verify the live site loads the menu + records and is playable on a desktop and a mobile viewport
+- [x] 6.1 Push the change to `main`, confirm the GitHub Pages workflow deploy goes green, and verify the live site loads the menu + records and is playable on a desktop and a mobile viewport
