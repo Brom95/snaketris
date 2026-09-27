@@ -6,7 +6,7 @@ import { game, resetGame } from './state.js';
 import { loadBoard } from './highscores.js';
 import { spawnPiece, stepPiece } from './pieces.js';
 import { moveSnake, snakeTicksPerCell, consumePieceAtHead } from './snake.js';
-import { initInput, fitCanvas } from './input.js';
+import { initInput, fitCanvas, pollController } from './input.js';
 import { initRender, render } from './render.js';
 
 let acc = 0;
@@ -56,6 +56,7 @@ export function frame(now) {
     acc -= TICK;
     update();
   }
+  pollController();
   render();
 }
 

@@ -7,6 +7,23 @@ import { game, toMenu, startGame } from './state.js';
 
 let canvas = null;
 
+// ---------- Controller (gamepad) input ----------
+// Standard Gamepad API mapping (per design D4).
+const DPAD_UP = 11;      // D-pad up
+const DPAD_DOWN = 12;    // D-pad down
+const DPAD_LEFT = 13;    // D-pad left
+const DPAD_RIGHT = 14;   // D-pad right
+const BUTTON_A = 0;      // A: confirm / accept
+const BUTTON_B = 1;      // B: back / cancel
+const STICK_DEADZONE = 0.3; // ignore small axis values (stick drift)
+
+// Edge-detection state for the per-frame poll. `prevButtons` maps button
+// index -> was-pressed-last-frame; `null` means "no gamepad / not yet
+// polled". Cleared whenever a gamepad disconnects so stale state never
+// carries across.
+let prevButtons = null;
+let prevStickDir = null;
+
 // Shared direction path: PLAYING gate + no-reverse rule. Both keyboard and
 // touch feed here so they obey identical rules.
 export function setDirection(d) {
@@ -88,6 +105,16 @@ export function initInput(canvasEl) {
   canvas.addEventListener('pointercancel', onPointerCancel);
   canvas.addEventListener('keydown', onKey);
   document.addEventListener('keydown', onKey);
+  // Gamepad connection lifecycle (design D5): clear any leftover controller
+  // poll state on connect/disconnect so no stale held state survives a gamepad
+  // change. Connection state itself is derived from polling, so no index
+  // bookkeeping is needed here.
+  const clearControllerPrev = () => {
+    prevButtons = null;
+    prevStickDir = null;
+  };
+  window.addEventListener('gamepadconnected', clearControllerPrev);
+  window.addEventListener('gamepaddisconnected', clearControllerPrev);
 }
 
 export function fitCanvas() {
@@ -181,4 +208,95 @@ export function swipeToDir(dx, dy) {
     return dx < 0 ? { r: 0, c: -1 } : { r: 0, c: 1 };
   }
   return dy < 0 ? { r: -1, c: 0 } : { r: 1, c: 0 };
+}
+// Quantize the left thumbstick to a single cardinal direction. The axis with
+// the larger magnitude past STICK_DEADZONE wins; inside the deadzone the stick
+// contributes no direction (null). This mirrors the dominant-axis logic of
+// tapToDir/swipeToDir.
+function stickDir(gp) {
+  const ax = gp.axes[0]; // left stick X: negative -> left, positive -> right
+  const ay = gp.axes[1]; // left stick Y: negative -> up, positive -> down
+  const axPast = Math.abs(ax) > STICK_DEADZONE ? Math.abs(ax) : 0;
+  const ayPast = Math.abs(ay) > STICK_DEADZONE ? Math.abs(ay) : 0;
+  if (axPast >= ayPast) {
+    return axPast === 0 ? null : { r: 0, c: ax < 0 ? -1 : 1 };
+  }
+  return { r: ay < 0 ? -1 : 1, c: 0 };
+}
+
+export function pollController() {
+  if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return;
+  const gp = navigator.getGamepads()[0];
+  if (!gp) {
+    // No gamepad: clear previous poll state so a reconnect cannot inherit
+    // a stale held state (design D3).
+    prevButtons = null;
+    prevStickDir = null;
+    return;
+  }
+  const buttons = gp.buttons;
+  const stick = stickDir(gp);
+
+  // Current + previous per-input pressed state.
+  const aNow = !!buttons[BUTTON_A].pressed;
+  const bNow = !!buttons[BUTTON_B].pressed;
+  const upNow = buttons[DPAD_UP].pressed || (stick && stick.r === -1);
+  const downNow = buttons[DPAD_DOWN].pressed || (stick && stick.r === 1);
+  const leftNow = buttons[DPAD_LEFT].pressed || (stick && stick.c === -1);
+  const rightNow = buttons[DPAD_RIGHT].pressed || (stick && stick.c === 1);
+
+  const prev = prevButtons || {};
+  const prevUp = prev[DPAD_UP] || (prevStickDir && prevStickDir.r === -1);
+  const prevDown = prev[DPAD_DOWN] || (prevStickDir && prevStickDir.r === 1);
+  const prevLeft = prev[DPAD_LEFT] || (prevStickDir && prevStickDir.c === -1);
+  const prevRight = prev[DPAD_RIGHT] || (prevStickDir && prevStickDir.c === 1);
+
+  // Edge detection: only the unpressed -> pressed transition fires an action.
+  const aEdge = aNow && !prev[BUTTON_A];
+  const bEdge = bNow && !prev[BUTTON_B];
+  const upEdge = upNow && !prevUp;
+  const downEdge = downNow && !prevDown;
+  const leftEdge = leftNow && !prevLeft;
+  const rightEdge = rightNow && !prevRight;
+
+  if (game.state === PLAYING) {
+    // Steering is the exception to edge-only: the D-pad/stick direction is
+    // applied whenever held (like holding a key). D-pad takes precedence over
+    // the stick when both are pressed. setDirection() is idempotent for the
+    // same direction and enforces the no-reverse rule.
+    let dir = null;
+    if (buttons[DPAD_UP].pressed) dir = { r: -1, c: 0 };
+    else if (buttons[DPAD_DOWN].pressed) dir = { r: 1, c: 0 };
+    else if (buttons[DPAD_LEFT].pressed) dir = { r: 0, c: -1 };
+    else if (buttons[DPAD_RIGHT].pressed) dir = { r: 0, c: 1 };
+    else dir = stick; // may be null
+    if (dir) setDirection(dir);
+  } else if (game.state === MENU) {
+    // D-pad/stick up-down moves the selection (edge-only, wrapping).
+    if (upEdge) game.menuSelect = (game.menuSelect + 2) % 3;
+    else if (downEdge) game.menuSelect = (game.menuSelect + 1) % 3;
+    // A confirms the highlighted item (edge-only), matching keyboard/touch.
+    else if (aEdge) {
+      if (game.menuSelect === 0) startGame();
+      else if (game.menuSelect === 1) game.state = RECORDS;
+      else game.state = HELP;
+    }
+  } else if (game.state === RECORDS || game.state === HELP) {
+    // B returns to the menu (edge-only), matching keyboard/touch.
+    if (bEdge) toMenu();
+  } else if (game.state === GAME_OVER) {
+    // A returns to the menu (edge-only), matching keyboard/touch.
+    if (aEdge) toMenu();
+  }
+
+  // Update previous poll state at the end of each pass (design D3).
+  prevButtons = {
+    [BUTTON_A]: aNow,
+    [BUTTON_B]: bNow,
+    [DPAD_UP]: buttons[DPAD_UP].pressed,
+    [DPAD_DOWN]: buttons[DPAD_DOWN].pressed,
+    [DPAD_LEFT]: buttons[DPAD_LEFT].pressed,
+    [DPAD_RIGHT]: buttons[DPAD_RIGHT].pressed
+  };
+  prevStickDir = stick;
 }
