@@ -1,6 +1,6 @@
 // Keyboard + pointer input, shared direction path, and canvas fitting.
 import {
-  BOARD_W, BOARD_H, PLAYING, MENU, RECORDS, HELP, GAME_OVER,
+  BOARD_W, BOARD_H, FIELD_V_GAP, PLAYING, MENU, RECORDS, HELP, GAME_OVER,
   MENU_ITEMS, MENU_ITEM_Y, MENU_ITEM_HIT_H
 } from './constants.js';
 import { game, toMenu, startGame } from './state.js';
@@ -94,7 +94,12 @@ export function fitCanvas() {
   // Contain fit: scale so the whole board fits the viewport, preserving
   // aspect ratio. No upper cap — the field may enlarge on large screens so
   // it fills the smaller viewport side (e.g. full height on a desktop).
-  const scale = Math.min(window.innerWidth / BOARD_W, window.innerHeight / BOARD_H);
+  // Reserve FIELD_V_GAP above and below: the field is inset from the top and
+  // bottom viewport edges by at least one board cell of breathing room.
+  const scale = Math.min(
+    window.innerWidth / BOARD_W,
+    (window.innerHeight - 2 * FIELD_V_GAP) / BOARD_H
+  );
   canvas.style.width = (BOARD_W * scale) + 'px';
   canvas.style.height = (BOARD_H * scale) + 'px';
 }

@@ -52,6 +52,12 @@ export const MIN_SNAKE_TICKS = 1;
 export const BOARD_W = COLS * CELL;
 export const BOARD_H = ROWS * CELL;
 
+// Vertical gap (screen px) reserved between the field and the top/bottom
+// viewport edges: breathing room left above and below the board. Two native
+// cells ≈ one displayed cell at 1080 p (displayed cell ≈ 49 px) and more at
+// smaller viewports.
+export const FIELD_V_GAP = 2 * CELL;
+
 // Palette
 export const COLORS = {
   bg: '#0b0e14',

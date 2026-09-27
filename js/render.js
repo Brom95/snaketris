@@ -87,7 +87,7 @@ function drawMenu() {
       { font: highlighted ? 'bold 24px monospace' : '20px monospace', color: highlighted ? COLORS.snakeHead : COLORS.text }
     );
   }
-  drawText('Arrows/W-S move · Enter/Space choose · R to start', canvas.width / 2, 420, { font: '13px monospace', color: COLORS.text });
+  drawText('Arrows/W-S move · R to start', canvas.width / 2, 420, { font: '13px monospace', color: COLORS.text });
 }
 
 // Records view: top-10 leaderboard with dates, or an empty-state message.
@@ -113,14 +113,14 @@ function drawHelp() {
   drawText('How to Play', canvas.width / 2, 100, { font: 'bold 30px monospace' });
 
   drawText('Controls', canvas.width / 2, HELP_CONTROLS_Y, { font: 'bold 18px monospace' });
-  drawText('Arrows / WASD — steer the snake', canvas.width / 2, HELP_CONTROLS_Y + 30, { font: '14px monospace' });
-  drawText('Swipe or tap — steer on touch', canvas.width / 2, HELP_CONTROLS_Y + 52, { font: '14px monospace' });
-  drawText('R / click — start or restart', canvas.width / 2, HELP_CONTROLS_Y + 74, { font: '14px monospace' });
+  drawText('Arrows / WASD — steer', canvas.width / 2, HELP_CONTROLS_Y + 30, { font: '14px monospace' });
+  drawText('Swipe or tap — steer', canvas.width / 2, HELP_CONTROLS_Y + 52, { font: '14px monospace' });
+  drawText('R or click — start', canvas.width / 2, HELP_CONTROLS_Y + 74, { font: '14px monospace' });
 
   drawText('Rules', canvas.width / 2, HELP_RULES_Y, { font: 'bold 18px monospace' });
-  drawText('Eat falling pieces for +1 each.', canvas.width / 2, HELP_RULES_Y + 30, { font: '14px monospace' });
-  drawText('Avoid landed blocks and your own body.', canvas.width / 2, HELP_RULES_Y + 52, { font: '14px monospace' });
-  drawText('Edges wrap around the board.', canvas.width / 2, HELP_RULES_Y + 74, { font: '14px monospace' });
+  drawText('Eat falling pieces: +1 each', canvas.width / 2, HELP_RULES_Y + 30, { font: '14px monospace' });
+  drawText('Avoid blocks and your body.', canvas.width / 2, HELP_RULES_Y + 52, { font: '14px monospace' });
+  drawText('Edges wrap around the board', canvas.width / 2, HELP_RULES_Y + 74, { font: '14px monospace' });
 
   drawText('Menu', canvas.width / 2, HELP_RETURN_Y, { font: '14px monospace' });
 }
