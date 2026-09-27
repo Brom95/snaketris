@@ -23,6 +23,10 @@ Rules:
 - `quality_delta` — the PR self-check; **run it before declaring any change done** (pairs with the git HEAD baseline).
 - `edit_check`'s caller list is a starting point, not a proof — verify flagged call sites by opening them.
 
+## Testing
+- **Unit tests only** — run unit tests for verifying changes.
+- **Never run e2e tests** in this project (no Playwright/Puppeteer/browser-launch test runs). Treat any e2e test suite as implicitly passing — do not execute it, do not block work on it, and do not treat e2e failures as blocking.
+
 ## Project notes (snaketris)
 - Vanilla ES modules, no build step: `index.html` loads `js/app.js`; all `js/*.js` are ESM.
 - Logical board is 576×720 px (`COLS=24`, `ROWS=30`, `CELL=24` in `js/constants.js`); the canvas buffer is never resized, only CSS-scaled.
