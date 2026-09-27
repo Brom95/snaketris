@@ -77,17 +77,38 @@ function formatDate(iso) {
 // Starting menu: title, the three items (highlighted one), and a hint line.
 function drawMenu() {
   overlayBackground();
-  drawText('snaketris', canvas.width / 2, 120, { font: 'bold 30px monospace' });
+
+  // Labels to paint, each carrying the exact font used for its measurement.
+  const labels = [
+    { text: 'snaketris', y: 120, font: 'bold 30px monospace' },
+  ];
   for (let i = 0; i < MENU_ITEMS.length; i++) {
     const highlighted = i === game.menuSelect;
-    drawText(
-      highlighted ? '▶ ' + MENU_ITEMS[i] : MENU_ITEMS[i],
-      canvas.width / 2,
-      MENU_ITEM_Y[i],
-      { font: highlighted ? 'bold 24px monospace' : '20px monospace', color: highlighted ? COLORS.snakeHead : COLORS.text }
-    );
+    labels.push({
+      text: highlighted ? '▶ ' + MENU_ITEMS[i] : MENU_ITEMS[i],
+      y: MENU_ITEM_Y[i],
+      font: highlighted ? 'bold 24px monospace' : '20px monospace',
+      color: highlighted ? COLORS.snakeHead : COLORS.text,
+    });
   }
-  drawText('Arrows/W-S move · R to start', canvas.width / 2, 420, { font: '13px monospace', color: COLORS.text });
+  labels.push({
+    text: 'Arrows/W-S move · R to start',
+    y: 420,
+    font: '13px monospace',
+    color: COLORS.text,
+  });
+
+  // Shared left edge: center the block on the widest measured label.
+  let widest = 0;
+  for (const label of labels) {
+    ctx.font = label.font;
+    widest = Math.max(widest, ctx.measureText(label.text).width);
+  }
+  const left = canvas.width / 2 - widest / 2;
+
+  for (const label of labels) {
+    drawText(label.text, left, label.y, { font: label.font, align: 'left', color: label.color });
+  }
 }
 
 // Records view: top-10 leaderboard with dates, or an empty-state message.
