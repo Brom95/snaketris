@@ -7,6 +7,6 @@ The system SHALL scale the playfield canvas to fit the available viewport while 
 - **WHEN** the viewport is narrower or shorter than the canvas's native size
 - **THEN** the canvas is uniformly scaled down to fit within the viewport while preserving its aspect ratio, and the entire board remains visible
 
-#### Scenario: Canvas fills the smaller viewport side on larger viewports
+#### Scenario: Canvas is not enlarged on larger viewports
 - **WHEN** the viewport is at least as large as the canvas's native size
 - **THEN** the canvas is enlarged to fill the smaller viewport dimension (width or height) while preserving its aspect ratio, and the entire board remains visible without scrolling

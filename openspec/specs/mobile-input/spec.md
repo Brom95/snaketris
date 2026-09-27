@@ -51,15 +51,15 @@ The system SHALL start the game from the idle state or restart it from the game-
 - **THEN** a new game starts from scratch with the score reset to 0
 
 ### Requirement: Responsive canvas sizing
-The system SHALL scale the playfield canvas to fit the available viewport while preserving its aspect ratio, so the full board is visible without horizontal or vertical scrolling on small screens.
+The system SHALL scale the playfield canvas to fit the available viewport while preserving its aspect ratio, inscribing it into the smaller side of the viewport (it may enlarge beyond its native size on larger screens), and SHALL inset the field from the top and bottom viewport edges by at least one board cell, so that the full board is always visible without horizontal or vertical scrolling and the board has clear breathing room at the top and bottom of the screen.
 
 #### Scenario: Canvas fits a viewport smaller than its native size
 - **WHEN** the viewport is narrower or shorter than the canvas's native size
-- **THEN** the canvas is uniformly scaled down to fit within the viewport while preserving its aspect ratio, and the entire board remains visible
+- **THEN** the canvas is uniformly scaled down, inset from the top and bottom viewport edges by at least one board cell, and the entire board remains visible without horizontal or vertical scrolling
 
 #### Scenario: Canvas is not enlarged on larger viewports
 - **WHEN** the viewport is at least as large as the canvas's native size
-- **THEN** the canvas is rendered at its native size and is not enlarged
+- **THEN** the canvas is enlarged to fill the smaller viewport dimension (width or height) while preserving its aspect ratio, remains inset from the top and bottom viewport edges by at least one board cell, and the entire board remains visible without scrolling
 
 ### Requirement: Touch gesture handling
 The system SHALL prevent the browser from scrolling or zooming in response to touch gestures on the board, and SHALL suppress text selection and long-press context menus on the board so gestures are handled entirely as game input.
