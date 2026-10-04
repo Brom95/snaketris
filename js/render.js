@@ -127,7 +127,7 @@ function drawOctocat(x, y) {
   ctx.stroke();
 }
 
-// Starting menu: title, the three items (highlighted one), and a hint line.
+// Starting menu: title and the three items (highlighted one).
 function drawMenu() {
   overlayBackground();
 
@@ -144,12 +144,6 @@ function drawMenu() {
       color: highlighted ? COLORS.snakeHead : COLORS.text,
     });
   }
-  labels.push({
-    text: 'Arrows/W-S move · R to start',
-    y: 420,
-    font: '13px monospace',
-    color: COLORS.text,
-  });
 
   // Shared left edge: center the block on the widest measured label.
   let widest = 0;

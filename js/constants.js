@@ -36,8 +36,8 @@ export const HELP_RULES_Y = 230;
 export const HELP_RETURN_Y = 455;
 
 // GitHub icon layout (logical canvas coordinates), below menu items.
-export const GITHUB_ICON_Y = 500;
-export const GITHUB_ICON_HIT_H = 30;
+export const GITHUB_ICON_Y = 370;
+export const GITHUB_ICON_HIT_H = 40;
 
 // URL for the GitHub repository.
 export const GITHUB_URL = 'https://github.com/Brom95/snaketris';
