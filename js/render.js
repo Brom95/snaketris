@@ -81,7 +81,7 @@ function drawOctocat(x, y) {
   const size = CELL * 1.5; // ~36 px — clearly visible
 
   ctx.save();
-  ctx.translate(x - 12, y - 12); // centre the 24×24 viewBox
+  ctx.translate(x - size / 2, y - size / 2); // half the SCALED viewBox, so (x, y) is the centre
   ctx.scale(size / 24, size / 24);
 
   const path = new Path2D(
