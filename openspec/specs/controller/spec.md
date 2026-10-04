@@ -17,7 +17,7 @@ The system SHALL detect when a gamepad is connected or disconnected and make con
 - **THEN** subsequent controller input no longer affects the game, and no stale button or stick state from the disconnected gamepad drives the snake
 
 ### Requirement: Controller steering
-The system SHALL set the snake's queued direction from the D-pad or the left thumbstick, using the same four directions (up, down, left, right) as keyboard and touch input, and SHALL route each direction through the shared direction path so that the in-game no-reverse rule applies. Specifically, the D-pad up/down/left/right buttons (standard gamepad buttons 11, 12, 13, 14) and the left thumbstick (standard axis 0 horizontal and axis 1 vertical; negative is up/left, positive is down/right) each produce the matching direction.
+The system SHALL set the snake's queued direction from the D-pad or the left thumbstick, using the same four directions (up, down, left, right) as keyboard and touch input, and SHALL route each direction through the shared direction path so that the in-game no-reverse rule applies. Specifically, the D-pad up/down/left/right buttons (standard gamepad buttons **12, 13, 14, 15**) and the left thumbstick (standard axis 0 horizontal and axis 1 vertical; negative is up/left, positive is down/right) each produce the matching direction.
 
 #### Scenario: D-pad up steers the snake up
 - **WHEN** the player presses the D-pad up button while playing

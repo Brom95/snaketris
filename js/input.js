@@ -10,10 +10,10 @@ let canvas = null;
 
 // ---------- Controller (gamepad) input ----------
 // Standard Gamepad API mapping (per design D4).
-const DPAD_UP = 11;      // D-pad up
-const DPAD_DOWN = 12;    // D-pad down
-const DPAD_LEFT = 13;    // D-pad left
-const DPAD_RIGHT = 14;   // D-pad right
+const DPAD_UP = 12;      // D-pad up (standard Gamepad API button index)
+const DPAD_DOWN = 13;    // D-pad down
+const DPAD_LEFT = 14;    // D-pad left
+const DPAD_RIGHT = 15;   // D-pad right
 const BUTTON_A = 0;      // A: confirm / accept
 const BUTTON_B = 1;      // B: back / cancel
 const STICK_DEADZONE = 0.3; // ignore small axis values (stick drift)
