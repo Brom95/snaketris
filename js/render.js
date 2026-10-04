@@ -75,6 +75,42 @@ function formatDate(iso) {
   return y + '-' + m + '-' + day;
 }
 
+// Minimal GitHub octocat icon: head + ears + body + tentacles.
+function drawOctocat(x, y) {
+  const s = CELL * 0.45; // ~11px radius — fits nicely at GITHUB_ICON_Y
+  ctx.fillStyle = COLORS.grid;
+
+  // Head
+  ctx.beginPath();
+  ctx.arc(x, y - s * 0.15, s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ears
+  ctx.beginPath();
+  ctx.arc(x - s * 0.65, y - s * 0.7, s * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + s * 0.65, y - s * 0.7, s * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body (smaller circle below head)
+  ctx.beginPath();
+  ctx.arc(x, y + s * 0.9, s * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tentacles (three small arcs at the bottom)
+  const tentY = y + s * 1.4;
+  ctx.beginPath();
+  ctx.arc(x - s * 0.3, tentY, s * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x, tentY + s * 0.15, s * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + s * 0.3, tentY, s * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 // Starting menu: title, the three items (highlighted one), and a hint line.
 function drawMenu() {
   overlayBackground();
@@ -111,11 +147,8 @@ function drawMenu() {
     drawText(label.text, left, label.y, { font: label.font, align: 'left', color: label.color });
   }
 
-  // GitHub icon below the menu block.
-  drawText('GitHub', canvas.width / 2, GITHUB_ICON_Y, {
-    font: '13px monospace',
-    color: COLORS.grid,
-  });
+  // GitHub octocat icon below the menu block.
+  drawOctocat(canvas.width / 2, GITHUB_ICON_Y);
 }
 
 // Records view: top-10 leaderboard with dates, or an empty-state message.

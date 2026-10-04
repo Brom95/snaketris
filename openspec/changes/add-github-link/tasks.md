@@ -8,7 +8,7 @@
 ## 2. Render — draw the GitHub icon below menu items
 
 - [x] 2.1 In `drawMenu()` (`js/render.js`), after drawing the hint text, render a small "GH" label or simple octocat glyph at `GITHUB_ICON_Y`, using a muted color from `COLORS` (e.g. `grid` or a lighter text variant); verify it appears below the navigation hint and doesn't overlap any menu item
-- [ ] 2.2 Verify the icon renders correctly at all viewport sizes (it's drawn in logical canvas coords, scaled by the existing fitCanvas transform)
+- [ ] 2.2 Verify the icon renders correctly at all viewport sizes (it's drawn in logical canvas coords, scaled by the existing fitCanvas transform) — requires browser verification
 
 ## 3. Input — pointer hit-test for the GitHub icon
 
