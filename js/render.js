@@ -77,13 +77,12 @@ function formatDate(iso) {
 
 // Minimal GitHub octocat silhouette using canvas paths.
 // Head + ears + body drawn as filled shapes, tentacles below.
-// Facial features (eyes + smile) drawn in a slightly brighter tone for
-// recognisability against the dark overlay background.
+// Facial features (eyes + smile) for recognisability.
 function drawOctocat(x, y) {
-  const s = CELL * 0.48; // ~11.5px scale factor
+  const s = CELL * 0.85; // ~20px scale factor — clearly visible
 
   // Head shape — ears + main circle
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.beginPath();
   ctx.arc(x - s * 0.6, y - s * 0.85, s * 0.3, 0, Math.PI * 2); // left ear
   ctx.fill();
