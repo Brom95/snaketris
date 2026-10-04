@@ -20,6 +20,9 @@
 //   - A from game over returning to the menu
 //   - edge detection (a held button does not re-fire)
 //   - gamepad disconnect stops input and clears stale held state
+//   - first connected pad in any slot (a pad reporting in a non-zero slot
+//     drives the game; slot 0 wins when both are connected)
+//   - a held left stick does not swallow a D-pad edge
 //   - initInput registers gamepadconnected/gamepaddisconnected once each and
 //     keeps the existing keyboard/pointer listeners
 //
@@ -51,7 +54,8 @@ function sameDir(a, b) {
   return a && b && a.r === b.r && a.c === b.c;
 }
 
-// Build a stub gamepad. Buttons 0/1 = A/B, 11/12/13/14 = D-pad up/down/left/right.
+// Build a stub gamepad on the standard W3C layout: buttons 0/1 = A/B,
+// 12/13/14/15 = D-pad up/down/left/right, 17 buttons total.
 function makePad({
   a = false,
   b = false,
@@ -62,13 +66,13 @@ function makePad({
   ax = 0,
   ay = 0
 } = {}) {
-  const buttons = Array.from({ length: 15 }, () => ({ pressed: false, value: 0 }));
+  const buttons = Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
   if (a) buttons[0].pressed = true;
   if (b) buttons[1].pressed = true;
-  if (up) buttons[11].pressed = true;
-  if (down) buttons[12].pressed = true;
-  if (left) buttons[13].pressed = true;
-  if (right) buttons[14].pressed = true;
+  if (up) buttons[12].pressed = true;
+  if (down) buttons[13].pressed = true;
+  if (left) buttons[14].pressed = true;
+  if (right) buttons[15].pressed = true;
   return { buttons, axes: [ax, ay] };
 }
 
@@ -334,6 +338,59 @@ check(game.state === PLAYING, 'reconnect with A: fresh edge fires (prev cleared 
 startGame();
 pollFrames([null, null, null]);
 check(sameDir(game.nextDir, { r: 0, c: 1 }), 'no gamepad: steering is a no-op (nextDir unchanged)');
+
+// ---------- First connected pad in any slot (design D4) ----------
+
+console.log('=== First connected pad in any slot ===');
+
+// A pad that reports in a non-zero slot drives the game: slot 0 is empty.
+startPlaying({ r: 0, c: 1 }); // right (up not blocked)
+setGamepads([null, makePad({ up: true })]);
+pollController();
+check(sameDir(game.nextDir, { r: -1, c: 0 }), 'pad in slot 1 steers up while slot 0 is empty');
+resetControllerPrev();
+
+// The first non-null entry wins, so slot 0 takes precedence over a second
+// connected pad (selecting a specific pad is out of scope).
+startPlaying({ r: 1, c: 0 }); // down (right not blocked)
+setGamepads([makePad({ right: true }), makePad({ up: true })]);
+pollController();
+check(sameDir(game.nextDir, { r: 0, c: 1 }), 'slot 0 pad wins over slot 1 pad (first non-null entry)');
+resetControllerPrev();
+
+// Deeper slots resolve the same way.
+startPlaying({ r: 0, c: -1 }); // left (down not blocked)
+setGamepads([null, null, makePad({ down: true })]);
+pollController();
+check(sameDir(game.nextDir, { r: 1, c: 0 }), 'pad in slot 2 steers down while slots 0-1 are empty');
+resetControllerPrev();
+
+// ---------- Held left stick does not swallow a D-pad edge ----------
+
+console.log('=== Held left stick does not swallow a D-pad edge ===');
+
+resetControllerPrev();
+toMenu();
+game.menuSelect = 0;
+
+// Frame 1: only the stick is held down -> the stick's own edge moves the
+// selection and records prevStickDir.
+setGamepads([makePad({ ay: 0.8 })]);
+pollController();
+check(game.menuSelect === 1, 'frame1 stick-down edge: 0 -> 1');
+
+// Frame 2: the stick is STILL held down while the D-pad down button (index 13)
+// is freshly pressed. The stick must not mark that button as already pressed,
+// so its unpressed->pressed edge fires and the selection advances again.
+setGamepads([makePad({ down: true, ay: 0.8 })]);
+pollController();
+check(game.menuSelect === 2, 'frame2 D-pad down edge while stick held: 1 -> 2 (edge not swallowed)');
+
+// Frame 3: D-pad released, stick still held -> no new edge on either channel.
+setGamepads([makePad({ ay: 0.8 })]);
+pollController();
+check(game.menuSelect === 2, 'frame3 stick held, no new edge: selection stays 2');
+resetControllerPrev();
 
 // ---------- initInput registers gamepad listeners once each ----------
 

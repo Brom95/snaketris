@@ -1,0 +1,80 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Gamepad D-pad diagnostic</title>
+<style>
+  body { background:#111820; color:#e6edf3; font-family:system-ui,sans-serif; margin:0; padding:16px; }
+  h1 { font-size:18px; margin:0 0 12px; }
+  .grid { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; }
+  .chip { border:1px solid #33404f; border-radius:6px; padding:6px 8px; font-size:12px; min-width:96px; }
+  .chip.on { background:#2f8f4f; border-color:#54c97a; }
+  .axis { display:flex; align-items:center; gap:8px; margin:4px 0; font-size:12px; }
+  .bar { height:14px; border:1px solid #33404f; border-radius:4px; position:relative; }
+  .fill { position:absolute; top:0; bottom:0; background:#3f7fd9; border-radius:4px; }
+  .legend { font-size:12px; opacity:.75; white-space:pre; }
+  code { font-family:monospace; }
+</style>
+
+<h1>Gamepad D-pad diagnostic</h1>
+<p class="legend">Press each D-pad direction one at a time and read which chip turns green.
+If NO button chip turns green while you press the D-pad, watch the axis bars —
+your pad reports the D-pad as axes (a hat switch) instead of buttons.</p>
+
+<div id="pads" class="legend">Waiting for a gamepad… press any button to wake it.</div>
+<div id="buttons" class="grid"></div>
+<div id="axes"></div>
+
+<script>
+var padsEl = document.getElementById('pads'),
+    btnEl  = document.getElementById('buttons'),
+    axEl   = document.getElementById('axes');
+
+function frame() {
+  var pads;
+  try { pads = navigator.getGamepads(); } catch (e) { pads = []; }
+  var live = [];
+  for (var i = 0; i < pads.length; i++) if (pads[i]) live.push([i, pads[i]]);
+
+  if (!live.length) {
+    padsEl.textContent = 'No gamepad detected. Press any button once to wake it.';
+    btnEl.innerHTML = ''; axEl.innerHTML = '';
+    requestAnimationFrame(frame); return;
+  }
+
+  var out = [];
+  for (var k = 0; k < live.length; k++) {
+    var idx = live[k][0], gp = live[k][1];
+    out.push('slot ' + idx + '  ·  ' + (gp.vendor || 'unknown') +
+             '  ·  mapping=' + gp.mapping + '  ·  ' + gp.buttons.length + ' buttons, ' +
+             gp.axes.length + ' axes');
+  }
+  padsEl.textContent = out.join('\n');
+
+  var gp = live[0][1], buttons = gp.buttons, axes = gp.axes;
+
+  var names = {0:'A',1:'B',2:'X',3:'Y',4:'LB',5:'RB',6:'LT',7:'RT',
+               8:'Back',9:'Start',10:'L3',11:'R3',
+               12:'DPAD UP',13:'DPAD DOWN',14:'DPAD LEFT',15:'DPAD RIGHT',
+               16:'Hat up',17:'Hat down',18:'Hat left',19:'Hat right'};
+  var html = '';
+  for (var b = 0; b < buttons.length; b++) {
+    var on = buttons[b].pressed;
+    html += '<div class="chip' + (on ? ' on' : '') + '">' +
+            b + ' ' + (names[b] || '?') + (on ? '  <b>PRESSED</b>' : '') + '</div>';
+  }
+  btnEl.innerHTML = html;
+
+  var ax = '';
+  for (var a = 0; a < axes.length; a++) {
+    var v = axes[a];
+    var w = Math.abs(v) * 50;
+    var left = v >= 0 ? 50 : 50 - w;
+    ax += '<div class="axis">axis ' + a + ' = ' + v.toFixed(3) +
+          '<div class="bar" style="width:120px"><div class="fill" style="left:' +
+          left + '%;width:' + w + '%"></div></div></div>';
+  }
+  axEl.innerHTML = ax;
+
+  requestAnimationFrame(frame);
+}
+frame();
+</script>

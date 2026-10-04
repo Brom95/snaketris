@@ -232,7 +232,11 @@ function stickDir(gp) {
 
 export function pollController() {
   if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return;
-  const gp = navigator.getGamepads()[0];
+  const pads = navigator.getGamepads();
+  let gp = null;
+  for (let i = 0; i < pads.length; i++) {
+    if (pads[i]) { gp = pads[i]; break; }
+  }
   if (!gp) {
     // No gamepad: clear previous poll state so a reconnect cannot inherit
     // a stale held state (design D3).
@@ -243,27 +247,26 @@ export function pollController() {
   const buttons = gp.buttons;
   const stick = stickDir(gp);
 
-  // Current + previous per-input pressed state.
+  // Button-only pressed state. A thumbstick value must never be OR-ed into a
+  // button's current/previous state: a held stick would then mark the matching
+  // D-pad button as "already pressed", swallowing its edge.
   const aNow = !!buttons[BUTTON_A].pressed;
   const bNow = !!buttons[BUTTON_B].pressed;
-  const upNow = buttons[DPAD_UP].pressed || (stick && stick.r === -1);
-  const downNow = buttons[DPAD_DOWN].pressed || (stick && stick.r === 1);
-  const leftNow = buttons[DPAD_LEFT].pressed || (stick && stick.c === -1);
-  const rightNow = buttons[DPAD_RIGHT].pressed || (stick && stick.c === 1);
+  const upNow = !!buttons[DPAD_UP].pressed;
+  const downNow = !!buttons[DPAD_DOWN].pressed;
+  const leftNow = !!buttons[DPAD_LEFT].pressed;
+  const rightNow = !!buttons[DPAD_RIGHT].pressed;
 
   const prev = prevButtons || {};
-  const prevUp = prev[DPAD_UP] || (prevStickDir && prevStickDir.r === -1);
-  const prevDown = prev[DPAD_DOWN] || (prevStickDir && prevStickDir.r === 1);
-  const prevLeft = prev[DPAD_LEFT] || (prevStickDir && prevStickDir.c === -1);
-  const prevRight = prev[DPAD_RIGHT] || (prevStickDir && prevStickDir.c === 1);
-
-  // Edge detection: only the unpressed -> pressed transition fires an action.
   const aEdge = aNow && !prev[BUTTON_A];
   const bEdge = bNow && !prev[BUTTON_B];
-  const upEdge = upNow && !prevUp;
-  const downEdge = downNow && !prevDown;
-  const leftEdge = leftNow && !prevLeft;
-  const rightEdge = rightNow && !prevRight;
+  const upEdge = upNow && !prev[DPAD_UP];
+  const downEdge = downNow && !prev[DPAD_DOWN];
+
+  const stickUp = !!stick && stick.r === -1;
+  const stickDown = !!stick && stick.r === 1;
+  const stickUpEdge = stickUp && !(prevStickDir && prevStickDir.r === -1);
+  const stickDownEdge = stickDown && !(prevStickDir && prevStickDir.r === 1);
 
   if (game.state === PLAYING) {
     // Steering is the exception to edge-only: the D-pad/stick direction is
@@ -271,16 +274,16 @@ export function pollController() {
     // the stick when both are pressed. setDirection() is idempotent for the
     // same direction and enforces the no-reverse rule.
     let dir = null;
-    if (buttons[DPAD_UP].pressed) dir = { r: -1, c: 0 };
-    else if (buttons[DPAD_DOWN].pressed) dir = { r: 1, c: 0 };
-    else if (buttons[DPAD_LEFT].pressed) dir = { r: 0, c: -1 };
-    else if (buttons[DPAD_RIGHT].pressed) dir = { r: 0, c: 1 };
+    if (upNow) dir = { r: -1, c: 0 };
+    else if (downNow) dir = { r: 1, c: 0 };
+    else if (leftNow) dir = { r: 0, c: -1 };
+    else if (rightNow) dir = { r: 0, c: 1 };
     else dir = stick; // may be null
     if (dir) setDirection(dir);
   } else if (game.state === MENU) {
     // D-pad/stick up-down moves the selection (edge-only, wrapping).
-    if (upEdge) game.menuSelect = (game.menuSelect + 2) % 3;
-    else if (downEdge) game.menuSelect = (game.menuSelect + 1) % 3;
+    if (upEdge || stickUpEdge) game.menuSelect = (game.menuSelect + 2) % 3;
+    else if (downEdge || stickDownEdge) game.menuSelect = (game.menuSelect + 1) % 3;
     // A confirms the highlighted item (edge-only), matching keyboard/touch.
     else if (aEdge) {
       if (game.menuSelect === 0) startGame();
