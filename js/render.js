@@ -77,26 +77,24 @@ function formatDate(iso) {
 
 // Minimal GitHub octocat silhouette using canvas paths.
 // Head + ears + body drawn as filled shapes, tentacles below.
-// Uses a subtle white (0.25 opacity) so it's visible but doesn't compete
-// with the menu items — styled like a muted icon, not a selectable item.
+// Facial features (eyes + smile) drawn in a slightly brighter tone for
+// recognisability against the dark overlay background.
 function drawOctocat(x, y) {
   const s = CELL * 0.48; // ~11.5px scale factor
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
 
-  // Left ear
+  // Head shape — ears + main circle
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.beginPath();
-  ctx.arc(x - s * 0.6, y - s * 0.85, s * 0.3, 0, Math.PI * 2);
+  ctx.arc(x - s * 0.6, y - s * 0.85, s * 0.3, 0, Math.PI * 2); // left ear
   ctx.fill();
-  // Right ear
   ctx.beginPath();
-  ctx.arc(x + s * 0.6, y - s * 0.85, s * 0.3, 0, Math.PI * 2);
+  ctx.arc(x + s * 0.6, y - s * 0.85, s * 0.3, 0, Math.PI * 2); // right ear
   ctx.fill();
-  // Head circle
   ctx.beginPath();
-  ctx.arc(x, y - s * 0.15, s * 0.78, 0, Math.PI * 2);
+  ctx.arc(x, y - s * 0.15, s * 0.78, 0, Math.PI * 2); // head
   ctx.fill();
 
-  // Body (smaller ellipse below)
+  // Body (ellipse below head)
   ctx.beginPath();
   ctx.ellipse(x, y + s * 0.9, s * 0.42, s * 0.32, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -112,6 +110,22 @@ function drawOctocat(x, y) {
   ctx.beginPath();
   ctx.arc(x + s * 0.28, tY, s * 0.13, 0, Math.PI * 2);
   ctx.fill();
+
+  // Eyes (two small dark circles)
+  ctx.fillStyle = 'rgba(11,14,20,0.7)';
+  ctx.beginPath();
+  ctx.arc(x - s * 0.25, y - s * 0.2, s * 0.09, 0, Math.PI * 2); // left eye
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + s * 0.25, y - s * 0.2, s * 0.09, 0, Math.PI * 2); // right eye
+  ctx.fill();
+
+  // Smile (small arc)
+  ctx.strokeStyle = 'rgba(11,14,20,0.7)';
+  ctx.lineWidth = s * 0.06;
+  ctx.beginPath();
+  ctx.arc(x, y - s * 0.05, s * 0.18, Math.PI * 0.15, Math.PI * 0.85);
+  ctx.stroke();
 }
 
 // Starting menu: title, the three items (highlighted one), and a hint line.
