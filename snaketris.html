@@ -9,11 +9,18 @@
       margin: 0;
       min-height: 100vh;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: center;
+      /* FIELD_V_GAP (2 * CELL in js/constants.js), expressed as the CSS gap
+         around the field. */
+      gap: 48px;
       background: #0b0e14;
+      color: #e8ecf4;
       font-family: monospace;
     }
+    /* The touch-suppression rules belong to the board only: the canvas is the
+       play field and nothing else. */
     canvas {
       display: block;
       touch-action: none;
@@ -21,10 +28,93 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
     }
+    /* UI_COLUMN_MIN (js/constants.js) is the interface column's own width —
+       it never follows the field's scale. */
+    #ui {
+      width: min(320px, 92vw);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .view { display: none; }
+    .view.on { display: block; }
+    #score { font-size: 16px; }
+    #status { font-size: 16px; }
+    #menu-title { font-size: 24px; margin: 0; }
+    #menu-items { list-style: none; margin: 0; padding: 0; }
+    #menu-items li { font-size: 16px; }
+    #menu-items li.on { font-weight: bold; color: #a7f3a0; }
+    #menu-items li.on::before { content: '\25b6 '; }
+    #github-link { color: inherit; text-decoration: none; }
+    #github-link svg { width: 24px; height: 24px; fill: currentColor; }
+    #records-title, #help-title { font-size: 24px; margin: 0; }
+    #records-list { margin: 0; padding: 0; list-style: decimal inside; }
+    #records-list li { font-size: 14px; }
+    #records-empty, .return { font-size: 14px; }
+    #help-controls, #help-rules { margin: 0; }
+    #help-controls h3, #help-rules h3 { font-size: 16px; margin: 0; }
+    #help-controls ul, #help-rules ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      font-size: 14px;
+    }
+    /* UI_STACK_MAX_WIDTH (js/constants.js): on narrow viewports the field
+       already fills the width, so the interface stacks above it. */
+    @media (max-width: 760px) {
+      body {
+        flex-direction: column-reverse;
+        flex-wrap: nowrap;
+      }
+    }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
+  <div id="ui">
+    <p id="score">Score: 0</p>
+    <p id="status" class="view">Game Over — press R or click for menu</p>
+    <div id="menu-view" class="view">
+      <h1 id="menu-title">snaketris</h1>
+      <ul id="menu-items">
+        <li id="menu-item-play" tabindex="-1">Play</li>
+        <li id="menu-item-records" tabindex="-1">Records</li>
+        <li id="menu-item-help" tabindex="-1">How to Play</li>
+      </ul>
+      <a id="github-link" href="https://github.com/Brom95/snaketris" target="_blank" rel="noopener">
+        <svg id="github-icon" viewBox="0 0 24 24" aria-label="GitHub repository" role="img">
+          <path d="M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966 -1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943"/>
+        </svg>
+      </a>
+    </div>
+    <div id="records-view" class="view">
+      <h2 id="records-title">Records</h2>
+      <ol id="records-list"></ol>
+      <p id="records-empty" class="view">No scores yet — play a game!</p>
+      <p id="records-return" class="return">Menu</p>
+    </div>
+    <div id="help-view" class="view">
+      <h2 id="help-title">How to Play</h2>
+      <section id="help-controls">
+        <h3>Controls</h3>
+        <ul>
+          <li>Arrows / WASD — steer</li>
+          <li>Swipe or tap — steer</li>
+          <li>R or click — start</li>
+        </ul>
+      </section>
+      <section id="help-rules">
+        <h3>Rules</h3>
+        <ul>
+          <li>Eat falling pieces: +1 each</li>
+          <li>Avoid blocks and your body.</li>
+          <li>Edges wrap around the board</li>
+        </ul>
+      </section>
+      <p id="help-return" class="return">Menu</p>
+    </div>
+  </div>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

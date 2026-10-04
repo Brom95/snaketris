@@ -8,6 +8,7 @@ import { spawnPiece, stepPiece } from './pieces.js';
 import { moveSnake, snakeTicksPerCell, consumePieceAtHead } from './snake.js';
 import { initInput, fitCanvas, pollController } from './input.js';
 import { initRender, render } from './render.js';
+import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
 let acc = 0;
 let last = performance.now();
@@ -58,6 +59,7 @@ export function frame(now) {
   }
   pollController();
   render();
+  syncViews(game.state === 'RECORDS' ? loadBoard() : null);
 }
 
 // Full setup: create/size the canvas, register input + render, seed state,
@@ -68,9 +70,11 @@ export function init() {
   canvas.height = ROWS * CELL;
   initRender(canvas);
   initInput(canvas);
+  initUi();
   resetGame();
-  fitCanvas();
-  window.addEventListener('resize', fitCanvas);
+  syncViews(null);
+  fitCanvas(interfaceBandHeight());
+  window.addEventListener('resize', () => fitCanvas(interfaceBandHeight()));
   requestAnimationFrame(frame);
 }
 

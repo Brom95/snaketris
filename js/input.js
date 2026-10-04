@@ -1,12 +1,11 @@
 // Keyboard + pointer input, shared direction path, and canvas fitting.
 import {
   BOARD_W, BOARD_H, FIELD_V_GAP, PLAYING, MENU, RECORDS, HELP, GAME_OVER,
-  MENU_ITEMS, MENU_ITEM_Y, MENU_ITEM_HIT_H,
-  GITHUB_ICON_Y, GITHUB_ICON_HIT_H, GITHUB_URL,
 } from './constants.js';
 import { game, toMenu, startGame } from './state.js';
 
 let canvas = null;
+let menuItemsEls = [];
 
 // ---------- Controller (gamepad) input ----------
 // Standard Gamepad API mapping (per design D4).
@@ -116,17 +115,28 @@ export function initInput(canvasEl) {
   };
   window.addEventListener('gamepadconnected', clearControllerPrev);
   window.addEventListener('gamepaddisconnected', clearControllerPrev);
+  // Interface elements live outside the canvas, so their pointer events never
+  // reach the canvas listeners; one document-level listener covers them and
+  // bails out for anything happening on the board (see onInterfacePointerUp).
+  menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
+  document.addEventListener('pointerup', onInterfacePointerUp);
 }
 
-export function fitCanvas() {
+export function fitCanvas(reserved = 0) {
   // Contain fit: scale so the whole board fits the viewport, preserving
   // aspect ratio. No upper cap — the field may enlarge on large screens so
   // it fills the smaller viewport side (e.g. full height on a desktop).
   // Reserve FIELD_V_GAP above and below: the field is inset from the top and
   // bottom viewport edges by at least one board cell of breathing room.
+  // `reserved` is the extra band the stacked interface takes from the same
+  // axis (0 while it shares a track beside the field); the rule is unchanged.
+  const availableH = Math.max(
+    window.innerHeight - 2 * FIELD_V_GAP - reserved,
+    FIELD_V_GAP
+  );
   const scale = Math.min(
     window.innerWidth / BOARD_W,
-    (window.innerHeight - 2 * FIELD_V_GAP) / BOARD_H
+    availableH / BOARD_H
   );
   canvas.style.width = (BOARD_W * scale) + 'px';
   canvas.style.height = (BOARD_H * scale) + 'px';
@@ -154,23 +164,9 @@ export function onPointerUp(e) {
   pointerStart = null;
 
   // Non-game states: act on the tap position, no steering classification.
-  if (game.state === MENU) {
-    // Select the item whose hit range contains the tap's logical y.
-    for (let i = 0; i < MENU_ITEMS.length; i++) {
-      if (Math.abs(end.y - MENU_ITEM_Y[i]) <= MENU_ITEM_HIT_H / 2) {
-        game.menuSelect = i;
-        if (i === 0) startGame();
-        else if (i === 1) game.state = RECORDS;
-        else game.state = HELP;
-        return;
-      }
-    }
-    // GitHub icon: only if no menu item matched.
-    if (Math.abs(end.y - GITHUB_ICON_Y) <= GITHUB_ICON_HIT_H / 2) {
-      window.open(GITHUB_URL, '_blank');
-    }
-    return;
-  }
+  // MENU lives entirely on the page (see onInterfacePointerUp), so a gesture
+  // that ends on the board does nothing here.
+  if (game.state === MENU) return;
   // RECORDS / HELP / GAME_OVER: return to the menu.
   if (game.state === RECORDS || game.state === HELP || game.state === GAME_OVER) {
     toMenu();
@@ -192,6 +188,37 @@ export function onPointerCancel(e) {
   if (e.pointerId !== activePointerId) return;
   activePointerId = null;
   pointerStart = null;
+}
+
+// ---------- Interface (page) pointer input ----------
+// The interface lives outside the canvas, so its hit areas are the boxes the
+// browser laid out rather than coordinates this module owns.
+function hit(el, x, y) {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+export function onInterfacePointerUp(e) {
+  if (canvas && e.target === canvas) return; // board gestures belong to onPointerUp
+  const x = e.clientX;
+  const y = e.clientY;
+  if (game.state === MENU) {
+    for (let i = 0; i < menuItemsEls.length; i++) {
+      if (!hit(menuItemsEls[i], x, y)) continue;
+      game.menuSelect = i;
+      if (i === 0) startGame();
+      else if (i === 1) game.state = RECORDS;
+      else game.state = HELP;
+      return;
+    }
+    // The GitHub link is a real anchor: the browser navigates it itself, so a
+    // click outside the items selects nothing.
+    return;
+  }
+  if (game.state === RECORDS || game.state === HELP || game.state === GAME_OVER) {
+    toMenu();
+  }
 }
 
 // Tap region mapping: dominant offset from the center decides left/right vs

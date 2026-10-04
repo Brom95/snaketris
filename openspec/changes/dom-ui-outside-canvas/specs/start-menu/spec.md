@@ -1,9 +1,6 @@
-# start-menu Specification
+# Spec Delta
 
-## Purpose
-The starting menu shown on launch and after game over, offering "Play", "Records", and "How to Play" items selectable by keyboard or pointer, and the flow that launches the game, opens the records view, opens the help view, and returns to the menu.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Starting menu on launch and after game over
 The system SHALL display the starting menu when the page first loads and again whenever a game ends, replacing the previous idle and game-over views. The menu shows the title, the three selectable items, and the GitHub icon, and no longer shows a navigation hint line (the icon takes the space where it used to be). The menu SHALL be composed of page elements rather than text painted onto the play field.
@@ -31,13 +28,6 @@ The system SHALL render the starting menu's labels — the "snaketris" title and
 - **WHEN** the starting menu is shown at any viewport size and any item is highlighted
 - **THEN** the leftmost label edge and the widest label's right edge are symmetric about the center of the menu's own area, so the block stays centered and no menu label is clipped
 
-### Requirement: Three menu items
-The system SHALL present exactly three selectable items in the starting menu — "Play", "Records", and "How to Play" — with exactly one item highlighted as the current selection.
-
-#### Scenario: All items listed
-- **WHEN** the starting menu is shown
-- **THEN** the items "Play", "Records", and "How to Play" are listed and exactly one is highlighted
-
 ### Requirement: Keyboard navigation and confirmation
 The system SHALL let the player move the selection with the arrow keys (and W/S) and confirm the highlighted item with Enter or Space, whether or not the menu items are focusable page elements. A single confirmation SHALL perform exactly one menu action.
 
@@ -63,27 +53,6 @@ The system SHALL let the player select a menu item by clicking or tapping it, wh
 #### Scenario: Tapping the interface does not steer the snake
 - **WHEN** the player taps a menu item while the menu is shown
 - **THEN** the tap selects the item and is not interpreted as a steering gesture
-
-### Requirement: Play starts a new game
-The system SHALL start a new game when "Play" is selected from the menu.
-
-#### Scenario: Play launches gameplay
-- **WHEN** "Play" is selected
-- **THEN** a new game starts and the game board is shown
-
-### Requirement: Records opens the records view
-The system SHALL open the records view when "Records" is selected from the menu.
-
-#### Scenario: Records opens leaderboard
-- **WHEN** "Records" is selected
-- **THEN** the records view is shown (see the `highscores` capability)
-
-### Requirement: How to Play opens the help view
-The system SHALL open the help view when "How to Play" is selected from the menu.
-
-#### Scenario: How to Play opens help screen
-- **WHEN** "How to Play" is selected
-- **THEN** the help view is shown
 
 ### Requirement: Help view shows controls and rules
 The system SHALL display the game's controls and rules in the help view, and SHALL offer a control to return to the starting menu. All help-view text lines SHALL fit within the viewport width at every supported viewport size (not clipped).
@@ -117,6 +86,8 @@ The system SHALL navigate to the GitHub repository page `https://github.com/Brom
 #### Scenario: Click opens repo
 - **WHEN** the player clicks or taps the GitHub link/icon on the menu
 - **THEN** the browser navigates to `https://github.com/Brom95/snaketris` in a new tab
+
+## ADDED Requirements
 
 ### Requirement: Menu, records and help views are page elements
 The system SHALL render the starting menu, the records view and the help view as page elements, so their text is selectable, browser-scalable, and readable by assistive technology, and so their hit areas follow their rendered boxes rather than a separately maintained layout.

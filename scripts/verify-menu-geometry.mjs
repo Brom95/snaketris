@@ -1,41 +1,45 @@
-// Headless geometry check for the left-aligned start menu
-// (change: left-align-menu-labels; amended by add-github-link, which removed
-// the navigation hint line to make room for the GitHub icon).
+// Headless check for the start menu as PAGE elements
+// (change: left-align-menu-labels, re-hosted by dom-ui-outside-canvas).
 //
-// Mirrors drawMenu() in js/render.js: same labels, same fonts, same shared-left-edge
-// anchor, and the same measureText() semantics.
+// The menu used to be painted inside the canvas, so this script modelled
+// drawMenu()'s measureText() geometry. The menu is now page markup, so there is
+// no canvas text measurement left to model: the assertions are DOM assertions
+// (a title, three selectable items, the highlight following game.menuSelect)
+// plus the keyboard cycle, which must keep performing exactly one menu action
+// per press.
 //
-// No canvas is available in Node, so text width is modeled as a flat
-// 0.6em advance per glyph — the advance width of standard monospace
-// fonts (Consolas, DejaVu Sans Mono, Courier, ...), which is the model
-// used in the change's design. Run: node scripts/verify-menu-geometry.mjs
+// Run: node scripts/verify-menu-geometry.mjs
 
-import { MENU_ITEMS, MENU_ITEM_Y, BOARD_W, BOARD_H } from '../js/constants.js';
+import { MENU_ITEMS, MENU, RECORDS, HELP, PLAYING } from '../js/constants.js';
+import { game, toMenu, startGame } from '../js/state.js';
+import { initInput, onKey } from '../js/input.js';
+import { initUi, syncViews } from '../js/ui.js';
+import { readFileSync } from 'node:fs';
 
-const ADVANCE_EM = 0.6; // monospace advance width, em
+const page = readFileSync(new URL('../snaketris.html', import.meta.url), 'utf8');
 
-function widthOf(text, fontSize) {
-  return text.length * ADVANCE_EM * fontSize;
+// ---------- Static page assertions ----------
+
+const titleOk = /<h1 id="menu-title">[^<]*snaketris/i.test(page);
+const listOk = /<ul id="menu-items">/.test(page);
+
+// The three items, in document order, with their labels and tabindex attribute.
+const itemTagRe = /<li id="(menu-item-[a-z]+)"([^>]*)>([^<]*)<\/li>/g;
+const items = [];
+let m;
+while ((m = itemTagRe.exec(page)) !== null) {
+  items.push({ id: m[1], attrs: m[2], label: m[3] });
 }
+const labelsMatch =
+  items.length === MENU_ITEMS.length &&
+  items.every((it, i) => it.label === MENU_ITEMS[i]);
+const tabindexOk = items.every((it) => /tabindex="-1"/.test(it.attrs));
+// tabindex="-1" keeps the items focusable-by-script but never tabbable, and no
+// <button> exists, so the browser never activates them on its own.
+const noButtons = !/<button/.test(page);
+const highlightCss = /#menu-items li\.on\b/.test(page) || /li\.on\s*\{/.test(page);
 
-function fontSizeOf(font) {
-  return Number(font.match(/(\d+(?:\.\d+)?)(?=px)/)[1]);
-}
-
-// The same labels drawMenu() builds for a given menuSelect, in draw order.
-// The menu has no hint line: the space below the items holds the GitHub icon.
-function labelsFor(menuSelect) {
-  const labels = [{ text: 'snaketris', y: 120, font: 'bold 30px monospace' }];
-  for (let i = 0; i < MENU_ITEMS.length; i++) {
-    const highlighted = i === menuSelect;
-    labels.push({
-      text: highlighted ? '▶ ' + MENU_ITEMS[i] : MENU_ITEMS[i],
-      y: MENU_ITEM_Y[i],
-      font: highlighted ? 'bold 24px monospace' : '20px monospace',
-    });
-  }
-  return labels;
-}
+// ---------- Behavioural plumbing ----------
 
 let failures = 0;
 function check(cond, msg) {
@@ -45,44 +49,136 @@ function check(cond, msg) {
     failures++;
   }
 }
-function near(a, b) {
-  return Math.abs(a - b) < 1e-9;
+
+// Rich enough DOM for ui.js: classList.toggle drives the view/highlight
+// visibility, getBoundingClientRect feeds the interface hit test.
+// Class state lives in one map keyed by id so every handle for an id agrees.
+const classState = new Map();
+const childState = new Map();
+const rects = new Map();
+function el(id) {
+  if (!classState.has(id)) classState.set(id, new Set());
+  if (!childState.has(id)) childState.set(id, []);
+  const classes = classState.get(id);
+  const children = childState.get(id);
+  return {
+    id,
+    textContent: '',
+    classList: {
+      toggle: (name, on) => {
+        if (on === false) classes.delete(name);
+        else if (on === true) classes.add(name);
+        else if (classes.has(name)) classes.delete(name);
+        else classes.add(name);
+      },
+      contains: (name) => classes.has(name),
+    },
+    appendChild: (child) => {
+      children.push(child);
+    },
+    getBoundingClientRect: () => rects.get(id) || { left: 0, top: 0, right: 0, bottom: 0 },
+  };
 }
 
-console.log('Board: ' + BOARD_W + 'x' + BOARD_H + ' (buffer, CSS-scaled), center x = ' + BOARD_W / 2);
+const menuItems = [el('menu-item-play'), el('menu-item-records'), el('menu-item-help')];
+globalThis.document = {
+  getElementById: (id) => el(id),
+  querySelectorAll: (selector) => (selector === '#menu-items > li' ? menuItems : []),
+  createElement: (tag) => el('li'),
+  addEventListener: () => {},
+};
+globalThis.window = { innerWidth: 1280, innerHeight: 800, addEventListener: () => {} };
 
-// The highlighted item is painted in a larger bold font, so the widest label
-// (and therefore the shared left edge) depends on which item is selected.
-// Every selection must keep the block centered and unclipped.
+initInput({
+  style: {},
+  getBoundingClientRect: () => ({ left: 0, top: 0, width: 240, height: 480 }),
+  setPointerCapture: () => {},
+  addEventListener: () => {},
+  removeEventListener: () => {},
+});
+initUi();
+
+function press(key) {
+  onKey({ key, preventDefault: () => {} });
+}
+
+// ---------- Static checks ----------
+
+console.log('=== Menu is page markup ===');
+check(titleOk, 'snaketris.html has <h1 id="menu-title">snaketris</h1>');
+check(listOk, 'the items live in <ul id="menu-items">');
+check(labelsMatch, 'the three item labels match MENU_ITEMS in order: ' + items.map((it) => it.label).join(', '));
+check(tabindexOk, 'every item carries tabindex="-1" so the browser never activates it natively');
+check(noButtons, 'no <button> element exists: keyboard navigation stays in onKey');
+check(highlightCss, 'the highlight style keys on the .on class (li.on)');
+
+// ---------- Highlight follows game.menuSelect ----------
+
+console.log('=== Highlight follows game.menuSelect ===');
+
+toMenu();
+syncViews(null);
 for (let sel = 0; sel < MENU_ITEMS.length; sel++) {
-  const labels = labelsFor(sel);
-  for (const l of labels) l.w = widthOf(l.text, fontSizeOf(l.font));
-
-  const widest = Math.max(...labels.map((l) => l.w));
-  const left = BOARD_W / 2 - widest / 2;
-  const widestLabel = labels.find((l) => l.w === widest);
-
-  console.log('menuSelect=' + sel + ' (' + MENU_ITEMS[sel] + '): widest "' + widestLabel.text +
-    '" ' + widest + ' px, left=' + left + ', right=' + (left + widest));
-  for (const l of labels) {
-    console.log('  ' + l.text + '  [' + fontSizeOf(l.font) + 'px]  w=' + l.w +
-      '  left=' + left + '  right=' + (left + l.w));
-  }
-
-  check(labels.length === 1 + MENU_ITEMS.length, 'menu paints title + ' + MENU_ITEMS.length +
-    ' items only (no hint line): ' + labels.length + ' labels');
-  check(near(left + widest / 2, BOARD_W / 2), 'widest label centered on the board: [' + left + ', ' + (left + widest) + ']');
-  check(labels.every((l) => left >= 0 && left + l.w <= BOARD_W), 'every label within [0, ' + BOARD_W + ']: left=' + left + ', rightmost=' + (left + widest));
-  check(near(BOARD_W - (left + widest), left), 'equal margins: ' + left + 'px / ' + (BOARD_W - (left + widest)) + 'px');
-  check(labels.every((l) => l.y >= 0 && l.y <= BOARD_H), 'every label baseline inside the board height');
+  game.menuSelect = sel;
+  syncViews(null);
+  const on = menuItems.filter((it) => it.classList.contains('on')).map((it) => it.id);
+  check(on.length === 1 && on[0] === items[sel].id,
+    'menuSelect=' + sel + ' highlights only ' + items[sel].id);
 }
 
-// The highlighted item is the widest label only when it is the longest item;
-// otherwise the title wins, which is what pins the shared left edge.
-const widestSel0 = widthOf('snaketris', 30);
-check(near(widestSel0, 162), 'title width is 162px (9 glyphs at 30px)');
-check(near(widthOf('▶ How to Play', 24), 187.2), 'the widest highlighted item is 187.2px ("▶ How to Play" at 24px)');
-check(widthOf('▶ How to Play', 24) > widestSel0, 'a highlighted long item outwidens the title, so left shifts per selection');
+// ---------- Keyboard cycle ----------
 
-console.log(failures === 0 ? 'All menu geometry assertions passed.' : 'Menu geometry check FAILED.');
-process.exit(failures ? 1 : 0);
+console.log('=== Keyboard cycle performs one action per press ===');
+
+toMenu();
+game.menuSelect = 0;
+press('arrowdown');
+check(game.menuSelect === 1 && game.state === MENU, 'ArrowDown: 0 -> 1');
+press('arrowdown');
+check(game.menuSelect === 2 && game.state === MENU, 'ArrowDown: 1 -> 2');
+press('arrowdown');
+check(game.menuSelect === 0 && game.state === MENU, 'ArrowDown: 2 -> 0 (wraps)');
+press('arrowup');
+check(game.menuSelect === 2 && game.state === MENU, 'ArrowUp: 0 -> 2 (wraps)');
+press('arrowup');
+check(game.menuSelect === 1 && game.state === MENU, 'ArrowUp: 2 -> 1');
+
+toMenu();
+game.menuSelect = 1;
+press('enter');
+check(game.state === RECORDS, 'Enter on "Records" opens RECORDS (one action)');
+press('enter');
+check(game.state === MENU, 'Enter in RECORDS returns to MENU');
+
+toMenu();
+game.menuSelect = 2;
+press(' ');
+check(game.state === HELP, 'Space on "How to Play" opens HELP');
+press('escape');
+check(game.state === MENU, 'Escape in HELP returns to MENU');
+
+toMenu();
+game.menuSelect = 0;
+press('enter');
+check(game.state === PLAYING, 'Enter on "Play" starts the game');
+
+toMenu();
+press('r');
+check(game.state === PLAYING, 'R starts the game from the menu');
+
+// A single press must not advance the selection twice.
+toMenu();
+game.menuSelect = 0;
+press('arrowdown');
+check(game.menuSelect === 1, 'one ArrowDown press advances exactly one step');
+
+// ---------- Summary ----------
+
+console.log('');
+if (failures === 0) {
+  console.log('All menu assertions passed.');
+  process.exit(0);
+} else {
+  console.log('Menu check FAILED: ' + failures + ' assertion(s) failed.');
+  process.exit(1);
+}

@@ -19,25 +19,8 @@ export const GAME_OVER = 'GAME_OVER';
 export const RECORDS = 'RECORDS';
 export const HELP = 'HELP';
 
-// Menu layout (logical canvas coordinates), shared by render.js (drawing)
-// and input.js (pointer hit-testing).
+// The menu labels, in the order they appear as page elements in snaketris.html.
 export const MENU_ITEMS = ['Play', 'Records', 'How to Play'];
-export const MENU_ITEM_Y = [200, 250, 300];
-export const MENU_ITEM_HIT_H = 44;
-
-// Records view layout (logical canvas coordinates).
-export const RECORDS_LINE_Y = 150;
-export const RECORDS_LINE_SPACING = 30;
-export const RECORDS_RETURN_Y = 455;
-
-// Help view layout (logical canvas coordinates).
-export const HELP_CONTROLS_Y = 130;
-export const HELP_RULES_Y = 230;
-export const HELP_RETURN_Y = 455;
-
-// GitHub icon layout (logical canvas coordinates), below menu items.
-export const GITHUB_ICON_Y = 370;
-export const GITHUB_ICON_HIT_H = 40;
 
 // URL for the GitHub repository.
 export const GITHUB_URL = 'https://github.com/Brom95/snaketris';
@@ -64,6 +47,12 @@ export const BOARD_H = ROWS * CELL;
 // cells ≈ one displayed cell at 1080 p (displayed cell ≈ 49 px) and more at
 // smaller viewports.
 export const FIELD_V_GAP = 2 * CELL;
+
+// Page layout (viewport px). The interface column is sized by its own rule and
+// never follows the field's scale; both values are mirrored verbatim in the
+// page CSS (snaketris.html): the `#ui` width and the stacking breakpoint.
+export const UI_STACK_MAX_WIDTH = 760; // at or below this viewport width the interface stacks above the field
+export const UI_COLUMN_MIN = 320; // mirrors `#ui { width: min(320px, 92vw) }`
 
 // Palette
 export const COLORS = {
