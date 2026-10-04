@@ -75,56 +75,33 @@ function formatDate(iso) {
   return y + '-' + m + '-' + day;
 }
 
-// Minimal GitHub octocat silhouette using canvas paths.
-// Head + ears + body drawn as filled shapes, tentacles below.
-// Facial features (eyes + smile) for recognisability.
+// GitHub logo (octocat) drawn from the official SVG path.
+// viewBox="0 0 24 24" — scaled and centred at (x, y).
 function drawOctocat(x, y) {
-  const s = CELL * 0.85; // ~20px scale factor — clearly visible
+  const size = CELL * 1.5; // ~36 px — clearly visible
 
-  // Head shape — ears + main circle
+  ctx.save();
+  ctx.translate(x - 12, y - 12); // centre the 24×24 viewBox
+  ctx.scale(size / 24, size / 24);
+
+  const path = new Path2D(
+    'M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 ' +
+    '0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 ' +
+    '2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 ' +
+    '2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 ' +
+    '1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 ' +
+    '1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 ' +
+    '7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 ' +
+    '4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 ' +
+    '0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966 ' +
+    '-1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 ' +
+    '1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 ' +
+    '1.437-.719.382-.381.674-.718.944-.943'
+  );
+
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.beginPath();
-  ctx.arc(x - s * 0.6, y - s * 0.85, s * 0.3, 0, Math.PI * 2); // left ear
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x + s * 0.6, y - s * 0.85, s * 0.3, 0, Math.PI * 2); // right ear
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x, y - s * 0.15, s * 0.78, 0, Math.PI * 2); // head
-  ctx.fill();
-
-  // Body (ellipse below head)
-  ctx.beginPath();
-  ctx.ellipse(x, y + s * 0.9, s * 0.42, s * 0.32, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Three tentacles (small circles at the bottom)
-  const tY = y + s * 1.3;
-  ctx.beginPath();
-  ctx.arc(x - s * 0.28, tY, s * 0.13, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x, tY + s * 0.12, s * 0.13, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x + s * 0.28, tY, s * 0.13, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eyes (two small dark circles)
-  ctx.fillStyle = 'rgba(11,14,20,0.7)';
-  ctx.beginPath();
-  ctx.arc(x - s * 0.25, y - s * 0.2, s * 0.09, 0, Math.PI * 2); // left eye
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x + s * 0.25, y - s * 0.2, s * 0.09, 0, Math.PI * 2); // right eye
-  ctx.fill();
-
-  // Smile (small arc)
-  ctx.strokeStyle = 'rgba(11,14,20,0.7)';
-  ctx.lineWidth = s * 0.06;
-  ctx.beginPath();
-  ctx.arc(x, y - s * 0.05, s * 0.18, Math.PI * 0.15, Math.PI * 0.85);
-  ctx.stroke();
+  ctx.fill(path);
+  ctx.restore();
 }
 
 // Starting menu: title and the three items (highlighted one).
