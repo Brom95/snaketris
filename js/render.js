@@ -75,39 +75,42 @@ function formatDate(iso) {
   return y + '-' + m + '-' + day;
 }
 
-// Minimal GitHub octocat icon: head + ears + body + tentacles.
+// Minimal GitHub octocat silhouette using canvas paths.
+// Head + ears + body drawn as filled shapes, tentacles below.
+// Uses a subtle white (0.25 opacity) so it's visible but doesn't compete
+// with the menu items — styled like a muted icon, not a selectable item.
 function drawOctocat(x, y) {
-  const s = CELL * 0.45; // ~11px radius — fits nicely at GITHUB_ICON_Y
-  ctx.fillStyle = COLORS.grid;
+  const s = CELL * 0.48; // ~11.5px scale factor
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
 
-  // Head
+  // Left ear
   ctx.beginPath();
-  ctx.arc(x, y - s * 0.15, s, 0, Math.PI * 2);
+  ctx.arc(x - s * 0.6, y - s * 0.85, s * 0.3, 0, Math.PI * 2);
   ctx.fill();
-
-  // Ears
+  // Right ear
   ctx.beginPath();
-  ctx.arc(x - s * 0.65, y - s * 0.7, s * 0.38, 0, Math.PI * 2);
+  ctx.arc(x + s * 0.6, y - s * 0.85, s * 0.3, 0, Math.PI * 2);
   ctx.fill();
+  // Head circle
   ctx.beginPath();
-  ctx.arc(x + s * 0.65, y - s * 0.7, s * 0.38, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Body (smaller circle below head)
-  ctx.beginPath();
-  ctx.arc(x, y + s * 0.9, s * 0.55, 0, Math.PI * 2);
+  ctx.arc(x, y - s * 0.15, s * 0.78, 0, Math.PI * 2);
   ctx.fill();
 
-  // Tentacles (three small arcs at the bottom)
-  const tentY = y + s * 1.4;
+  // Body (smaller ellipse below)
   ctx.beginPath();
-  ctx.arc(x - s * 0.3, tentY, s * 0.18, 0, Math.PI * 2);
+  ctx.ellipse(x, y + s * 0.9, s * 0.42, s * 0.32, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Three tentacles (small circles at the bottom)
+  const tY = y + s * 1.3;
+  ctx.beginPath();
+  ctx.arc(x - s * 0.28, tY, s * 0.13, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(x, tentY + s * 0.15, s * 0.18, 0, Math.PI * 2);
+  ctx.arc(x, tY + s * 0.12, s * 0.13, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(x + s * 0.3, tentY, s * 0.18, 0, Math.PI * 2);
+  ctx.arc(x + s * 0.28, tY, s * 0.13, 0, Math.PI * 2);
   ctx.fill();
 }
 
