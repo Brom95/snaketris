@@ -1,7 +1,8 @@
 // Keyboard + pointer input, shared direction path, and canvas fitting.
 import {
   BOARD_W, BOARD_H, FIELD_V_GAP, PLAYING, MENU, RECORDS, HELP, GAME_OVER,
-  MENU_ITEMS, MENU_ITEM_Y, MENU_ITEM_HIT_H
+  MENU_ITEMS, MENU_ITEM_Y, MENU_ITEM_HIT_H,
+  GITHUB_ICON_Y, GITHUB_ICON_HIT_H, GITHUB_URL,
 } from './constants.js';
 import { game, toMenu, startGame } from './state.js';
 
@@ -161,7 +162,12 @@ export function onPointerUp(e) {
         if (i === 0) startGame();
         else if (i === 1) game.state = RECORDS;
         else game.state = HELP;
+        return;
       }
+    }
+    // GitHub icon: only if no menu item matched.
+    if (Math.abs(end.y - GITHUB_ICON_Y) <= GITHUB_ICON_HIT_H / 2) {
+      window.open(GITHUB_URL, '_blank');
     }
     return;
   }

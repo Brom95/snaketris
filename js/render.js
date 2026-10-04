@@ -5,6 +5,7 @@ import {
   MENU_ITEMS, MENU_ITEM_Y,
   RECORDS_LINE_Y, RECORDS_LINE_SPACING, RECORDS_RETURN_Y,
   HELP_CONTROLS_Y, HELP_RULES_Y, HELP_RETURN_Y,
+  GITHUB_ICON_Y,
 } from './constants.js';
 import { game } from './state.js';
 import { getGrid } from './grid.js';
@@ -109,6 +110,12 @@ function drawMenu() {
   for (const label of labels) {
     drawText(label.text, left, label.y, { font: label.font, align: 'left', color: label.color });
   }
+
+  // GitHub icon below the menu block.
+  drawText('GitHub', canvas.width / 2, GITHUB_ICON_Y, {
+    font: '13px monospace',
+    color: COLORS.grid,
+  });
 }
 
 // Records view: top-10 leaderboard with dates, or an empty-state message.
