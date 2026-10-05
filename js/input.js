@@ -1,6 +1,7 @@
 // Keyboard + pointer input, shared direction path, and canvas fitting.
 import {
-  BOARD_W, BOARD_H, FIELD_V_GAP, PLAYING, MENU, RECORDS, HELP, GAME_OVER,
+  BOARD_W, BOARD_H, FIELD_V_GAP, FIELD_V_GAP_MOBILE, UI_STACK_MAX_WIDTH,
+  PLAYING, MENU, RECORDS, HELP, GAME_OVER,
 } from './constants.js';
 import { game, toMenu, startGame } from './state.js';
 
@@ -128,11 +129,11 @@ export function fitCanvas(reserved = 0) {
   // it fills the smaller viewport side (e.g. full height on a desktop).
   // Reserve FIELD_V_GAP above and below: the field is inset from the top and
   // bottom viewport edges by at least one board cell of breathing room.
-  // `reserved` is the extra band the stacked interface takes from the same
-  // axis (0 while it shares a track beside the field); the rule is unchanged.
+  // On narrow viewports the reservation is halved so the board starts higher.
+  const gap = window.innerWidth <= UI_STACK_MAX_WIDTH ? FIELD_V_GAP_MOBILE : FIELD_V_GAP;
   const availableH = Math.max(
-    window.innerHeight - 2 * FIELD_V_GAP - reserved,
-    FIELD_V_GAP
+    window.innerHeight - 2 * gap - reserved,
+    gap
   );
   const scale = Math.min(
     window.innerWidth / BOARD_W,

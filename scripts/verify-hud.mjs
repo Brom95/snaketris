@@ -17,7 +17,7 @@ function check(cond, label) {
 }
 
 // ---------- Page: the readout and the status message exist as elements ------
-check(/<p id="score">Score: 0<\/p>/.test(page), 'score readout is a page element starting at 0');
+check(/<p id="score"[^>]*>Score: 0<\/p>/.test(page), 'score readout is a page element starting at 0');
 check(/<p id="status" class="view">Game Over/.test(page), 'game-over message is a hidden page element');
 check(/#score \{ font-size: 16px; \}/.test(page), 'score readout has its own font size');
 check(/#status \{ font-size: 16px; \}/.test(page), 'status message has its own font size');
@@ -98,8 +98,8 @@ check(registry.score.style.position === '', 'the readout clears its inline style
 game.state = consts.PLAYING;
 ui.syncViews(null);
 check(registry['game'].classes.has('on'), 'the field is on screen in PLAYING');
-check(registry.score.style.position === 'fixed', 'the readout floats over the top edge where the interface stacks');
-check(registry.score.style.top === FIELD_BOX.top + 'px', 'the readout sits at the top edge of the field');
+check(registry.score.style.position === '', 'the readout stays in normal flow (no overlay) on stacked layouts');
+check(registry.score.style.top === '', 'the readout does not pin to the field top edge');
 
 game.state = consts.GAME_OVER;
 ui.syncViews(null);

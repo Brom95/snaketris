@@ -4,7 +4,7 @@
 // and state.js, so the module graph stays one-way (app -> ui).
 import {
   MENU, RECORDS, HELP, GAME_OVER, PLAYING,
-  FIELD_V_GAP, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
+  FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
 } from './constants.js';
 import { game } from './state.js';
 
@@ -68,23 +68,16 @@ function highlightMenu() {
   }
 }
 
-// Where the interface stacks above the field the readout floats over the top
-// edge of the field instead of sitting in the column, so it reserves no band of
-// its own; anywhere else (or while the field is hidden) it returns to the flow.
-function placeScore(overField) {
+// The readout sits in normal flow within the #ui band. On stacked layouts
+// (mobile) it is part of the interface band above the field rather than an
+// overlay over the top edge, so the full field height below that band is
+// unobstructed. Clearing any inline styles returns it to flow.
+function placeScore() {
   if (!scoreEl) return;
-  if (!overField || !fieldEl) {
-    scoreEl.style.position = '';
-    scoreEl.style.top = '';
-    scoreEl.style.left = '';
-    scoreEl.style.width = '';
-    return;
-  }
-  const box = fieldEl.getBoundingClientRect();
-  scoreEl.style.position = 'fixed';
-  scoreEl.style.top = box.top + 'px';
-  scoreEl.style.left = box.left + 'px';
-  scoreEl.style.width = box.width + 'px';
+  scoreEl.style.position = '';
+  scoreEl.style.top = '';
+  scoreEl.style.left = '';
+  scoreEl.style.width = '';
 }
 
 // The one view authority: `game.state` decides which interface elements are
@@ -95,7 +88,7 @@ export function syncViews(recordsBoard) {
   const fieldOn = state === PLAYING || state === GAME_OVER;
   show(fieldEl, fieldOn);
   show(scoreEl, fieldOn);
-  placeScore(fieldOn && stackedLayout());
+  placeScore();
   show(statusEl, state === GAME_OVER);
   show(menuViewEl, state === MENU);
   show(recordsViewEl, state === RECORDS);
@@ -114,8 +107,10 @@ function stackedLayout() {
 }
 
 // Height the stacked interface occupies, including the gap around the field.
-// Zero when the interface shares a track beside the field.
+// Zero when the interface shares a track beside the field. On narrow
+// viewports the gap is halved so the board starts higher on screen.
 export function interfaceBandHeight() {
   if (!stackedLayout() || !uiEl) return 0;
-  return uiEl.getBoundingClientRect().height + FIELD_V_GAP;
+  const gap = window.innerWidth <= UI_STACK_MAX_WIDTH ? FIELD_V_GAP_MOBILE : FIELD_V_GAP;
+  return uiEl.getBoundingClientRect().height + gap;
 }

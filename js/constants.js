@@ -47,6 +47,9 @@ export const BOARD_H = ROWS * CELL;
 // cells ≈ one displayed cell at 1080 p (displayed cell ≈ 49 px) and more at
 // smaller viewports.
 export const FIELD_V_GAP = 2 * CELL;
+// On narrow viewports (≤ UI_STACK_MAX_WIDTH) the top/bottom reservation is
+// halved so the board starts higher on screen.
+export const FIELD_V_GAP_MOBILE = CELL;
 
 // Page layout (viewport px). The interface column is sized by its own rule and
 // never follows the field's scale; both values are mirrored verbatim in the
