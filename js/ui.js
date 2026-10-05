@@ -94,6 +94,7 @@ export function syncViews(recordsBoard) {
   if (scoreEl) scoreEl.textContent = 'Score: ' + game.score;
   const fieldOn = state === PLAYING || state === GAME_OVER;
   show(fieldEl, fieldOn);
+  show(scoreEl, fieldOn);
   placeScore(fieldOn && stackedLayout());
   show(statusEl, state === GAME_OVER);
   show(menuViewEl, state === MENU);
