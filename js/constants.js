@@ -30,7 +30,7 @@ export const TICK = 1 / 60;        // fixed update step, seconds
 export const SPAWN_INTERVAL = 60;  // new piece every N ticks
 
 // Piece fall speed model (cells/tick)
-export const BASE_FALL = 0.08;     // base piece fall speed, cells per tick
+export const BASE_FALL = 0.04;     // base piece fall speed, cells per tick
 export const MAX_FALL = 0.9;       // hard cap so pieces never tunnel a cell
 // The snake moves SNAKE_SPEED_DELTA ticks/cell faster than the piece;
 // it is never slower than MIN_SNAKE_TICKS ticks/cell.

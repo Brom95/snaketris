@@ -1,12 +1,12 @@
 // Piece lifecycle + difficulty ramp.
-import { COLS, ROWS, SOLID, TETROMINOES, BASE_FALL, MAX_FALL } from './constants.js';
+import { COLS, ROWS, EMPTY, SOLID, TETROMINOES, BASE_FALL, MAX_FALL } from './constants.js';
 import { game } from './state.js';
 import { getCell, setCell } from './grid.js';
 
 // Difficulty ramp: fall speed (cells/tick) ticks up one step per two
 // landed blocks, from a base of 0.08, capped at MAX_FALL.
 export function currentFallSpeed() {
-  const tier = Math.floor(game.landedBlocks / 2);
+  const tier = Math.floor(game.landedBlocks / 5);
   return Math.min(MAX_FALL, BASE_FALL * Math.pow(1.08, tier));
 }
 
@@ -73,6 +73,21 @@ export function stepPiece(p) {
   p.row = nextRow;
 }
 
+// Clear full rows: scan every row; if all COLS cells are SOLID, set them to EMPTY,
+// award +10 score per cleared row, subtract 10 from landedBlocks (clamp to ≥0).
+export function clearFullRows() {
+  for (let r = 0; r < ROWS; r++) {
+    let full = true;
+    for (let c = 0; c < COLS; c++) {
+      if (getCell(r, c) !== SOLID) { full = false; break; }
+    }
+    if (!full) continue;
+    for (let c = 0; c < COLS; c++) setCell(r, c, EMPTY);
+    game.score += 10;
+    game.landedBlocks = Math.max(0, game.landedBlocks - 10);
+  }
+}
+
 // Snap the piece to the grid as SOLID blocks and remove it from the list.
 export function landPiece(p) {
   for (const [dr, dc] of p.shape) {
@@ -85,4 +100,5 @@ export function landPiece(p) {
   }
   const idx = game.pieces.indexOf(p);
   if (idx >= 0) game.pieces.splice(idx, 1);
+  clearFullRows();
 }
