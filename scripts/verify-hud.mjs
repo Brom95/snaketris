@@ -32,8 +32,10 @@ check(!/drawOverlay\(/.test(renderBody), 'the render path paints no game-over ov
 check(!/Game Over/.test(renderBody), 'the render path carries no game-over wording');
 
 // ---------- Behaviour: run syncViews over stub interface elements ----------
+// The stubs hand back a rich element so ui.js can drive the view toggle, the
+// readout's inline styles (placeScore) and the stacked-layout decision.
 function makeEl(id) {
-  const el = { id, textContent: '', classes: new Set(), children: [] };
+  const el = { id, textContent: '', classes: new Set(), children: [], style: {} };
   el.classList = {
     toggle: (name, on) => {
       if (on) el.classes.add(name);
@@ -42,12 +44,16 @@ function makeEl(id) {
     contains: (name) => el.classes.has(name),
   };
   el.appendChild = (child) => el.children.push(child);
+  // The play field is the only element placeScore measures; everything else
+  // reports a zero box so the readout's overlay position resolves to no-op.
+  el.getBoundingClientRect = () => FIELD_BOX;
   return el;
 }
 
+const FIELD_BOX = { left: 40, top: 100, width: 300, height: 600 };
 const registry = {};
 for (const id of ['ui', 'score', 'status', 'menu-view', 'records-view', 'help-view',
-                  'records-list', 'records-empty']) {
+                  'records-list', 'records-empty', 'game']) {
   registry[id] = makeEl(id);
 }
 const menuItems = [makeEl('menu-item-play'), makeEl('menu-item-records'), makeEl('menu-item-help')];
@@ -57,6 +63,8 @@ globalThis.document = {
   querySelectorAll: (selector) => menuItems,
   createElement: (tag) => makeEl(tag),
 };
+// The stacked-layout decision reads the viewport; a phone width forces stacking.
+globalThis.window = { innerWidth: 390, innerHeight: 844 };
 
 const consts = await import('../js/constants.js');
 const ui = await import('../js/ui.js');
@@ -78,8 +86,24 @@ game.score = 7;
 ui.syncViews(null);
 check(registry.score.textContent === 'Score: 7', 'the readout follows the score one-for-one');
 
+// ---------- Field visibility and the readout's overlay rule -----------------
+// The field is on screen only in PLAYING and GAME_OVER; while it is hidden the
+// readout returns to the interface flow (clears its inline styles), and where
+// the interface stacks above the field it floats over the top edge.
+game.state = consts.MENU;
+ui.syncViews(null);
+check(!registry['game'].classes.has('on'), 'the field is hidden while MENU is shown');
+check(registry.score.style.position === '', 'the readout clears its inline styles while the field is hidden');
+
+game.state = consts.PLAYING;
+ui.syncViews(null);
+check(registry['game'].classes.has('on'), 'the field is on screen in PLAYING');
+check(registry.score.style.position === 'fixed', 'the readout floats over the top edge where the interface stacks');
+check(registry.score.style.top === FIELD_BOX.top + 'px', 'the readout sits at the top edge of the field');
+
 game.state = consts.GAME_OVER;
 ui.syncViews(null);
+check(registry['game'].classes.has('on'), 'the final board stays visible in GAME_OVER');
 check(registry.status.classes.has('on'), 'the game-over message appears when a game ends');
 check(registry.score.textContent === 'Score: 7', 'the final score stays readable beside the field');
 check(!registry['menu-view'].classes.has('on'), 'the menu view is hidden in GAME_OVER');

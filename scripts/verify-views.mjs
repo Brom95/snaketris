@@ -80,6 +80,7 @@ function el(id) {
   const classes = classesOf(id);
   const node = {
     id,
+    style: {},
     classList: {
       toggle: (name, on) => {
         if (on === false) classes.delete(name);

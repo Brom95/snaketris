@@ -3,7 +3,7 @@
 // step with `game.state`, the single view authority. Imports only constants.js
 // and state.js, so the module graph stays one-way (app -> ui).
 import {
-  MENU, RECORDS, HELP, GAME_OVER,
+  MENU, RECORDS, HELP, GAME_OVER, PLAYING,
   FIELD_V_GAP, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
 } from './constants.js';
 import { game } from './state.js';
@@ -17,6 +17,7 @@ let helpViewEl = null;
 let recordsListEl = null;
 let recordsEmptyEl = null;
 let menuItemsEls = [];
+let fieldEl = null;
 
 // Called by app.js once the page is parsed; stores the interface elements.
 export function initUi() {
@@ -29,6 +30,7 @@ export function initUi() {
   recordsListEl = document.getElementById('records-list');
   recordsEmptyEl = document.getElementById('records-empty');
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
+  fieldEl = document.getElementById('game');
 }
 
 // Shows or hides one interface element. `.view` hides by default, `.view.on`
@@ -66,11 +68,33 @@ function highlightMenu() {
   }
 }
 
+// Where the interface stacks above the field the readout floats over the top
+// edge of the field instead of sitting in the column, so it reserves no band of
+// its own; anywhere else (or while the field is hidden) it returns to the flow.
+function placeScore(overField) {
+  if (!scoreEl) return;
+  if (!overField || !fieldEl) {
+    scoreEl.style.position = '';
+    scoreEl.style.top = '';
+    scoreEl.style.left = '';
+    scoreEl.style.width = '';
+    return;
+  }
+  const box = fieldEl.getBoundingClientRect();
+  scoreEl.style.position = 'fixed';
+  scoreEl.style.top = box.top + 'px';
+  scoreEl.style.left = box.left + 'px';
+  scoreEl.style.width = box.width + 'px';
+}
+
 // The one view authority: `game.state` decides which interface elements are
 // on screen. Called every frame from the render path.
 export function syncViews(recordsBoard) {
   const state = game.state;
   if (scoreEl) scoreEl.textContent = 'Score: ' + game.score;
+  const fieldOn = state === PLAYING || state === GAME_OVER;
+  show(fieldEl, fieldOn);
+  placeScore(fieldOn && stackedLayout());
   show(statusEl, state === GAME_OVER);
   show(menuViewEl, state === MENU);
   show(recordsViewEl, state === RECORDS);

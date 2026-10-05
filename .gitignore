@@ -1,2 +1,4 @@
 .qwen/
 .opencode/
+node_modules/
+.ripwire_*

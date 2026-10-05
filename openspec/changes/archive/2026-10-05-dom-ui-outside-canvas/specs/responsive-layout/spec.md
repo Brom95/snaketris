@@ -1,9 +1,10 @@
-# responsive-layout Specification
+# Spec Delta
 
 ## Purpose
+
 Keeps the play field and the page interface on separate scaling paths, so each stays legible and usable across viewports from a narrow phone to a wide desktop, and so the interface can use space the field cannot.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Field and interface scale independently
 The system SHALL size the play field and the page interface by separate rules, so changing the size of one does not change the size of the other.

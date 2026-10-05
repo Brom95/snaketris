@@ -1,4 +1,8 @@
 {
   "name": "snaketris",
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "puppeteer-core": "^25.12.0"
+  }
 }

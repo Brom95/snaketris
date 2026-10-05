@@ -57,6 +57,13 @@ check(hasId('help-controls'), 'the controls section is a page section');
 check(hasId('help-rules'), 'the rules section is a page section');
 check(body.includes('class="return"'), 'return controls are marked for the pointer handler');
 
+// ---------- Field hidden by default, shown in PLAYING ----------
+
+console.log('=== Field hidden by default ===');
+check(/<canvas[^>]*class="field"/.test(body), 'the canvas carries class="field" (hidden by default)');
+check(css.includes('.field { display: none; }'), '.field { display: none; } hides the field by default');
+check(css.includes('.field.on { display: block; }'), '.field.on { display: block; } shows the field in PLAYING');
+
 // ---------- Menu items: three labels, none natively activatable ----------
 
 console.log('=== Menu items are page elements, not controls ===');

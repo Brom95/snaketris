@@ -12,6 +12,18 @@ import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
 let acc = 0;
 let last = performance.now();
+let lastBand = -1;
+
+// The band the interface takes from the field changes with the shown view
+// (the hidden field and the overlaid readout claim none), so the field is
+// re-fitted on the frame rather than only on resize. The band rarely moves,
+// so the fit is skipped while it is unchanged.
+function fitField(force = false) {
+  const band = interfaceBandHeight();
+  if (!force && band === lastBand) return;
+  lastBand = band;
+  fitCanvas(band);
+}
 
 // Fixed-timestep update body. Runs at a constant TICK, decoupled from
 // render() via requestAnimationFrame. The tab-visibility pause is handled by
@@ -60,6 +72,7 @@ export function frame(now) {
   pollController();
   render();
   syncViews(game.state === 'RECORDS' ? loadBoard() : null);
+  fitField();
 }
 
 // Full setup: create/size the canvas, register input + render, seed state,
@@ -73,8 +86,8 @@ export function init() {
   initUi();
   resetGame();
   syncViews(null);
-  fitCanvas(interfaceBandHeight());
-  window.addEventListener('resize', () => fitCanvas(interfaceBandHeight()));
+  fitField(true);
+  window.addEventListener('resize', () => fitField(true));
   requestAnimationFrame(frame);
 }
 

@@ -1,9 +1,10 @@
-# hud Specification
+# Spec Delta
 
 ## Purpose
+
 Defines the text that accompanies live play — the running score readout and the game-over status message — as page elements outside the play field, so both stay legible and positioned without depending on the board's scale.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Score readout as a page element
 The system SHALL show the running score as a page element, and SHALL keep it visible for the whole duration of a game. While the interface shares a track beside the field the readout SHALL lie outside the play field; where the interface stacks above the field because the field already fills the available width, the readout SHALL instead overlay the top edge of the field, so the board can use the height the readout would otherwise take from it. The readout SHALL NOT overlay a field that is not on screen.

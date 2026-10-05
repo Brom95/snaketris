@@ -63,6 +63,7 @@ function el(id) {
   const children = childState.get(id);
   return {
     id,
+    style: {},
     textContent: '',
     classList: {
       toggle: (name, on) => {

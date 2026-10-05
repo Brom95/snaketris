@@ -39,6 +39,12 @@
     }
     .view { display: none; }
     .view.on { display: block; }
+    /* The field is on screen only while a game is in progress or has just
+       ended; js/ui.js toggles `.on` from the same game-state authority that
+       shows the views. `display: none` (not `visibility: hidden`) so a hidden
+       field takes no flex track and the view gets the whole viewport height. */
+    .field { display: none; }
+    .field.on { display: block; }
     #score { font-size: 16px; }
     #status { font-size: 16px; }
     #menu-title { font-size: 24px; margin: 0; }
@@ -71,7 +77,7 @@
   </style>
 </head>
 <body>
-  <canvas id="game"></canvas>
+  <canvas id="game" class="field"></canvas>
   <div id="ui">
     <p id="score">Score: 0</p>
     <p id="status" class="view">Game Over — press R or click for menu</p>
