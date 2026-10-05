@@ -1,7 +1,8 @@
 // Piece lifecycle + difficulty ramp.
-import { COLS, ROWS, EMPTY, SOLID, TETROMINOES, BASE_FALL, MAX_FALL } from './constants.js';
+import { COLS, ROWS, EMPTY, SOLID, TETROMINOES, BASE_FALL, MAX_FALL, SPAWN_INTERVAL, PLAYING } from './constants.js';
 import { game } from './state.js';
 import { getCell, setCell } from './grid.js';
+import { consumePieceAtHead } from './snake.js';
 
 // Difficulty ramp: fall speed (cells/tick) ticks up one step per two
 // landed blocks, from a base of 0.08, capped at MAX_FALL.
@@ -102,3 +103,19 @@ export function landPiece(p) {
   if (idx >= 0) game.pieces.splice(idx, 1);
   clearFullRows();
 }
+// Piece fall + eating + sequential-spawn gate as an engine system. The
+// accumulator (spawnAcc) and the interval live here; app.js no longer owns
+// the per-tick piece handling.
+export const piecesSystem = {
+  name: 'pieces',
+  update(ctx) {
+    if (game.state !== PLAYING) return;
+    for (const p of game.pieces.slice()) stepPiece(p);
+    if (game.state === 'PLAYING') consumePieceAtHead();
+    game.spawnAcc += 1;
+    if (game.spawnAcc >= SPAWN_INTERVAL && game.pieces.length === 0) {
+      game.spawnAcc = 0;
+      spawnPiece();
+    }
+  },
+};

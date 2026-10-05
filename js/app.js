@@ -1,16 +1,30 @@
 // app.js — entry point. Wires every module, owns the game loop and the
 // canvas. Called once on module load (deferred `<script type="module">`),
 // so the DOM is parsed by the time it runs.
-import { COLS, ROWS, CELL, TICK, SPAWN_INTERVAL } from './constants.js';
+import { COLS, ROWS, CELL, TICK } from './constants.js';
 import { game, resetGame } from './state.js';
 import { loadBoard } from './highscores.js';
-import { spawnPiece, stepPiece } from './pieces.js';
-import { moveSnake, snakeTicksPerCell, consumePieceAtHead } from './snake.js';
+import { createClock, createEngine } from './engine.js';
+import { snakeSystem } from './snake.js';
+import { piecesSystem } from './pieces.js';
 import { initInput, fitCanvas, pollController } from './input.js';
 import { initRender, render } from './render.js';
 import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
-let acc = 0;
+// The ordered systems: snake steps first (so the head sees the piece where
+// it was), then pieces fall and eat. app.js no longer owns per-tick game
+// logic — each system does its own state check and work in declared order.
+const engine = createEngine([snakeSystem, piecesSystem]);
+
+// The context handed to each system's update(ctx). The systems read the
+// shared `game` module directly; ctx is the hook for any future per-frame
+// data a system needs (kept minimal now).
+const ctx = { game };
+
+// Fixed-timestep clock: accumulates frame time and yields 0..N ticks to run.
+// Mirrors the accumulator pattern that lived in app.update().
+const clock = createClock(TICK);
+
 let last = performance.now();
 let lastBand = -1;
 
@@ -25,50 +39,20 @@ function fitField(force = false) {
   fitCanvas(band);
 }
 
-// Fixed-timestep update body. Runs at a constant TICK, decoupled from
-// render() via requestAnimationFrame. The tab-visibility pause is handled by
-// rAF stopping while hidden (dt is clamped on resume).
+// One fixed-timestep tick: advance the shared tick counter and run every
+// system in declared order. The systems each guard on game.state themselves.
 export function update() {
-  if (game.state !== 'PLAYING') return;
   game.tick++;
-
-  // Snake step first: interval derived from the current piece fall speed
-  // (snakeTicksPerCell = max(1, pieceTicksPerCell - 2)), possibly fractional.
-  // The snake is computed before the pieces so the head sees the piece where
-  // it was, and any cell it enters is eaten.
-  game.snakeAcc += 1;
-  if (game.snakeAcc >= snakeTicksPerCell()) {
-    game.snakeAcc -= snakeTicksPerCell();
-    moveSnake();
-  }
-
-  // Then the pieces fall. slice: pieces can be removed (landed) inside stepPiece.
-  for (const p of game.pieces.slice()) stepPiece(p);
-
-  // A block that fell onto the snake's head is eaten (only the head eats).
-  if (game.state === 'PLAYING') consumePieceAtHead();
-
-  // Sequential spawn: a new piece may spawn only when no piece is falling
-  // AND the spawn interval has elapsed. spawnAcc keeps counting while a
-  // piece is on the board, so the next spawn fires as soon as the previous
-  // one lands or is fully consumed.
-  game.spawnAcc += 1;
-  if (game.spawnAcc >= SPAWN_INTERVAL && game.pieces.length === 0) {
-    game.spawnAcc = 0;
-    spawnPiece();
-  }
+  engine.update(ctx);
 }
 
-// rAF callback: advance the fixed-timestep accumulator, then render.
+// rAF callback: advance the clock, run that many ticks, then render.
 export function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
-  acc += dt;
-  while (acc >= TICK) {
-    acc -= TICK;
-    update();
-  }
+  const n = clock.advance(dt);
+  for (let i = 0; i < n; i++) update();
   pollController();
   render();
   syncViews(game.state === 'RECORDS' ? loadBoard() : null);

@@ -73,3 +73,17 @@ export function consumePieceAtHead() {
   game.snake.push({ r: tail.r, c: tail.c });
   return 1;
 }
+// Snake step + self-collision + wrap as an engine system. The accumulator
+// (snakeAcc) and the derived interval live here; app.js no longer owns the
+// per-tick step.
+export const snakeSystem = {
+  name: 'snake',
+  update(ctx) {
+    if (game.state !== PLAYING) return;
+    game.snakeAcc += 1;
+    if (game.snakeAcc >= snakeTicksPerCell()) {
+      game.snakeAcc -= snakeTicksPerCell();
+      moveSnake();
+    }
+  },
+};
