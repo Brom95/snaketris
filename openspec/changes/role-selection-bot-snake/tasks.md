@@ -15,6 +15,9 @@
 - [x] 2.4 Add `SELECT_ROLE` handling to `pollController` (D-pad up/down, A confirms, B returns) and verify a test asserts A starts the game with the highlighted role and B returns to `MENU`
 - [x] 2.5 Make `syncViews` in `js/ui.js` show the role list only in `SELECT_ROLE` and highlight it from `game.roleSelect` and verify the main menu items are not highlighted while the sub-menu is open
 - [x] 2.6 Wire pointer selection of a role item in `onInterfacePointerUp` and verify clicking "Tetris" starts a Tetris-role game
+- [x] 2.7 Move the role list into its own `#role-view` in `snaketris.html` with a role title and a Back control, and verify the static-HTML test asserts the role view holds the title, the two items and the Back control
+- [x] 2.8 Show `#role-view` only in `SELECT_ROLE` and hide `#menu-view` there in `syncViews`, and verify `tests/ui.test.js` asserts the menu view and its items are off while the role screen is on
+- [x] 2.9 Route a click or tap on the Back control to `toMenu` in `onInterfacePointerUp` and verify a test asserts the state returns to `MENU` and no game started
 
 ## 3. Piece control
 
@@ -22,6 +25,7 @@
 - [x] 3.2 Implement `rotatePiece(p, cw)` with the CW/CCW offset rule, bounding-box normalisation, and rejection on out-of-bounds or SOLID overlap, and verify `tests/pieces.test.js` covers a legal rotation, a wall-blocked rotation, and a solid-blocked rotation for all seven shapes
 - [x] 3.3 Add the `game.pieceMoveAcc` tick and the `snakeTicksPerCell()` gate to the shift path and verify a test asserts two presses inside one interval produce exactly one cell of movement, and that the gate follows the ramp
 - [x] 3.4 Route shift and rotation intents through `handleIntent` only when `game.role === 'tetris'`, and verify a test asserts a steering intent in Tetris role does not change `game.nextDir`
+- [x] 3.5 Map a tap in the centre region of the board to a rotation in `js/devices.js` (`tapToShift` reports the centre, `pieceGesture` turns it into a rotate intent) and verify `tests/devices.test.js` asserts a centre tap rotates while a side tap still shifts
 
 ## 4. Bot — snake policy
 
@@ -67,3 +71,4 @@
 - [x] 9.1 Run the full `node:test` suite and `openspec validate role-selection-bot-snake --strict` and confirm both report no failures
 - [x] 9.2 Run ripwire `quality_delta` against git HEAD and confirm no new failure modes are reported
 - [x] 9.3 Play one game in each role in a browser and confirm: the role sub-menu opens from Play with the 🐍 and 🏗️ markers, the piece shifts and rotates with the cooldown, the bot moves and eats, both scores update, the records board shows the role marker on each entry, and the game-over screen names the winner
+- [x] 9.4 In the browser check, confirm the role screen hides the main menu items, the title and the GitHub link, and that clicking Back returns to the main menu

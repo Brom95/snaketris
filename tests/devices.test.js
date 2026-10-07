@@ -52,6 +52,19 @@ test('tapToShift: side of the board decides, dead centre does nothing', () => {
   assert.equal(devices.tapToShift(235), 1);
 });
 
+test('Tetris role: a centre tap rotates the piece, a side tap still shifts it', () => {
+  startIn('PLAYING', 'tetris');
+  // Stub canvas rect is 576x720; logical board is 240x480, so clientX 288
+  // maps to logical x 120 (the dead centre).
+  devices.onPointerDown({ pointerId: 1, clientX: 288, clientY: 360 });
+  assert.deepEqual(devices.onPointerUp({ pointerId: 1, clientX: 288, clientY: 360 }),
+    { action: 'pieceRotate', cw: true });
+
+  devices.onPointerDown({ pointerId: 2, clientX: 12, clientY: 360 }); // logical x 5
+  assert.deepEqual(devices.onPointerUp({ pointerId: 2, clientX: 12, clientY: 360 }),
+    { action: 'pieceShift', dc: -1 });
+});
+
 // ---------- Gamepad ----------
 test('gamepad SELECT_ROLE: D-pad moves the role, A starts, B returns to menu', () => {
   startIn('SELECT_ROLE');

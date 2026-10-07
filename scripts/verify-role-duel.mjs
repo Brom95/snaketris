@@ -75,6 +75,17 @@ async function until(page, fn, arg, timeout = 10000) {
 const stateIs = (page, state, timeout = 5000) =>
   until(page, (wanted) => window.__game.state === wanted, state, timeout);
 
+// A view class is applied on the next rendered frame. `page.isVisible` reads
+// the DOM at one instant and does not wait, so every visibility check goes
+// through this waiter.
+async function shown(page, selector, want, timeout = 3000) {
+  const settled = await until(page, (probe) => {
+    const el = document.querySelector(probe.sel);
+    return Boolean(el) && el.checkVisibility() === probe.want;
+  }, { sel: selector, want }, timeout);
+  return settled && (await page.isVisible(selector)) === want;
+}
+
 // Read the live game state from the page.
 async function snapshot(page) {
   return page.evaluate(() => {
@@ -155,6 +166,21 @@ async function freshPage(context) {
   return page;
 }
 
+// Tap the exact centre of the field and check that the falling piece rotates.
+// A rotation blocked by a wall or a block leaves the shape unchanged, so the
+// tap is repeated until a piece can turn.
+async function centreTapRotates(page) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const before = await snapshot(page);
+    if (before.state !== 'PLAYING' || !before.piece) return false;
+    await page.click('#game');
+    const after = await snapshot(page);
+    if (after.piece && after.piece.shape.join('|') !== before.piece.shape.join('|')) return true;
+    await page.waitForTimeout(400);
+  }
+  return false;
+}
+
 // Open the role sub-menu and start one game in the given role.
 async function playRole(context, role) {
   const page = await freshPage(context);
@@ -172,18 +198,25 @@ async function playRole(context, role) {
 const browser = await chromium.launch();
 const context = await browser.newContext();
 
-console.log('=== Menu and role sub-menu ===');
+console.log('=== Menu and role screen ===');
 const menu = await freshPage(context);
 const menuItems = await menu.$$eval('#menu-items > li', (els) => els.map((e) => e.textContent));
 check(menuItems.length === 3, 'main menu has three items: ' + menuItems.join(', '));
 await menu.click('#menu-item-play');
 await stateIs(menu, 'SELECT_ROLE');
 const roleTexts = await menu.$$eval('#role-items > li', (els) => els.map((e) => e.textContent));
-check(roleTexts.length === 2, 'role sub-menu has two items: ' + roleTexts.join(' | '));
+check(roleTexts.length === 2, 'role screen has two items: ' + roleTexts.join(' | '));
 check(roleTexts[0].includes('\u{1F40D}'), 'the Snake item carries the snake marker');
 check(roleTexts[1].includes('\u{1F3D7}'), 'the Tetris item carries the builder marker');
-check(await until(menu, () => document.getElementById('role-items').classList.contains('on'),
-  undefined, 5000), 'the role list is visible in SELECT_ROLE');
+check(await shown(menu, '#role-view', true), 'the role screen is on screen in SELECT_ROLE');
+check(await shown(menu, '#menu-title', false), 'the menu title is hidden on the role screen');
+check(await shown(menu, '#menu-items', false), 'the menu items are hidden on the role screen');
+check(await shown(menu, '#github-link', false), 'the GitHub link is hidden on the role screen');
+check(await shown(menu, '#role-back', true), 'the role screen shows a Back control');
+await menu.click('#role-back');
+check(await stateIs(menu, 'MENU'), 'Back returns to the main menu');
+check(await shown(menu, '#menu-items', true), 'the menu items are visible again after Back');
+check(await shown(menu, '#role-view', false), 'the role screen is hidden after Back');
 await menu.close();
 
 console.log('=== Tetris role: piece control and cooldown ===');
@@ -235,6 +268,8 @@ if (gateOpen) {
 }
 
 let played = await snapshot(tetrisPage);
+check(await centreTapRotates(tetrisPage),
+  'a tap in the centre of the field rotates the falling piece');
 const bothScored = (page) => until(page, () => {
   const g = window.__game;
   return (g.snakeScore > 0 && g.tetrisScore > 0) || g.state === 'GAME_OVER';

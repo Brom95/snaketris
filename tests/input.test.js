@@ -74,6 +74,18 @@ test('clicking Play in the main menu opens the role sub-menu', () => {
   assert.equal(state.game.state, 'SELECT_ROLE');
 });
 
+test('clicking Back on the role screen returns to the menu without starting a game', () => {
+  fresh();
+  state.game.state = 'SELECT_ROLE';
+  stub.roleItems[0].getBoundingClientRect = () => ({ left: 0, top: 0, right: 320, bottom: 24 });
+  stub.roleItems[1].getBoundingClientRect = () => ({ left: 0, top: 30, right: 320, bottom: 54 });
+  stub.elements['role-back'].getBoundingClientRect = () => ({ left: 0, top: 60, right: 320, bottom: 84 });
+  input.onInterfacePointerUp({ target: stub.document, clientX: 10, clientY: 70 });
+  assert.equal(state.game.state, 'MENU');
+  assert.equal(state.game.roleSelect, 0);
+  assert.equal(state.game.pieces.length, 0);
+});
+
 test('Tetris role: steering keys control the piece, never the snake', () => {
   fresh();
   state.game.role = 'tetris';

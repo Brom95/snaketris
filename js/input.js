@@ -24,6 +24,7 @@ import {
 let canvas = null;
 let menuItemsEls = [];
 let roleItemsEls = [];
+let roleBackEl = null;
 
 // ---------- FLOW: single state machine (collapsed nav path) ----------
 // Move the highlight one step in the active list: the role list in the
@@ -160,6 +161,7 @@ export function initInput(canvasEl) {
   // bails out for anything happening on the board (see onInterfacePointerUp).
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
   roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
+  roleBackEl = document.getElementById('role-back');
   document.addEventListener('pointerup', onInterfacePointerUp);
 }
 
@@ -204,7 +206,9 @@ export function onInterfacePointerUp(e) {
     if (item >= 0) {
       game.roleSelect = item;
       handleIntent({ action: 'confirm' });
+      return;
     }
+    if (hit(roleBackEl, x, y)) handleIntent({ action: 'toMenu' });
     return;
   }
   if (game.state === RECORDS || game.state === HELP || game.state === GAME_OVER) {

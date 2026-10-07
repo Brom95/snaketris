@@ -14,13 +14,13 @@ let uiEl = null;
 let scoreEl = null;
 let statusEl = null;
 let menuViewEl = null;
+let roleViewEl = null;
 let recordsViewEl = null;
 let helpViewEl = null;
 let recordsListEl = null;
 let recordsEmptyEl = null;
 let menuItemsEls = [];
 let roleItemsEls = [];
-let roleListEl = null;
 let fieldEl = null;
 
 // Called by app.js once the page is parsed; stores the interface elements.
@@ -29,12 +29,12 @@ export function initUi() {
   scoreEl = document.getElementById('score');
   statusEl = document.getElementById('status');
   menuViewEl = document.getElementById('menu-view');
+  roleViewEl = document.getElementById('role-view');
   recordsViewEl = document.getElementById('records-view');
   helpViewEl = document.getElementById('help-view');
   recordsListEl = document.getElementById('records-list');
   recordsEmptyEl = document.getElementById('records-empty');
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
-  roleListEl = document.getElementById('role-items');
   roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
   fieldEl = document.getElementById('game');
 }
@@ -111,13 +111,14 @@ export function syncViews(recordsBoard) {
   placeScore();
   show(statusEl, state === GAME_OVER);
   if (state === GAME_OVER && statusEl) statusEl.textContent = statusText();
-  show(menuViewEl, state === MENU || state === SELECT_ROLE);
-  show(roleListEl, state === SELECT_ROLE);
+  // The role screen is a separate view: opening it hides the main menu.
+  show(menuViewEl, state === MENU);
+  show(roleViewEl, state === SELECT_ROLE);
   show(recordsViewEl, state === RECORDS);
   show(helpViewEl, state === HELP);
   if (state === MENU) highlightItem(menuItemsEls, game.menuSelect);
   if (state === SELECT_ROLE) {
-    // The main menu items are not selectable while the sub-menu is open.
+    // The menu is off screen here, so its highlight is cleared too.
     highlightItem(menuItemsEls, -1);
     highlightItem(roleItemsEls, game.roleSelect);
   }

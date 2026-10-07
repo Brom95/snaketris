@@ -14,7 +14,7 @@ ui.initUi();
 const scoreEl = stub.elements.score;
 const statusEl = stub.elements.status;
 const menuViewEl = stub.elements['menu-view'];
-const roleListEl = stub.elements['role-items'];
+const roleViewEl = stub.elements['role-view'];
 const recordsViewEl = stub.elements['records-view'];
 const recordsListEl = stub.elements['records-list'];
 
@@ -86,20 +86,20 @@ test('every records entry carries its role marker, legacy entries included', () 
   assert.ok(rows[2].startsWith(ROLE_MARKERS.snake));
 });
 
-test('the role list is visible only in SELECT_ROLE and follows roleSelect', () => {
+test('the role screen replaces the menu screen and highlights the chosen role', () => {
   resetGame();
   game.state = MENU;
   game.menuSelect = 0;
   game.roleSelect = 1;
   ui.syncViews([]);
   assert.ok(on(menuViewEl));
-  assert.ok(!on(roleListEl));
+  assert.ok(!on(roleViewEl));
   assert.ok(on(stub.menuItems[0]));
 
   game.state = SELECT_ROLE;
   ui.syncViews([]);
-  assert.ok(on(menuViewEl));
-  assert.ok(on(roleListEl));
+  assert.ok(!on(menuViewEl));
+  assert.ok(on(roleViewEl));
   assert.ok(!on(stub.menuItems[0]));
   assert.ok(!on(stub.menuItems[1]));
   assert.ok(!on(stub.menuItems[2]));

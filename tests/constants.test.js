@@ -54,6 +54,17 @@ test('static HTML: role items carry the role markers', () => {
   assert.ok(html.includes('<li id="role-item-tetris" tabindex="-1">\u{1F3D7}\u{FE0F} Tetris</li>'));
 });
 
+test('static HTML: the role screen is its own view with a title and a Back control', () => {
+  const roleView = html.match(/<div id="role-view" class="view">([\s\S]*?)<\/div>/);
+  assert.ok(roleView, 'missing #role-view');
+  assert.ok(roleView[1].includes('<h2 id="role-title">Choose your side</h2>'));
+  assert.ok(roleView[1].includes('<ul id="role-items">'));
+  assert.ok(roleView[1].includes('<p id="role-back" class="return" tabindex="-1">Back</p>'));
+  // The role list is no longer inside the main menu view.
+  const menuBlock = html.match(/<div id="menu-view" class="view">([\s\S]*?)<\/div>/);
+  assert.ok(!menuBlock[1].includes('role-items'));
+});
+
 test('static HTML: help view documents roles, bot, blocked rotation, and every input device', () => {
   assert.ok(html.includes('Play — choose Snake or Tetris'));
   assert.ok(html.includes('shift and rotate the piece'));

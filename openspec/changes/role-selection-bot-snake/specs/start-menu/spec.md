@@ -17,6 +17,17 @@ The system SHALL show a role sub-menu with exactly two selectable items, "Snake"
 - **WHEN** the role sub-menu is shown
 - **THEN** the two items are separated from one another and each has its own distinct hit area
 
+### Requirement: Role screen replaces the starting menu
+The system SHALL show the role screen as its own view in `SELECT_ROLE`: the starting-menu items, the menu title and the GitHub link SHALL be hidden while the role screen is shown, and the role screen SHALL show only its own title, the two role items and a Back control. The role screen SHALL be composed of page elements rather than text painted onto the play field.
+
+#### Scenario: Menu content is hidden on the role screen
+- **WHEN** the role screen is shown
+- **THEN** the "Play", "Records" and "How to Play" items, the "snaketris" title and the GitHub link are not shown
+
+#### Scenario: Role screen shows its own content
+- **WHEN** the role screen is shown
+- **THEN** the role title, the two role items and the Back control are the only menu-area content on screen
+
 ### Requirement: Keyboard role selection
 The system SHALL let the player move the role selection with the arrow keys (and W/S) and confirm it with Enter or Space. A single confirmation SHALL perform exactly one action.
 
@@ -36,10 +47,14 @@ The system SHALL let the player choose a role by clicking or tapping its item.
 - **THEN** the game starts in Tetris role
 
 ### Requirement: Role sub-menu can be cancelled
-The system SHALL return to the starting menu from the role sub-menu in response to Escape (keyboard) or the gamepad B button, and SHALL NOT start a game.
+The system SHALL return to the starting menu from the role sub-menu in response to Escape (keyboard), the gamepad B button, or a click or tap on the Back control, and SHALL NOT start a game.
 
 #### Scenario: Escape returns to the menu
 - **WHEN** the role sub-menu is shown and the player presses Escape
+- **THEN** the starting menu is shown again and no game has started
+
+#### Scenario: The Back control returns to the menu
+- **WHEN** the player clicks or taps the Back control on the role screen
 - **THEN** the starting menu is shown again and no game has started
 
 ## MODIFIED Requirements

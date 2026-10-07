@@ -144,12 +144,12 @@ export function onPointerUp(e) {
   return snakeGesture(dx, dy, end.x, end.y);
 }
 
-// Board gesture for the Tetris role: a tap shifts the piece sideways, a
-// vertical swipe rotates it, a horizontal swipe shifts it.
+// Board gesture for the Tetris role: a side tap shifts the piece, a centre tap
+// rotates it, a vertical swipe rotates it, a horizontal swipe shifts it.
 function pieceGesture(dx, dy, x) {
   if (Math.max(Math.abs(dx), Math.abs(dy)) < TAP_THRESHOLD) {
     const dc = tapToShift(x);
-    return dc === 0 ? null : { action: 'pieceShift', dc };
+    return dc === 0 ? { action: 'pieceRotate', cw: true } : { action: 'pieceShift', dc };
   }
   if (Math.abs(dy) > Math.abs(dx)) return { action: 'pieceRotate', cw: dy > 0 };
   return { action: 'pieceShift', dc: dx < 0 ? -1 : 1 };

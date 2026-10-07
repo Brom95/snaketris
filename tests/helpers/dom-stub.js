@@ -83,6 +83,8 @@ export function installDomStub() {
     score: makeEl('score'),
     status: makeEl('status'),
     'menu-view': makeEl('menu-view'),
+    'role-view': makeEl('role-view'),
+    'role-back': makeEl('role-back', { left: 0, top: 60, width: 320, height: 24 }),
     'records-view': makeEl('records-view'),
     'help-view': makeEl('help-view'),
     'records-list': makeEl('records-list'),
