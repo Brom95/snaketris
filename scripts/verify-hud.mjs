@@ -24,8 +24,11 @@ check(/#status \{ font-size: 16px; \}/.test(page), 'status message has its own f
 check(!/window\.open/.test(page), 'no scripted navigation in the page');
 
 // ---------- Sources: ui.js owns both, render.js no longer paints them ------
-check(/scoreEl\.textContent = 'Score: ' \+ game\.score/.test(uiSrc), 'ui.js writes the score text');
+check(/scoreEl\.textContent = scoreText\(\)/.test(uiSrc), 'ui.js writes the score text from the side scores');
+check(/'Snake ' \+ game\.snakeScore \+ '  ·  Tetris ' \+ game\.tetrisScore/.test(uiSrc), 'the readout text carries both side scores');
 check(/show\(statusEl, state === GAME_OVER\)/.test(uiSrc), 'ui.js shows the status message only in GAME_OVER');
+check(!/position: fixed/.test(uiSrc), 'ui.js never pins the readout over the field');
+check(/FIELD_V_GAP_MOBILE/.test(uiSrc), 'ui.js uses the mobile gap when it measures the interface band');
 check(!/Score: /.test(renderSrc), 'render.js paints no score text');
 const renderBody = renderSrc.slice(renderSrc.indexOf('export function render()'));
 check(!/drawOverlay\(/.test(renderBody), 'the render path paints no game-over overlay');
@@ -75,21 +78,22 @@ ui.initUi();
 ui.syncViews(null);
 
 check(game.state === consts.MENU, 'the stubbed game starts in MENU');
-check(registry.score.textContent === 'Score: 0', 'the readout shows 0 at game start');
+check(registry.score.textContent === 'Snake 0  ·  Tetris 0', 'the readout shows both side scores at 0 at game start');
 check(registry['menu-view'].classes.has('on'), 'the menu view is on screen in MENU');
 check(!registry.status.classes.has('on'), 'the game-over message is hidden outside GAME_OVER');
 check(!registry['records-view'].classes.has('on'), 'the records view is hidden in MENU');
 
-// The readout mirrors `game.score` verbatim, so a +1 per cell eaten is a +1
-// here; stepping the score is the contract under test.
-game.score = 7;
+// Each side score is reported on its own, so stepping one side moves only
+// that side's number in the readout.
+game.snakeScore = 3;
+game.tetrisScore = 1;
 ui.syncViews(null);
-check(registry.score.textContent === 'Score: 7', 'the readout follows the score one-for-one');
+check(registry.score.textContent === 'Snake 3  ·  Tetris 1', 'the readout follows each side score');
 
-// ---------- Field visibility and the readout's overlay rule -----------------
+// ---------- Field visibility and the readout's placement rule ---------------
 // The field is on screen only in PLAYING and GAME_OVER; while it is hidden the
-// readout returns to the interface flow (clears its inline styles), and where
-// the interface stacks above the field it floats over the top edge.
+// readout returns to the interface flow (clears its inline styles), and it
+// stays in that flow on stacked layouts instead of overlaying the field.
 game.state = consts.MENU;
 ui.syncViews(null);
 check(!registry['game'].classes.has('on'), 'the field is hidden while MENU is shown');
@@ -105,7 +109,7 @@ game.state = consts.GAME_OVER;
 ui.syncViews(null);
 check(registry['game'].classes.has('on'), 'the final board stays visible in GAME_OVER');
 check(registry.status.classes.has('on'), 'the game-over message appears when a game ends');
-check(registry.score.textContent === 'Score: 7', 'the final score stays readable beside the field');
+check(registry.score.textContent === 'Snake 3  ·  Tetris 1', 'the final side scores stay readable when the game ends');
 check(!registry['menu-view'].classes.has('on'), 'the menu view is hidden in GAME_OVER');
 check(!registry['help-view'].classes.has('on'), 'no other view leaks into GAME_OVER');
 

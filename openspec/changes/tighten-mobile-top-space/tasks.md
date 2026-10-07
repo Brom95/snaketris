@@ -4,3 +4,4 @@
 - [x] 2. Update `fitCanvas()` in `js/input.js` to use `FIELD_V_GAP_MOBILE` on viewports ≤ 760 px
 - [x] 3. Update `placeScore()` and `interfaceBandHeight()` in `js/ui.js` so the score sits in the interface band (not an overlay) when stacked
 - [x] 4. Run headless harness (`scripts/verify-hud.mjs`) to confirm no regression
+- [x] 5. Update `scripts/verify-hud.mjs` to the two-score HUD (Snake and Tetris readouts, no `game.score`) and re-run it until every check passes
