@@ -33,16 +33,33 @@ test('eating +1 per cell + growth', () => {
   const MID = Math.floor(20 / 2);
   const ps = game.pieces;
   ps.length = 0;
-  ps.push({ shape: [[0, 0], [0, 1], [0, 2]], col: 7, row: MID }); // 3-cell piece in head path
-  const s0 = game.score;
+  ps.push({ shape: [[0, 0], [0, 1], [0, 2], [0, 3]], col: 7, row: MID }); // 4-cell piece in head path
+  const s0 = game.snakeScore;
   moveSnake();
-  assert.equal(game.score, s0 + 1);
+  assert.equal(game.snakeScore, s0 + 1);
+  assert.equal(game.snake.length, 4);
+  moveSnake();
+  assert.equal(game.snakeScore, s0 + 2);
   assert.equal(game.snake.length, 5);
   moveSnake();
-  assert.equal(game.score, s0 + 2);
+  assert.equal(game.snakeScore, s0 + 3);
+  assert.equal(game.pieces.length, 1); // piece still has one cell
   assert.equal(game.snake.length, 6);
+});
+
+test('whole-piece bonus: +4 when the last cell of a piece is eaten', () => {
+  freshStart();
+  const MID = Math.floor(20 / 2);
+  const ps = game.pieces;
+  ps.length = 0;
+  ps.push({ shape: [[0, 0], [0, 1], [0, 2]], col: 7, row: MID }); // 3-cell piece in head path
+  const s0 = game.snakeScore;
   moveSnake();
-  assert.equal(game.score, s0 + 3);
+  moveSnake();
+  moveSnake();
   assert.equal(game.pieces.length, 0);
-  assert.equal(game.snake.length, 4 + game.score);
+  assert.equal(game.snakeScore, s0 + 3 + 4); // 3 cells + whole-piece bonus
+  assert.equal(game.tetrisScore, 0);
+  // Growth pays for cells only, not for the bonus.
+  assert.equal(game.snake.length, 3 + 3);
 });

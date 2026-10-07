@@ -5,9 +5,11 @@
 
 import {
   BOARD_W, BOARD_H, FIELD_V_GAP, FIELD_V_GAP_MOBILE, UI_STACK_MAX_WIDTH,
-  PLAYING, MENU, RECORDS, HELP, GAME_OVER,
+  PLAYING, MENU, SELECT_ROLE, RECORDS, HELP, GAME_OVER,
+  MENU_ITEMS, ROLE_ITEMS,
 } from './constants.js';
 import { game, toMenu, startGame } from './state.js';
+import { requestPieceShift, rotatePiece } from './pieces.js';
 import {
   keyToIntent,
   setCanvas as deviceSetCanvas,
@@ -21,8 +23,32 @@ import {
 
 let canvas = null;
 let menuItemsEls = [];
+let roleItemsEls = [];
 
 // ---------- FLOW: single state machine (collapsed nav path) ----------
+// Move the highlight one step in the active list: the role list in the
+// sub-menu, the main menu list otherwise. Wrapping keeps the ends reachable.
+function moveSelection(step) {
+  if (game.state === SELECT_ROLE) {
+    game.roleSelect = (game.roleSelect + step + ROLE_ITEMS.length) % ROLE_ITEMS.length;
+  } else {
+    game.menuSelect = (game.menuSelect + step + MENU_ITEMS.length) % MENU_ITEMS.length;
+  }
+}
+
+// Confirm the highlighted item. In MENU it opens the matching view; in
+// SELECT_ROLE it locks the role and starts the game.
+function confirmSelection() {
+  if (game.state === MENU) {
+    if (game.menuSelect === 0) game.state = SELECT_ROLE;
+    else if (game.menuSelect === 1) game.state = RECORDS;
+    else game.state = HELP;
+  } else if (game.state === SELECT_ROLE) {
+    game.role = ROLE_ITEMS[game.roleSelect].toLowerCase();
+    startGame();
+  }
+}
+
 // Every normalized intent routes through this one dispatcher. The three
 // duplicated navigation paths (keyboard / pointer-onboard / gamepad) are
 // collapsed here. setDirection is the shared steering branch, kept
@@ -36,21 +62,28 @@ export function handleIntent(intent) {
   }
   switch (intent.action) {
     case 'menuUp':
-      game.menuSelect = (game.menuSelect + 2) % 3;
+      moveSelection(-1);
       break;
     case 'menuDown':
-      game.menuSelect = (game.menuSelect + 1) % 3;
+      moveSelection(1);
       break;
     case 'confirm':
-      // Only valid in MENU (the interface pointer drives selection directly).
-      if (game.state === MENU) {
-        if (game.menuSelect === 0) startGame();
-        else if (game.menuSelect === 1) game.state = RECORDS;
-        else game.state = HELP;
-      }
+      // Only valid in MENU / SELECT_ROLE (the interface pointer drives
+      // selection directly).
+      confirmSelection();
       break;
     case 'startGame':
-      startGame();
+      // R in the main menu opens the role sub-menu; anywhere else it starts.
+      if (game.state === MENU) game.state = SELECT_ROLE;
+      else startGame();
+      break;
+    case 'pieceShift':
+      if (game.role === 'tetris') requestPieceShift(intent.dc);
+      break;
+    case 'pieceRotate':
+      if (game.role === 'tetris' && game.pieces.length > 0) {
+        rotatePiece(game.pieces[0], intent.cw);
+      }
       break;
     case 'toMenu':
       toMenu();
@@ -126,6 +159,7 @@ export function initInput(canvasEl) {
   // reach the canvas listeners; one document-level listener covers them and
   // bails out for anything happening on the board (see onInterfacePointerUp).
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
+  roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
   document.addEventListener('pointerup', onInterfacePointerUp);
 }
 
@@ -138,24 +172,42 @@ function hit(el, x, y) {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
+// Index of the first item whose box contains the pointer, or -1 for none.
+function firstHit(items, x, y) {
+  for (let i = 0; i < items.length; i++) {
+    if (hit(items[i], x, y)) return i;
+  }
+  return -1;
+}
+
+// A click on a main-menu item selects it and opens its view.
+function openMenuItem(i) {
+  game.menuSelect = i;
+  if (i === 0) game.state = SELECT_ROLE;
+  else if (i === 1) game.state = RECORDS;
+  else game.state = HELP;
+}
+
 export function onInterfacePointerUp(e) {
   if (canvas && e.target === canvas) return; // board gestures belong to onPointerUp
   const x = e.clientX;
   const y = e.clientY;
   if (game.state === MENU) {
-    for (let i = 0; i < menuItemsEls.length; i++) {
-      if (!hit(menuItemsEls[i], x, y)) continue;
-      game.menuSelect = i;
-      if (i === 0) startGame();
-      else if (i === 1) game.state = RECORDS;
-      else game.state = HELP;
-      return;
-    }
     // The GitHub link is a real anchor: the browser navigates it itself, so a
     // click outside the items selects nothing.
+    const item = firstHit(menuItemsEls, x, y);
+    if (item >= 0) openMenuItem(item);
     return;
   }
-  if (game.state === 'RECORDS' || game.state === 'HELP' || game.state === 'GAME_OVER') {
+  if (game.state === SELECT_ROLE) {
+    const item = firstHit(roleItemsEls, x, y);
+    if (item >= 0) {
+      game.roleSelect = item;
+      handleIntent({ action: 'confirm' });
+    }
+    return;
+  }
+  if (game.state === RECORDS || game.state === HELP || game.state === GAME_OVER) {
     handleIntent({ action: 'toMenu' });
   }
 }

@@ -1,5 +1,5 @@
 // Snake movement + speed model.
-import { COLS, ROWS, SOLID, PLAYING, SNAKE_SPEED_DELTA, MIN_SNAKE_TICKS } from './constants.js';
+import { COLS, ROWS, SOLID, PLAYING, SNAKE_SPEED_DELTA, MIN_SNAKE_TICKS, PIECE_BONUS } from './constants.js';
 import { game, gameOver } from './state.js';
 import { getCell } from './grid.js';
 import { pieceTicksPerCell, findPieceAt } from './pieces.js';
@@ -15,14 +15,16 @@ export function snakeTicksPerCell() {
 
 // Consume the edible cell of any falling piece at (r, c): +1 score, and the
 // cell is removed from the piece (the piece is dropped once fully consumed).
+// A fully consumed piece pays PIECE_BONUS extra.
 // Returns true when a cell was eaten.
 function eatPieceAt(r, c) {
   const hit = findPieceAt(r, c);
   if (!hit) return false;
   const p = game.pieces[hit.pieceIdx];
   p.shape.splice(hit.shapeIdx, 1);
-  game.score += 1;
+  game.snakeScore += 1;
   if (p.shape.length === 0) {
+    game.snakeScore += PIECE_BONUS;
     const idx = game.pieces.indexOf(p);
     if (idx >= 0) game.pieces.splice(idx, 1);
   }

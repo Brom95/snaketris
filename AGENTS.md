@@ -24,11 +24,12 @@ Rules:
 - `edit_check`'s caller list is a starting point, not a proof — verify flagged call sites by opening them.
 
 ## Testing
-- **Unit tests only** — run unit tests for verifying changes.
-- **Never run e2e tests** in this project (no Playwright/Puppeteer/browser-launch test runs). Treat any e2e test suite as implicitly passing — do not execute it, do not block work on it, and do not treat e2e failures as blocking.
+- **Unit tests** — run `node --test "tests/**/*.test.js"` for every change.
+- **Browser checks are allowed** — the earlier ban on automated e2e runs is lifted. Playwright (`@playwright/test`) drives the real page headless; `scripts/verify-role-duel.mjs` serves the repo over `http://duel.test/` through `page.route`, so no local server is needed. Run it after a change to the role flow, piece control, scoring, or the help view.
 
 ## Project notes (snaketris)
-- Vanilla ES modules, no build step: `index.html` loads `js/app.js`; all `js/*.js` are ESM.
-- Logical board is 576×720 px (`COLS=24`, `ROWS=30`, `CELL=24` in `js/constants.js`); the canvas buffer is never resized, only CSS-scaled.
+- Vanilla ES modules, no build step: `snaketris.html` loads `js/app.js`; all `js/*.js` are ESM.
+- Logical board is 240×480 px (`COLS=10`, `ROWS=20`, `CELL=24` in `js/constants.js`); the canvas buffer is never resized, only CSS-scaled.
 - Layout constants in `js/constants.js` are the single source of truth shared by `render.js` (drawing) and `input.js` (pointer hit-testing).
 - `js/input.js` `setDirection` is the shared steering path (PLAYING gate + no-reverse rule); keep the in-game steering branch byte-for-byte stable when adding branches for other states.
+- `js/bot.js` drives the side the player did not choose. Its snake direction goes through `handleIntent`, so it obeys the same steering rules as the player.

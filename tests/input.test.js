@@ -1,5 +1,6 @@
 // input.test.js — no-reverse + keyboard mapping, multi-pointer ignore,
-// tap-zone mapping, swipe dominant axis, mobile fit (fitCanvas).
+// tap-zone mapping, swipe dominant axis, mobile fit (fitCanvas), the role
+// sub-menu navigation, and the role gate on piece control.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installDomStub } from './helpers/dom-stub.js';
@@ -24,6 +25,64 @@ test('no-reverse + keyboard mapping', async () => {
   input.onKey({ key: 's', preventDefault() {} });
   assert.equal(state.game.nextDir.r, 1);
   assert.equal(state.game.nextDir.c, 0);
+});
+
+test('role sub-menu: R opens it, up/down wrap, confirm starts the chosen role', () => {
+  fresh();
+  assert.equal(state.game.state, 'MENU');
+  input.onKey({ key: 'r', preventDefault() {} });
+  assert.equal(state.game.state, 'SELECT_ROLE');
+
+  input.onKey({ key: 's', preventDefault() {} }); // down → Tetris
+  assert.equal(state.game.roleSelect, 1);
+  input.onKey({ key: 's', preventDefault() {} }); // wraps back to Snake
+  assert.equal(state.game.roleSelect, 0);
+  input.onKey({ key: 'w', preventDefault() {} }); // up wraps to Tetris
+  assert.equal(state.game.roleSelect, 1);
+  input.onKey({ key: 'Enter', preventDefault() {} });
+  assert.equal(state.game.state, 'PLAYING');
+  assert.equal(state.game.role, 'tetris');
+
+  fresh();
+  input.onKey({ key: 'r', preventDefault() {} });
+  input.onKey({ key: 'Escape', preventDefault() {} });
+  assert.equal(state.game.state, 'MENU');
+});
+
+test('clicking a role item starts the game with that role', () => {
+  fresh();
+  state.game.state = 'SELECT_ROLE';
+  stub.roleItems[0].getBoundingClientRect = () => ({ left: 0, top: 0, right: 320, bottom: 24 });
+  stub.roleItems[1].getBoundingClientRect = () => ({ left: 0, top: 30, right: 320, bottom: 54 });
+  input.onInterfacePointerUp({ target: stub.document, clientX: 10, clientY: 40 });
+  assert.equal(state.game.state, 'PLAYING');
+  assert.equal(state.game.role, 'tetris');
+
+  // startGame resets the game, so the selection index is not observable after
+  // the click; the role it produced is.
+  fresh();
+  state.game.state = 'SELECT_ROLE';
+  input.onInterfacePointerUp({ target: stub.document, clientX: 10, clientY: 10 });
+  assert.equal(state.game.state, 'PLAYING');
+  assert.equal(state.game.role, 'snake');
+});
+
+test('clicking Play in the main menu opens the role sub-menu', () => {
+  fresh();
+  stub.menuItems[0].getBoundingClientRect = () => ({ left: 0, top: 0, right: 320, bottom: 24 });
+  input.onInterfacePointerUp({ target: stub.document, clientX: 10, clientY: 10 });
+  assert.equal(state.game.state, 'SELECT_ROLE');
+});
+
+test('Tetris role: steering keys control the piece, never the snake', () => {
+  fresh();
+  state.game.role = 'tetris';
+  state.startGame();
+  state.game.dir = { r: 0, c: 1 };
+  state.game.nextDir = { r: 0, c: 1 };
+  input.onKey({ key: 'arrowup', preventDefault() {} });
+  input.onKey({ key: 'arrowleft', preventDefault() {} });
+  assert.deepEqual(state.game.nextDir, { r: 0, c: 1 });
 });
 
 test('multi-pointer ignore + pointercancel', async () => {

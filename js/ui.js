@@ -3,10 +3,12 @@
 // step with `game.state`, the single view authority. Imports only constants.js
 // and state.js, so the module graph stays one-way (app -> ui).
 import {
-  MENU, RECORDS, HELP, GAME_OVER, PLAYING,
+  MENU, SELECT_ROLE, RECORDS, HELP, GAME_OVER, PLAYING,
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
+  ROLE_MARKERS,
 } from './constants.js';
 import { game } from './state.js';
+import { entryRole } from './highscores.js';
 
 let uiEl = null;
 let scoreEl = null;
@@ -17,6 +19,8 @@ let helpViewEl = null;
 let recordsListEl = null;
 let recordsEmptyEl = null;
 let menuItemsEls = [];
+let roleItemsEls = [];
+let roleListEl = null;
 let fieldEl = null;
 
 // Called by app.js once the page is parsed; stores the interface elements.
@@ -30,6 +34,8 @@ export function initUi() {
   recordsListEl = document.getElementById('records-list');
   recordsEmptyEl = document.getElementById('records-empty');
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
+  roleListEl = document.getElementById('role-items');
+  roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
   fieldEl = document.getElementById('game');
 }
 
@@ -49,23 +55,37 @@ function formatDate(iso) {
 }
 
 // The leaderboard rows are rebuilt from the board the caller supplies, so this
-// module stays free of storage concerns.
+// module stays free of storage concerns. Every row carries its role marker.
 function fillRecords(board) {
   recordsListEl.textContent = '';
   for (let i = 0; i < board.length; i++) {
     const li = document.createElement('li');
-    li.textContent = board[i].score + '  ·  ' + formatDate(board[i].date);
+    li.textContent = ROLE_MARKERS[entryRole(board[i])] + '  ' + board[i].score + '  ·  ' + formatDate(board[i].date);
     recordsListEl.appendChild(li);
   }
   show(recordsEmptyEl, board.length === 0);
 }
 
-// The highlighted menu item follows `game.menuSelect`; the `::before` marker
-// and the highlight colour come from the page CSS.
-function highlightMenu() {
-  for (let i = 0; i < menuItemsEls.length; i++) {
-    show(menuItemsEls[i], i === game.menuSelect);
+// Highlight one item in a list by index. The `::before` marker and the
+// highlight colour come from the page CSS. Index -1 clears the whole list.
+function highlightItem(items, index) {
+  for (let i = 0; i < items.length; i++) {
+    show(items[i], i === index);
   }
+}
+
+// Both side scores, each labelled with its side. The chosen role is not named.
+function scoreText() {
+  return 'Snake ' + game.snakeScore + '  ·  Tetris ' + game.tetrisScore;
+}
+
+// The game-over line names the winner and shows both final scores.
+function statusText() {
+  let winner = 'Draw';
+  if (game.snakeScore > game.tetrisScore) winner = 'Snake wins';
+  else if (game.tetrisScore > game.snakeScore) winner = 'Tetris wins';
+  return 'Game Over — Snake ' + game.snakeScore + ', Tetris ' + game.tetrisScore + ' — ' + winner +
+    ' — press R or click for menu';
 }
 
 // The readout sits in normal flow within the #ui band. On stacked layouts
@@ -84,16 +104,23 @@ function placeScore() {
 // on screen. Called every frame from the render path.
 export function syncViews(recordsBoard) {
   const state = game.state;
-  if (scoreEl) scoreEl.textContent = 'Score: ' + game.score;
+  if (scoreEl) scoreEl.textContent = scoreText();
   const fieldOn = state === PLAYING || state === GAME_OVER;
   show(fieldEl, fieldOn);
   show(scoreEl, fieldOn);
   placeScore();
   show(statusEl, state === GAME_OVER);
-  show(menuViewEl, state === MENU);
+  if (state === GAME_OVER && statusEl) statusEl.textContent = statusText();
+  show(menuViewEl, state === MENU || state === SELECT_ROLE);
+  show(roleListEl, state === SELECT_ROLE);
   show(recordsViewEl, state === RECORDS);
   show(helpViewEl, state === HELP);
-  if (state === MENU) highlightMenu();
+  if (state === MENU) highlightItem(menuItemsEls, game.menuSelect);
+  if (state === SELECT_ROLE) {
+    // The main menu items are not selectable while the sub-menu is open.
+    highlightItem(menuItemsEls, -1);
+    highlightItem(roleItemsEls, game.roleSelect);
+  }
   if (state === RECORDS) fillRecords(recordsBoard || []);
 }
 

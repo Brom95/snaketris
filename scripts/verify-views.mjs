@@ -11,7 +11,7 @@
 
 import { initUi, syncViews } from '../js/ui.js';
 import { game } from '../js/state.js';
-import { RECORDS, HELP, MENU } from '../js/constants.js';
+import { RECORDS, HELP, MENU, ROLE_MARKERS } from '../js/constants.js';
 import { recordScore, loadBoard } from '../js/highscores.js';
 import { readFileSync } from 'node:fs';
 
@@ -32,12 +32,15 @@ const rulesSection = page.includes('<section id="help-rules">') && page.includes
 const helpReturn = page.includes('<p id="help-return" class="return">Menu</p>');
 
 const helpLines = [
-  'Arrows / WASD — steer',
-  'Swipe or tap — steer',
+  'Play — choose Snake or Tetris',
+  'Snake role: Arrows / WASD — steer',
+  'Snake role: Swipe or tap — steer',
+  'Snake role: D-pad or left stick — steer',
+  'Tetris role: Arrows / WASD — shift and rotate the piece',
+  'Tetris role: Tap — shift, vertical swipe — rotate',
+  'Tetris role: D-pad left/right — shift, up/down — rotate',
+  'Controller: A — confirm, B — back',
   'R or click — start',
-  'Eat falling pieces: +1 each',
-  'Avoid blocks and your body.',
-  'Edges wrap around the board',
 ];
 const helpLinesPresent = helpLines.every((line) => page.includes('<li>' + line + '</li>'));
 
@@ -166,11 +169,12 @@ check(board[0].score === Math.max(...recorded), 'the stored top entry is the hig
 game.state = RECORDS;
 syncViews(board);
 check(rows().length === board.length, 'records-list holds one row per entry: ' + rows().length);
-check(rows().every((li) => /^\d+  ·  \d{4}-\d{2}-\d{2}$/.test(li.textContent)),
-  'every row reads "<score>  ·  <YYYY-MM-DD>": ' + rows().map((li) => li.textContent).join(' | '));
-check(rows()[0].textContent.startsWith(board[0].score + '  ·  '),
+const markerRe = new RegExp('^(' + Object.values(ROLE_MARKERS).join('|') + ')  \\d+  ·  \\d{4}-\\d{2}-\\d{2}$');
+check(rows().every((li) => markerRe.test(li.textContent)),
+  'every row reads "<marker>  <score>  ·  <YYYY-MM-DD>": ' + rows().map((li) => li.textContent).join(' | '));
+check(rows()[0].textContent.includes(board[0].score + '  ·  '),
   'the top row is the highest score: ' + rows()[0].textContent);
-check(rows().every((li, i) => li.textContent.startsWith(board[i].score + '  ·  ')),
+check(rows().every((li, i) => li.textContent.includes(board[i].score + '  ·  ')),
   'row order matches the stored board: ' + rows().map((li) => li.textContent).join(' | '));
 check(!classesOf('records-empty').has('on'), 'the empty-state message is hidden when the board has entries');
 check(classesOf('records-view').has('on'), 'the records view is shown in RECORDS');
@@ -179,7 +183,8 @@ check(classesOf('records-view').has('on'), 'the records view is shown in RECORDS
 // ui.js must mirror that order row for row.
 syncViews([{ score: 9, date: dateOf(4) }, { score: 3, date: dateOf(3) }]);
 check(rows().length === 2, 'the fewer-than-ten case renders 2 rows');
-check(rows()[0].textContent === '9  ·  2026-09-04', 'rows mirror the handed board order: ' + rows()[0].textContent);
+check(rows()[0].textContent === ROLE_MARKERS.snake + '  9  ·  2026-09-04',
+  'rows mirror the handed board order, marker first: ' + rows()[0].textContent);
 
 // Empty state.
 syncViews([]);

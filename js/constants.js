@@ -14,6 +14,7 @@ export const CELL = 24; // cell size in CSS pixels
 
 // State machine
 export const MENU = 'MENU';
+export const SELECT_ROLE = 'SELECT_ROLE';
 export const PLAYING = 'PLAYING';
 export const GAME_OVER = 'GAME_OVER';
 export const RECORDS = 'RECORDS';
@@ -21,6 +22,12 @@ export const HELP = 'HELP';
 
 // The menu labels, in the order they appear as page elements in snaketris.html.
 export const MENU_ITEMS = ['Play', 'Records', 'How to Play'];
+
+// The two roles, in the order they appear as page elements in snaketris.html.
+// Each role's marker is shown on the role sub-menu item and on every record
+// entry, so the same glyph is used in both places.
+export const ROLE_ITEMS = ['Snake', 'Tetris'];
+export const ROLE_MARKERS = { snake: '\u{1F40D}', tetris: '\u{1F3D7}\u{FE0F}' };
 
 // URL for the GitHub repository.
 export const GITHUB_URL = 'https://github.com/Brom95/snaketris';
@@ -36,6 +43,10 @@ export const MAX_FALL = 0.9;       // hard cap so pieces never tunnel a cell
 // it is never slower than MIN_SNAKE_TICKS ticks/cell.
 export const SNAKE_SPEED_DELTA = 2;
 export const MIN_SNAKE_TICKS = 1;
+
+// Scoring
+export const PIECE_BONUS = 4;       // extra points for eating a whole piece
+export const LINE_CLEAR_POINTS = 10; // points for one cleared row
 
 // Native (logical) board size in CSS pixels. The buffer is never resized;
 // only the CSS display size is scaled to fit the viewport (fitCanvas).

@@ -5,16 +5,18 @@ import { COLS, ROWS, CELL, TICK } from './constants.js';
 import { game, resetGame } from './state.js';
 import { loadBoard } from './highscores.js';
 import { createClock, createEngine } from './engine.js';
+import { botSystem } from './bot.js';
 import { snakeSystem } from './snake.js';
 import { piecesSystem } from './pieces.js';
 import { initInput, fitCanvas, pollController } from './input.js';
 import { initRender, render } from './render.js';
 import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
-// The ordered systems: snake steps first (so the head sees the piece where
-// it was), then pieces fall and eat. app.js no longer owns per-tick game
-// logic — each system does its own state check and work in declared order.
-const engine = createEngine([snakeSystem, piecesSystem]);
+// The ordered systems: the bot decides first (its direction is applied before
+// the snake steps), then the snake steps, then the pieces fall and eat.
+// app.js no longer owns per-tick game logic — each system does its own state
+// check and work in declared order.
+const engine = createEngine([botSystem, snakeSystem, piecesSystem]);
 
 // The context handed to each system's update(ctx). The systems read the
 // shared `game` module directly; ctx is the hook for any future per-frame

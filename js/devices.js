@@ -46,12 +46,45 @@ export function tapToDir(x, y) {
   return oy < 0 ? { r: -1, c: 0 } : { r: 1, c: 0 };
 }
 
+// Tap region for the falling piece: only the horizontal side of the board
+// matters, so a near-centre tap shifts nothing.
+export function tapToShift(x) {
+  const ox = x - BOARD_W / 2;
+  if (Math.abs(ox) < TAP_THRESHOLD) return 0;
+  return ox < 0 ? -1 : 1;
+}
+
 // Swipe mapping: dominant axis of the displacement.
 export function swipeToDir(dx, dy) {
   if (Math.abs(dx) > Math.abs(dy)) {
     return dx < 0 ? { r: 0, c: -1 } : { r: 0, c: 1 };
   }
   return dy < 0 ? { r: -1, c: 0 } : { r: 1, c: 0 };
+}
+
+// Navigation keys for the main menu and the role sub-menu. R starts a game
+// from the main menu; Escape leaves the sub-menu.
+function menuKeyIntent(k, state) {
+  if (k === 'arrowup' || k === 'w') return { action: 'menuUp' };
+  if (k === 'arrowdown' || k === 's') return { action: 'menuDown' };
+  if (k === 'enter' || k === ' ') return { action: 'confirm' };
+  if (state === 'MENU' && k === 'r') return { action: 'startGame' };
+  if (state === 'SELECT_ROLE' && k === 'escape') return { action: 'toMenu' };
+  return null;
+}
+
+// Keys while a game runs: the Tetris role steers the falling piece, the Snake
+// role steers the snake.
+function playingKeyIntent(k) {
+  if (game.role === 'tetris') {
+    if (k === 'arrowleft' || k === 'a') return { action: 'pieceShift', dc: -1 };
+    if (k === 'arrowright' || k === 'd') return { action: 'pieceShift', dc: 1 };
+    if (k === 'arrowup' || k === 'w') return { action: 'pieceRotate', cw: false };
+    if (k === 'arrowdown' || k === 's') return { action: 'pieceRotate', cw: true };
+    return null;
+  }
+  const d = keyToDir(k);
+  return d ? { dir: d } : null;
 }
 
 // ---------- Keyboard device ----------
@@ -61,28 +94,15 @@ const TAP_THRESHOLD = 24; // displacement below one cell classifies as a tap
 // every action; pointer and gamepad cover a subset.
 export function keyToIntent(key) {
   const k = key.toLowerCase();
-  // MENU: arrows/W-S move the selection, Enter/Space confirms, R starts.
-  if (game.state === 'MENU') {
-    if (k === 'arrowup' || k === 'w') return { action: 'menuUp' };
-    if (k === 'arrowdown' || k === 's') return { action: 'menuDown' };
-    if (k === 'enter' || k === ' ') return { action: 'confirm' };
-    if (k === 'r') return { action: 'startGame' };
-    return null;
-  }
-  // RECORDS / HELP: return to the menu.
+  if (game.state === 'MENU' || game.state === 'SELECT_ROLE') return menuKeyIntent(k, game.state);
+  if (game.state === 'PLAYING') return playingKeyIntent(k);
   if (game.state === 'RECORDS' || game.state === 'HELP') {
-    if (k === 'enter' || k === ' ' || k === 'escape') return { action: 'toMenu' };
-    return null;
+    return (k === 'enter' || k === ' ' || k === 'escape') ? { action: 'toMenu' } : null;
   }
-  // GAME_OVER: R/Enter/Space back to the menu.
   if (game.state === 'GAME_OVER') {
-    if (k === 'r' || k === 'enter' || k === ' ') return { action: 'toMenu' };
-    return null;
+    return (k === 'r' || k === 'enter' || k === ' ') ? { action: 'toMenu' } : null;
   }
-  // PLAYING: steering, unchanged from before.
-  const d = keyToDir(k);
-  if (!d) return null;
-  return { dir: d };
+  return null;
 }
 
 // ---------- Pointer device (touch + mouse) ----------
@@ -112,7 +132,6 @@ export function onPointerUp(e) {
   const dy = end.y - pointerStart.y;
   pointerStart = null;
 
-  // Non-game states: act on the tap position, no steering classification.
   // MENU lives entirely on the page (see onInterfacePointerUp), so a gesture
   // that ends on the board does nothing here.
   if (game.state === 'MENU') return null;
@@ -121,15 +140,29 @@ export function onPointerUp(e) {
     return { action: 'toMenu' };
   }
   if (game.state !== 'PLAYING') return null;
+  if (game.role === 'tetris') return pieceGesture(dx, dy, end.x);
+  return snakeGesture(dx, dy, end.x, end.y);
+}
 
+// Board gesture for the Tetris role: a tap shifts the piece sideways, a
+// vertical swipe rotates it, a horizontal swipe shifts it.
+function pieceGesture(dx, dy, x) {
   if (Math.max(Math.abs(dx), Math.abs(dy)) < TAP_THRESHOLD) {
-    // Tap: displacement below one cell.
-    const tapDir = tapToDir(end.x, end.y);
-    if (tapDir) return { dir: tapDir };
-  } else {
-    // Swipe: dominant axis of the displacement.
-    return { dir: swipeToDir(dx, dy) };
+    const dc = tapToShift(x);
+    return dc === 0 ? null : { action: 'pieceShift', dc };
   }
+  if (Math.abs(dy) > Math.abs(dx)) return { action: 'pieceRotate', cw: dy > 0 };
+  return { action: 'pieceShift', dc: dx < 0 ? -1 : 1 };
+}
+
+// Board gesture for the Snake role: a tap steers toward the tapped region, a
+// swipe steers along its dominant axis.
+function snakeGesture(dx, dy, x, y) {
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < TAP_THRESHOLD) {
+    const dir = tapToDir(x, y);
+    return dir ? { dir } : null;
+  }
+  return { dir: swipeToDir(dx, dy) };
 }
 
 export function onPointerCancel(e) {
@@ -168,6 +201,53 @@ export function stickDir(gp) {
     return axPast === 0 ? null : { r: 0, c: ax < 0 ? -1 : 1 };
   }
   return { r: ay < 0 ? -1 : 1, c: 0 };
+}
+
+// Intent while a game runs. In Tetris role the piece is steered: left/right
+// shift (held, like a key), up/down rotate (edge-only, so one press is one
+// quarter turn). In Snake role steering is the exception to edge-only: the
+// D-pad/stick direction applies whenever held, D-pad taking precedence over
+// the stick. setDirection() enforces the no-reverse rule.
+function playingIntent(role, s) {
+  return role === 'tetris' ? pieceSteerIntent(s) : snakeSteerIntent(s);
+}
+
+// Snake role: a held D-pad direction wins, the thumbstick fills in when no
+// D-pad button is pressed.
+function snakeSteerIntent(s) {
+  const dir = heldDpadDir(s) || s.stick;
+  return dir ? { dir } : null;
+}
+
+function heldDpadDir(s) {
+  if (s.upNow) return { r: -1, c: 0 };
+  if (s.downNow) return { r: 1, c: 0 };
+  if (s.leftNow) return { r: 0, c: -1 };
+  if (s.rightNow) return { r: 0, c: 1 };
+  return null;
+}
+
+// Tetris role: left/right shift the piece while held; up/down rotate, edge-only,
+// so one press is one quarter turn.
+function pieceSteerIntent(s) {
+  let dc = 0;
+  if (s.leftNow) dc = -1;
+  else if (s.rightNow) dc = 1;
+  else if (s.stick) dc = s.stick.c;
+  if (dc) return { action: 'pieceShift', dc };
+  if (s.upEdge || s.stickUpEdge) return { action: 'pieceRotate', cw: false };
+  if (s.downEdge || s.stickDownEdge) return { action: 'pieceRotate', cw: true };
+  return null;
+}
+
+// Intent in the main menu and the role sub-menu: up/down move the highlight
+// (edge-only), A confirms. B cancels the sub-menu only.
+function menuIntent(state, s) {
+  if (s.upEdge || s.stickUpEdge) return { action: 'menuUp' };
+  if (s.downEdge || s.stickDownEdge) return { action: 'menuDown' };
+  if (s.aEdge) return { action: 'confirm' };
+  if (state === 'SELECT_ROLE' && s.bEdge) return { action: 'toMenu' };
+  return null;
 }
 
 // Raw poll → intent. The D-pad/stick direction is applied when held (like
@@ -210,33 +290,14 @@ export function pollController() {
   const stickUpEdge = stickUp && !(prevStickDir && prevStickDir.r === -1);
   const stickDownEdge = stickDown && !(prevStickDir && prevStickDir.r === 1);
 
-  if (game.state === 'PLAYING') {
-    // Steering is the exception to edge-only: the D-pad/stick direction is
-    // applied whenever held (like holding a key). D-pad takes precedence over
-    // the stick when both are pressed. setDirection() is idempotent for the
-    // same direction and enforces the no-reverse rule.
-    let dir = null;
-    if (upNow) dir = { r: -1, c: 0 };
-    else if (downNow) dir = { r: 1, c: 0 };
-    else if (leftNow) dir = { r: 0, c: -1 };
-    else if (rightNow) dir = { r: 0, c: 1 };
-    else dir = stick; // may be null
-    if (dir) return { dir };
-  } else if (game.state === 'MENU') {
-    // D-pad/stick up-down moves the selection (edge-only, wrapping).
-    if (upEdge || stickUpEdge) return { action: 'menuUp' };
-    if (downEdge || stickDownEdge) return { action: 'menuDown' };
-    // A confirms the highlighted item (edge-only), matching keyboard/touch.
-    if (aEdge) return { action: 'confirm' };
-  } else if (game.state === 'RECORDS' || game.state === 'HELP') {
-    // B returns to the menu (edge-only), matching keyboard/touch.
-    if (bEdge) return { action: 'toMenu' };
-  } else if (game.state === 'GAME_OVER') {
-    // A returns to the menu (edge-only), matching keyboard/touch.
-    if (aEdge) return { action: 'toMenu' };
-  }
+  const intent = chooseIntent(game.state, game.role, {
+    aEdge, bEdge, upEdge, downEdge,
+    stickUpEdge, stickDownEdge,
+    leftNow, rightNow, upNow, downNow, stick,
+  });
 
-  // Update previous poll state at the end of each pass (design D3).
+  // Update previous poll state on every pass, including the pass that emits
+  // an intent. Without this, a held button re-fires its edge each frame.
   prevButtons = {
     [BUTTON_A]: aNow,
     [BUTTON_B]: bNow,
@@ -246,6 +307,18 @@ export function pollController() {
     [DPAD_RIGHT]: buttons[DPAD_RIGHT].pressed
   };
   prevStickDir = stick;
+  return intent;
+}
+
+// State-dependent intent for one poll. Edge-only buttons drive menu actions;
+// the D-pad/stick direction is applied while held.
+function chooseIntent(state, role, s) {
+  if (state === 'PLAYING') return playingIntent(role, s);
+  if (state === 'MENU' || state === 'SELECT_ROLE') return menuIntent(state, s);
+  // B returns to the menu from the records and help views; A does the same
+  // after a game ends. Both are edge-only, matching keyboard and touch.
+  if (state === 'RECORDS' || state === 'HELP') return s.bEdge ? { action: 'toMenu' } : null;
+  if (state === 'GAME_OVER') return s.aEdge ? { action: 'toMenu' } : null;
   return null;
 }
 

@@ -1,6 +1,13 @@
 // High-score board: load/save/insert the top-10 scores in `localStorage`.
-// Each entry is { score: number, date: ISO-8601 string }.
+// Each entry is { score: number, date: ISO-8601 string, role: 'snake' | 'tetris' }.
+// Entries saved before roles existed have no `role` field and read as 'snake'.
 const STORAGE_KEY = 'snaketris.highscores';
+
+// Normalise an entry's role. Anything that is not 'tetris' is the snake side,
+// which keeps legacy entries readable.
+export function entryRole(entry) {
+  return entry && entry.role === 'tetris' ? 'tetris' : 'snake';
+}
 
 // Load the stored board. Returns [] when the entry is missing, not JSON,
 // or not an array, so corrupt state never breaks the game.
@@ -28,9 +35,9 @@ export function saveBoard(board) {
 // Record a finished game's score. Loads the board, appends the new entry,
 // sorts by score descending then date descending (newest first), keeps the
 // top 10, and saves.
-export function recordScore(score) {
+export function recordScore(score, role) {
   const board = loadBoard();
-  board.push({ score: score, date: new Date().toISOString() });
+  board.push({ score: score, date: new Date().toISOString(), role: role === 'tetris' ? 'tetris' : 'snake' });
   board.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     if (b.date > a.date) return 1;

@@ -41,11 +41,51 @@ test('static HTML: #ui interface column present', () => {
   assert.ok(html.includes('#ui'));
 });
 
-const { TETROMINOES } = await import(new URL('../js/constants.js', import.meta.url));
+test('static HTML: role sub-menu has exactly two items, main menu three', () => {
+  const roleBlock = html.match(/<ul id="role-items"[^>]*>([\s\S]*?)<\/ul>/);
+  assert.ok(roleBlock, 'missing #role-items list');
+  assert.equal((roleBlock[1].match(/<li/g) || []).length, 2);
+  const menuBlock = html.match(/<ul id="menu-items">([\s\S]*?)<\/ul>/);
+  assert.equal((menuBlock[1].match(/<li/g) || []).length, 3);
+});
+
+test('static HTML: role items carry the role markers', () => {
+  assert.ok(html.includes('<li id="role-item-snake" tabindex="-1">\u{1F40D} Snake</li>'));
+  assert.ok(html.includes('<li id="role-item-tetris" tabindex="-1">\u{1F3D7}\u{FE0F} Tetris</li>'));
+});
+
+test('static HTML: help view documents roles, bot, blocked rotation, and every input device', () => {
+  assert.ok(html.includes('Play — choose Snake or Tetris'));
+  assert.ok(html.includes('shift and rotate the piece'));
+  assert.ok(html.includes('The bot plays the side you did not choose.'));
+  assert.ok(html.includes('A rotation that hits a wall or a block is ignored.'));
+  assert.ok(html.includes('A piece may shift sideways once per snake step.'));
+  assert.ok(html.includes('Snake role: D-pad or left stick — steer'));
+  assert.ok(html.includes('Tetris role: D-pad left/right — shift, up/down — rotate'));
+  assert.ok(html.includes('Controller: A — confirm, B — back'));
+});
+
+const C = await import(new URL('../js/constants.js', import.meta.url));
+
+test('state machine includes the role-select state', () => {
+  assert.equal(C.SELECT_ROLE, 'SELECT_ROLE');
+  assert.equal(C.MENU_ITEMS.length, 3);
+});
+
+test('role items and markers are defined', () => {
+  assert.deepEqual(C.ROLE_ITEMS, ['Snake', 'Tetris']);
+  assert.equal(C.ROLE_MARKERS.snake, '\u{1F40D}');
+  assert.equal(C.ROLE_MARKERS.tetris, '\u{1F3D7}\u{FE0F}');
+});
+
+test('scoring constants', () => {
+  assert.equal(C.PIECE_BONUS, 4);
+  assert.equal(C.LINE_CLEAR_POINTS, 10);
+});
 
 test('TETROMINOES table integrity (7 tetrominoes, each 4 cells)', () => {
-  assert.equal(TETROMINOES.length, 7);
-  for (const t of TETROMINOES) {
+  assert.equal(C.TETROMINOES.length, 7);
+  for (const t of C.TETROMINOES) {
     assert.equal(t.length, 4);
     for (const [dr, dc] of t) {
       assert.ok(Number.isInteger(dr) && Number.isInteger(dc));

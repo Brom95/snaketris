@@ -8,14 +8,18 @@ import { recordScore } from './highscores.js';
 export const game = {
   state: MENU,
   menuSelect: 0,
+  roleSelect: 0,
+  role: 'snake',
   snake: [],
   pieces: [],
-  score: 0,
+  snakeScore: 0,
+  tetrisScore: 0,
   landedBlocks: 0,
   dir: { r: 0, c: 1 },
   nextDir: { r: 0, c: 1 },
   snakeAcc: 0,
   spawnAcc: 0,
+  pieceMoveAcc: 0,
   tick: 0
 };
 
@@ -24,8 +28,7 @@ function resetSnake() {
   game.snake = [
     { r: mid, c: 6 },
     { r: mid, c: 5 },
-    { r: mid, c: 4 },
-    { r: mid, c: 3 }
+    { r: mid, c: 4 }
   ];
   game.dir = { r: 0, c: 1 };
   game.nextDir = { r: 0, c: 1 };
@@ -34,19 +37,25 @@ function resetSnake() {
 export function resetGame() {
   game.state = MENU;
   game.menuSelect = 0;
+  game.roleSelect = 0;
   initGrid();
   resetSnake();
   game.pieces = [];
-  game.score = 0;
+  game.snakeScore = 0;
+  game.tetrisScore = 0;
   game.landedBlocks = 0;
   game.snakeAcc = 0;
   game.spawnAcc = 0;
+  game.pieceMoveAcc = 0;
   game.tick = 0;
 }
 
 export function startGame() {
   if (game.state === PLAYING) return;
+  const role = game.role;
   resetGame();
+  // resetGame clears the menu state; the role chosen before the game is kept.
+  game.role = role;
   game.state = PLAYING;
   // Prime the spawn accumulator so the first piece appears on the very next
   // update tick (matching the original immediate-spawn feel). Subsequent
@@ -61,9 +70,11 @@ export function restart() {
 export function toMenu() {
   game.state = MENU;
   game.menuSelect = 0;
+  game.roleSelect = 0;
 }
 
 export function gameOver() {
-  recordScore(game.score);
+  const playerScore = game.role === 'tetris' ? game.tetrisScore : game.snakeScore;
+  recordScore(playerScore, game.role);
   game.state = GAME_OVER;
 }
