@@ -1,7 +1,7 @@
 # mobile-input Specification
 
 ## Purpose
-Defines touch controls (swipe and tap-zone steering), touch-based start/restart, and responsive canvas sizing so the game is fully playable on mobile devices while preserving all existing keyboard input and game mechanics.
+Defines touch controls for the role the player chose — snake steering by swipe and tap zones, or piece shift and rotation in Tetris role — plus touch-based start/restart and responsive canvas sizing, so the game is fully playable on mobile devices while preserving all existing keyboard input and game mechanics.
 
 ## Requirements
 
@@ -38,6 +38,29 @@ The system SHALL map a tap (a touch ending with negligible displacement) to a sn
 #### Scenario: Tap respects the no-reverse rule
 - **WHEN** a tap requests a direction that is the exact opposite of the snake's current direction
 - **THEN** the direction is ignored and the snake continues in its current direction
+
+### Requirement: Touch piece control in Tetris role
+In Tetris role the system SHALL map a tap in the left or right region of the board to a sideways shift of the falling piece, a tap in the centre region to a rotation, and a swipe with a dominant vertical displacement to a rotation, and SHALL NOT interpret any touch gesture as snake steering.
+
+#### Scenario: Tap in the left region shifts the piece left
+- **WHEN** the player taps the left region of the board while a piece is falling in Tetris role
+- **THEN** the piece shifts one cell to the left
+
+#### Scenario: Tap in the right region shifts the piece right
+- **WHEN** the player taps the right region of the board while a piece is falling in Tetris role
+- **THEN** the piece shifts one cell to the right
+
+#### Scenario: Tap in the centre region rotates the piece
+- **WHEN** the player taps the centre region of the board while a piece is falling in Tetris role
+- **THEN** the piece rotates one quarter turn
+
+#### Scenario: Vertical swipe rotates the piece
+- **WHEN** the player performs a swipe with a dominant vertical displacement while a piece is falling in Tetris role
+- **THEN** the piece rotates one quarter turn in the direction of the swipe
+
+#### Scenario: Touch does not steer the snake in Tetris role
+- **WHEN** the player performs any swipe or tap on the board while a game is in progress in Tetris role
+- **THEN** the snake's direction is unchanged
 
 ### Requirement: Touch start and restart
 The system SHALL start the game from the idle state or restart it from the game-over state in response to a single tap on the board, matching the existing click behavior (score resets to 0 on restart).
