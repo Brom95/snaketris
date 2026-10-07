@@ -5,18 +5,14 @@
 **snaketris** is a single-page HTML5 game: a Snake/Tetris duel. Before each game the player chooses a role — Snake or Tetris. A bot drives the side the player did not choose. A falling piece is edible while it moves; once it touches the bottom or rests on other pieces it stops being edible and becomes a solid obstacle. The higher side score wins.
 
 - **Tech stack:** `snaketris.html` + `js/` ES modules (`constants.js`, `grid.js`, `state.js`, `engine.js`, `pieces.js`, `snake.js`, `bot.js`, `devices.js`, `input.js`, `ui.js`, `render.js`, `highscores.js`, `app.js`) + `package.json` (`"type": "module"`); vanilla JS only, no framework, no backend, no external dependencies, no build step. `snaketris.html` loads a single `<script type="module" src="js/app.js">` and is served over HTTP (primary target: GitHub Pages; `file://` double-click is blocked for module scripts in some browsers, e.g. Chrome).
-- **Current state:** Fully implemented. Change `role-selection-bot-snake` (40 tasks) is complete and awaits sync/archive. Unit tests live in `tests/` and run with `node --test "tests/**/*.test.js"` (106 checks). The headless Playwright check `scripts/verify-role-duel.mjs` drives the real page; final playability is confirmed by the user. Code pushed to main; GitHub Pages site at https://Brom95.github.io/snaketris.
+- **Current state:** Fully implemented. Change `role-selection-bot-snake` is synced into the main specs and archived. Unit tests live in `tests/` and run with `node --test "tests/**/*.test.js"` (109 checks). The headless Playwright check `scripts/verify-role-duel.mjs` drives the real page; final playability is confirmed by the user. Code pushed to main; GitHub Pages site at https://Brom95.github.io/snaketris.
 
 ## OpenSpec Setup
 
 - Schema: `spec-driven` (see `openspec/config.yaml`).
-- Active change: `openspec/changes/role-selection-bot-snake/`
-  - `proposal.md` — why/what
-  - `design.md` — role selection, bot policies, shared piece-shift throttle, side scoring
-  - `specs/` — `snaketris-game`, `bot-opponent`, `start-menu`, `hud`, `highscores`, `controller`, `mobile-input`
-  - `tasks.md` — 40 numbered tasks (state/constants → role sub-menu → piece control → bot snake policy → bot piece policy → scoring/HUD → records → help/docs → integration verification)
-- Main specs live in `openspec/specs/` (updated by `/opsx-sync` / archive).
-- Changes `snaketris-game` and `sequential-pieces-code-extraction` are archived in `openspec/changes/archive/`.
+- Open change: `openspec/changes/tighten-mobile-top-space/` (4 tasks, all complete; not yet synced or archived).
+- Main specs live in `openspec/specs/` (updated by `/opsx-sync` / archive): `snaketris-game`, `bot-opponent`, `start-menu`, `hud`, `highscores`, `controller`, `mobile-input`, `responsive-layout`.
+- Completed changes, including `role-selection-bot-snake`, are archived in `openspec/changes/archive/`.
 
 ### OpenSpec workflow (Qwen Code)
 
