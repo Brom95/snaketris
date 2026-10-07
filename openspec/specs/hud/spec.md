@@ -5,24 +5,27 @@ Defines the text that accompanies live play — the two side-score readouts and 
 
 ## Requirements
 
-### Requirement: Score readout as a page element
-The system SHALL show the running score as a page element, and SHALL keep it visible for the whole duration of a game. While the interface shares a track beside the field the readout SHALL lie outside the play field; where the interface stacks above the field because the field already fills the available width, the readout SHALL instead overlay the top edge of the field, so the board can use the height the readout would otherwise take from it. The readout SHALL NOT overlay a field that is not on screen.
+### Requirement: Score readout is a page element
+The system SHALL show the running score as a page element, and SHALL keep it visible for the whole duration of a game.
 
 #### Scenario: Score visible while playing
 - **WHEN** a game is in progress
 - **THEN** the current score is shown in a page element
 
+#### Scenario: Readout stays in the interface while the field is hidden
+- **WHEN** the starting menu, the records view or the help view is shown on a narrow viewport
+- **THEN** the readout is not positioned over the hidden field
+
+### Requirement: Score readout placement follows the layout
+Where the interface shares a track beside the field, the readout SHALL lie outside the play field. Where the interface stacks above the field, the readout SHALL sit inside the interface band above the field, not over the field.
+
 #### Scenario: Score never occludes the board
 - **WHEN** the score readout is shown at a viewport size where the interface sits beside the field
 - **THEN** it does not cover any part of the play field, and no falling piece or landed block is hidden behind it
 
-#### Scenario: Score overlays the field top on a stacked layout
+#### Scenario: Score sits in the stacked interface band on mobile
 - **WHEN** the interface stacks above the field on a narrow viewport while a game is in progress
-- **THEN** the readout sits over the top edge of the field, confined to that top band, and the rest of the board is unobstructed
-
-#### Scenario: Readout stays in the interface while the field is hidden
-- **WHEN** the starting menu, the records view or the help view is shown on a narrow viewport
-- **THEN** the readout is not positioned over the hidden field
+- **THEN** the readout is positioned within the stacked interface band above the field, not overlaying the top edge of the field, and the full field height below that band is unobstructed
 
 ### Requirement: Score readout tracks the running score
 The system SHALL update the score readout as the scores change, showing the snake score and the Tetris score, each labelled with its side. The readout SHALL NOT show the chosen role name.

@@ -17,7 +17,7 @@ The system SHALL size the play field and the page interface by separate rules, s
 - **THEN** the interface keeps its own legible size rather than scaling by the same factor as the field
 
 ### Requirement: Interface never overlaps the play field
-The system SHALL place the interface so it does not cover any part of the play field at any supported viewport size, with one exception: the score readout, which MAY overlay the top edge of the field where the interface stacks above it (see the `hud` capability). No other interface element — menu, records, help or game-over message — SHALL cover the field.
+The system SHALL place the interface so it does not cover any part of the play field at any supported viewport size. No interface element — score readout, menu, records, help or game-over message — SHALL cover the field.
 
 #### Scenario: No overlap on a wide viewport
 - **WHEN** the game is shown on a wide desktop viewport
@@ -27,8 +27,16 @@ The system SHALL place the interface so it does not cover any part of the play f
 - **WHEN** the game is shown on a narrow phone viewport where the field already fills the available width
 - **THEN** the menu, records, help and game-over elements are placed clear of the field, and the field keeps its contain-fit rule with the height the stacked interface occupies subtracted from the height it may use
 
-### Requirement: Stacked interface yields its band to the field
-Where the interface stacks above the field because the field already fills the viewport width, the system SHALL subtract the height the interface occupies on that axis from the height available to the field, so that field and interface together fit the viewport without scrolling. An interface element that overlays the field instead of occupying that axis SHALL NOT be subtracted.
+### Requirement: Stacked interface band and mobile gap
+The system SHALL subtract the stacked interface band from the field's available height when the interface stacks above the field, so the board never extends past the viewport. On narrow viewports (≤ 760 px), the vertical gap between the viewport top and the field is reduced from `FIELD_V_GAP` to a smaller value (`FIELD_V_GAP_MOBILE`), so the board starts higher on screen and uses more of the available height.
+
+#### Scenario: Stacked interface yields its band
+- **WHEN** the interface stacks above the field on a narrow viewport
+- **THEN** the field is scaled against the height left after the interface band and the gap, so field and interface together fit the viewport without scrolling
+
+#### Scenario: Tightened top gap on mobile
+- **WHEN** the game is shown on a viewport no wider than 760 px
+- **THEN** the vertical gap around the field is `FIELD_V_GAP_MOBILE` instead of `FIELD_V_GAP`, and the field starts higher on screen than on a wide viewport
 
 #### Scenario: Phone viewport shares its height between field and interface
 - **WHEN** the game is shown on a phone viewport whose width forces the interface to stack above the field
@@ -37,10 +45,6 @@ Where the interface stacks above the field because the field already fills the v
 #### Scenario: Beside layout reserves nothing
 - **WHEN** the interface shares a track beside the field on a wide viewport
 - **THEN** the field is scaled by the plain contain-fit rule with no height reserved for the interface
-
-#### Scenario: Overlaid readout reserves no band
-- **WHEN** the score readout overlays the top edge of the field on a stacked layout
-- **THEN** the readout is not counted in the interface band and the field is taller than it was while the readout occupied the band
 
 ### Requirement: Interface stays reachable without scrolling
 The system SHALL keep every interface element fully visible without horizontal or vertical scrolling at any supported viewport size.
