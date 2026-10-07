@@ -5,14 +5,14 @@
 **snaketris** is a single-page HTML5 game: a Snake/Tetris duel. Before each game the player chooses a role — Snake or Tetris. A bot drives the side the player did not choose. A falling piece is edible while it moves; once it touches the bottom or rests on other pieces it stops being edible and becomes a solid obstacle. The higher side score wins.
 
 - **Tech stack:** `snaketris.html` + `js/` ES modules (`constants.js`, `grid.js`, `state.js`, `engine.js`, `pieces.js`, `snake.js`, `bot.js`, `devices.js`, `input.js`, `ui.js`, `render.js`, `highscores.js`, `app.js`) + `package.json` (`"type": "module"`); vanilla JS only, no framework, no backend, no external dependencies, no build step. `snaketris.html` loads a single `<script type="module" src="js/app.js">` and is served over HTTP (primary target: GitHub Pages; `file://` double-click is blocked for module scripts in some browsers, e.g. Chrome).
-- **Current state:** Fully implemented. Change `role-selection-bot-snake` is synced into the main specs and archived. Unit tests live in `tests/` and run with `node --test "tests/**/*.test.js"` (109 checks). The headless Playwright check `scripts/verify-role-duel.mjs` drives the real page; final playability is confirmed by the user. Code pushed to main; GitHub Pages site at https://Brom95.github.io/snaketris.
+- **Current state:** Fully implemented. Changes `role-selection-bot-snake` and `tighten-mobile-top-space` are synced into the main specs and archived. Unit tests live in `tests/` and run with `node --test "tests/**/*.test.js"` (109 checks). The headless Playwright check `scripts/verify-role-duel.mjs` drives the real page; final playability is confirmed by the user. Code pushed to main; GitHub Pages site at https://Brom95.github.io/snaketris.
 
 ## OpenSpec Setup
 
 - Schema: `spec-driven` (see `openspec/config.yaml`).
-- Open change: `openspec/changes/tighten-mobile-top-space/` (4 tasks, all complete; not yet synced or archived).
+- Open changes: none — `openspec list` reports "No active changes found".
 - Main specs live in `openspec/specs/` (updated by `/opsx-sync` / archive): `snaketris-game`, `bot-opponent`, `start-menu`, `hud`, `highscores`, `controller`, `mobile-input`, `responsive-layout`.
-- Completed changes, including `role-selection-bot-snake`, are archived in `openspec/changes/archive/`.
+- Completed changes, including `role-selection-bot-snake` and `tighten-mobile-top-space`, are archived in `openspec/changes/archive/`.
 
 ### OpenSpec workflow (Qwen Code)
 
@@ -50,7 +50,7 @@
 ## Building and Running
 
 - **Run:** no build step — `snaketris.html` loads `js/app.js` via `<script type="module" src="js/app.js">`; serve over HTTP (published site https://Brom95.github.io/snaketris, or a local static server). `file://` double-click is blocked for module scripts in some browsers (Chrome).
-- **Testing:** `node:test` only — `node --test "tests/**/*.test.js"` (106 checks). `tests/helpers/dom-stub.js` supplies the stubbed DOM, canvas, `localStorage` and gamepad, plus a seeded LCG RNG (seed 20240601) so the suite is deterministic. `scripts/verify-role-duel.mjs` and `scripts/verify-views.mjs` drive the real page headless with Playwright (the repo is served over `http://duel.test/` through `page.route`, so no local server is needed). Final playability is confirmed by the user against the per-task "verify" clauses in `tasks.md`. Ripwire's `quality_delta` (structure) and CLI `--test-gate` form the pre-PR self-check.
+- **Testing:** `node:test` only — `node --test "tests/**/*.test.js"` (109 checks). `tests/helpers/dom-stub.js` supplies the stubbed DOM, canvas, `localStorage` and gamepad, plus a seeded LCG RNG (seed 20240601) so the suite is deterministic. Static harnesses `scripts/verify-hud.mjs`, `scripts/verify-page-layout.mjs` and `scripts/verify-menu-geometry.mjs` check the page markup, the CSS constants and the menu behaviour; `scripts/verify-role-duel.mjs` and `scripts/verify-views.mjs` drive the real page headless with Playwright (the repo is served over `http://duel.test/` through `page.route`, so no local server is needed). Final playability is confirmed by the user against the per-task "verify" clauses in `tasks.md`. Ripwire's `quality_delta` (structure) and CLI `--test-gate` form the pre-PR self-check.
 
 ## Development Conventions
 
