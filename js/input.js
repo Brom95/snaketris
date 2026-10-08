@@ -6,7 +6,7 @@
 import {
   BOARD_W, BOARD_H, FIELD_V_GAP, FIELD_V_GAP_MOBILE, UI_STACK_MAX_WIDTH,
   PLAYING, MENU, SELECT_ROLE, RECORDS, HELP, GAME_OVER,
-  MENU_ITEMS, ROLE_ITEMS,
+  MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS,
 } from './constants.js';
 import { game, toMenu, startGame } from './state.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
@@ -24,14 +24,13 @@ import {
 let canvas = null;
 let menuItemsEls = [];
 let roleItemsEls = [];
-let roleBackEl = null;
 
 // ---------- FLOW: single state machine (collapsed nav path) ----------
 // Move the highlight one step in the active list: the role list in the
 // sub-menu, the main menu list otherwise. Wrapping keeps the ends reachable.
 function moveSelection(step) {
   if (game.state === SELECT_ROLE) {
-    game.roleSelect = (game.roleSelect + step + ROLE_ITEMS.length) % ROLE_ITEMS.length;
+    game.roleSelect = (game.roleSelect + step + ROLE_SCREEN_ITEMS.length) % ROLE_SCREEN_ITEMS.length;
   } else {
     game.menuSelect = (game.menuSelect + step + MENU_ITEMS.length) % MENU_ITEMS.length;
   }
@@ -45,6 +44,10 @@ function confirmSelection() {
     else if (game.menuSelect === 1) game.state = RECORDS;
     else game.state = HELP;
   } else if (game.state === SELECT_ROLE) {
+    if (game.roleSelect === ROLE_SCREEN_ITEMS.length - 1) {
+      toMenu();
+      return;
+    }
     game.role = ROLE_ITEMS[game.roleSelect].toLowerCase();
     startGame();
   }
@@ -161,7 +164,6 @@ export function initInput(canvasEl) {
   // bails out for anything happening on the board (see onInterfacePointerUp).
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
   roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
-  roleBackEl = document.getElementById('role-back');
   document.addEventListener('pointerup', onInterfacePointerUp);
 }
 
@@ -202,13 +204,13 @@ export function onInterfacePointerUp(e) {
     return;
   }
   if (game.state === SELECT_ROLE) {
+    // Back is a normal item in the list, so confirming index 2 returns to the
+    // menu through the same path as a role choice.
     const item = firstHit(roleItemsEls, x, y);
     if (item >= 0) {
       game.roleSelect = item;
       handleIntent({ action: 'confirm' });
-      return;
     }
-    if (hit(roleBackEl, x, y)) handleIntent({ action: 'toMenu' });
     return;
   }
   if (game.state === RECORDS || game.state === HELP || game.state === GAME_OVER) {

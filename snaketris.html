@@ -55,10 +55,13 @@
       justify-content: center;
       align-items: center;
     }
-    #menu-items { list-style: none; margin: 0; padding: 0; }
+    /* The marker sits on every item and only changes opacity, so no item
+       grows when it becomes selected and the list never re-centres. */
+    #menu-items { list-style: none; margin: 0; padding: 0; min-width: 170px; }
     #menu-items li { font-size: 20px; padding: 20px 0; }
-    #menu-items li.on { font-weight: bold; color: #a7f3a0; }
-    #menu-items li.on::before { content: '\25b6 '; }
+    #menu-items li::before { content: '\25b6 '; opacity: 0; }
+    #menu-items li.on { color: #a7f3a0; }
+    #menu-items li.on::before { opacity: 1; }
     /* The role screen is its own view: it replaces the menu, so the menu items
        and the GitHub link are not on screen while it is open. */
     #role-view.on {
@@ -68,11 +71,12 @@
       align-items: center;
     }
     #role-title { font-size: 24px; margin: 0; }
-    /* Role items: same highlight rule as the main menu, smaller items. */
-    #role-items { list-style: none; margin: 0; padding: 0; }
-    #role-items li { font-size: 18px; padding: 12px 0; }
-    #role-items li.on { font-weight: bold; color: #a7f3a0; }
-    #role-items li.on::before { content: '\25b6 '; }
+    /* Role items: same marker rule and font size as the main menu. */
+    #role-items { list-style: none; margin: 0; padding: 0; min-width: 170px; }
+    #role-items li { font-size: 20px; padding: 12px 0; }
+    #role-items li::before { content: '\25b6 '; opacity: 0; }
+    #role-items li.on { color: #a7f3a0; }
+    #role-items li.on::before { opacity: 1; }
     #github-link { color: inherit; text-decoration: none; }
     #github-link svg { width: 24px; height: 24px; fill: currentColor; }
     #records-title, #help-title { font-size: 24px; margin: 0; }
@@ -123,8 +127,8 @@
       <ul id="role-items">
         <li id="role-item-snake" tabindex="-1">🐍 Snake</li>
         <li id="role-item-tetris" tabindex="-1">🏗️ Tetris</li>
+        <li id="role-back" tabindex="-1">Back</li>
       </ul>
-      <p id="role-back" class="return" tabindex="-1">Back</p>
     </div>
     <div id="records-view" class="view">
       <h2 id="records-title">Records</h2>
@@ -144,7 +148,7 @@
           <li>Tetris role: Arrows / WASD — shift and rotate the piece</li>
           <li>Tetris role: Tap a side — shift, tap the centre — rotate</li>
           <li>Tetris role: Vertical swipe — rotate</li>
-          <li>Tetris role: D-pad left/right — shift, up/down — rotate</li>
+          <li>Tetris role: D-pad left/right — shift, up/down — rotate, A — rotate clockwise</li>
           <li>Controller: A — confirm, B — back</li>
           <li>Back or Escape — return to the menu</li>
           <li>R or click — start</li>
@@ -156,7 +160,7 @@
           <li>The bot plays the side you did not choose.</li>
           <li>Snake: eat falling pieces, +1 per cell, +4 for a whole piece.</li>
           <li>Tetris: +1 per landed block, +10 per full row cleared.</li>
-          <li>A rotation that hits a wall or a block is ignored.</li>
+          <li>A blocked rotation tries the wall kicks. If every kick fails, the rotation is ignored.</li>
           <li>A piece may shift sideways once per snake step.</li>
           <li>Avoid blocks and your body.</li>
           <li>Edges wrap around the board.</li>

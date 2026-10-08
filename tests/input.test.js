@@ -27,7 +27,7 @@ test('no-reverse + keyboard mapping', async () => {
   assert.equal(state.game.nextDir.c, 0);
 });
 
-test('role sub-menu: R opens it, up/down wrap, confirm starts the chosen role', () => {
+test('role screen: R opens it, up/down wrap over Snake, Tetris, Back', () => {
   fresh();
   assert.equal(state.game.state, 'MENU');
   input.onKey({ key: 'r', preventDefault() {} });
@@ -35,9 +35,19 @@ test('role sub-menu: R opens it, up/down wrap, confirm starts the chosen role', 
 
   input.onKey({ key: 's', preventDefault() {} }); // down → Tetris
   assert.equal(state.game.roleSelect, 1);
-  input.onKey({ key: 's', preventDefault() {} }); // wraps back to Snake
+  input.onKey({ key: 's', preventDefault() {} }); // down → Back
+  assert.equal(state.game.roleSelect, 2);
+  input.onKey({ key: 's', preventDefault() {} }); // down wraps to Snake
   assert.equal(state.game.roleSelect, 0);
-  input.onKey({ key: 'w', preventDefault() {} }); // up wraps to Tetris
+  input.onKey({ key: 'w', preventDefault() {} }); // up wraps to Back
+  assert.equal(state.game.roleSelect, 2);
+  input.onKey({ key: 'Enter', preventDefault() {} });
+  assert.equal(state.game.state, 'MENU');
+  assert.equal(state.game.roleSelect, 0);
+  assert.equal(state.game.pieces.length, 0);
+
+  input.onKey({ key: 'r', preventDefault() {} }); // reopen the role screen
+  input.onKey({ key: 's', preventDefault() {} }); // down → Tetris
   assert.equal(state.game.roleSelect, 1);
   input.onKey({ key: 'Enter', preventDefault() {} });
   assert.equal(state.game.state, 'PLAYING');

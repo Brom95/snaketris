@@ -77,6 +77,7 @@ export function installDomStub() {
   canvas.addEventListener = (type, fn) => { (events.canvas[type] ??= []).push(fn); };
 
   // Interface elements declared in snaketris.html, keyed by id.
+  const roleBackEl = makeEl('role-back', { left: 0, top: 60, width: 320, height: 24 });
   const elements = {
     game: canvas,
     ui: makeEl('ui'),
@@ -84,7 +85,7 @@ export function installDomStub() {
     status: makeEl('status'),
     'menu-view': makeEl('menu-view'),
     'role-view': makeEl('role-view'),
-    'role-back': makeEl('role-back', { left: 0, top: 60, width: 320, height: 24 }),
+    'role-back': roleBackEl,
     'records-view': makeEl('records-view'),
     'help-view': makeEl('help-view'),
     'records-list': makeEl('records-list'),
@@ -93,7 +94,8 @@ export function installDomStub() {
     'role-items': makeEl('role-items'),
   };
   const menuItems = [makeEl('menu-item-play'), makeEl('menu-item-records'), makeEl('menu-item-help')];
-  const roleItems = [makeEl('role-item-snake'), makeEl('role-item-tetris')];
+  // Back is the third selectable item of the role list, not a separate control.
+  const roleItems = [makeEl('role-item-snake'), makeEl('role-item-tetris'), roleBackEl];
 
   const document = {
     getElementById: (id) => elements[id] ?? null,
