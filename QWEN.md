@@ -5,14 +5,14 @@
 **snaketris** is a single-page HTML5 game: a Snake/Tetris duel. Before each game the player chooses a role — Snake or Tetris. A bot drives the side the player did not choose. A falling piece is edible while it moves; once it touches the bottom or rests on other pieces it stops being edible and becomes a solid obstacle. The higher side score wins.
 
 - **Tech stack:** `snaketris.html` + `js/` ES modules (`constants.js`, `grid.js`, `state.js`, `engine.js`, `pieces.js`, `snake.js`, `bot.js`, `devices.js`, `input.js`, `ui.js`, `render.js`, `highscores.js`, `app.js`) + `package.json` (`"type": "module"`); vanilla JS only, no framework, no backend, no external dependencies, no build step. `snaketris.html` loads a single `<script type="module" src="js/app.js">` and is served over HTTP (primary target: GitHub Pages; `file://` double-click is blocked for module scripts in some browsers, e.g. Chrome).
-- **Current state:** Fully implemented. Changes `role-selection-bot-snake` and `tighten-mobile-top-space` are synced into the main specs and archived. Unit tests live in `tests/` and run with `node --test "tests/**/*.test.js"` (109 checks). The headless Playwright check `scripts/verify-role-duel.mjs` drives the real page; final playability is confirmed by the user. Code pushed to main; GitHub Pages site at https://Brom95.github.io/snaketris.
+- **Current state:** Fully implemented. `npm run verify` runs every harness script and `npm test` runs the unit suite; both exit 0 (120 unit checks, 8 harness scripts). Final playability is confirmed by the user. Code pushed to main; GitHub Pages site at https://Brom95.github.io/snaketris.
 
 ## OpenSpec Setup
 
 - Schema: `spec-driven` (see `openspec/config.yaml`).
 - Open changes: none — `openspec list` reports "No active changes found".
 - Main specs live in `openspec/specs/` (updated by `/opsx-sync` / archive): `snaketris-game`, `bot-opponent`, `start-menu`, `hud`, `highscores`, `controller`, `mobile-input`, `responsive-layout`.
-- Completed changes, including `role-selection-bot-snake` and `tighten-mobile-top-space`, are archived in `openspec/changes/archive/`.
+- Completed changes, including `role-selection-bot-snake`, `tighten-mobile-top-space`, `static-menu-selection`, `srs-piece-rotation`, `gamepad-a-rotate` and `shared-e2e-harness`, are archived in `openspec/changes/archive/`.
 
 ### OpenSpec workflow (Qwen Code)
 
@@ -40,7 +40,7 @@
 - **Roles:** the player picks Snake or Tetris in the role sub-menu (`Play` → `SELECT_ROLE`). The bot drives the other side. The starting snake is three segments.
 - **Snake:** moves on discrete steps (arrows/WASD, swipe or tap, no-reverse rule); classic growth — each eaten cell adds one segment; wrap-around at all four edges (modulo, no walls). Step interval is derived from the current piece fall speed: `max(1, 1/fallSpeed − 2)` ticks/cell — the snake is always strictly faster than a falling piece vertically (23 ticks/cell at base, 1 tick/cell at the 0.9 cap).
 - **Pieces:** the seven classic tetrominoes (I, O, T, S, Z, L, J) spawn at the top and fall; **edible while falling**, **solid obstacle once landed** (touches bottom or rests on other pieces). **Sequential spawn:** at most one piece is falling at a time — the next spawns only after the previous one has landed or been fully eaten. Falling is continuous, snaps to the grid only on landing.
-- **Piece control:** the side that controls the piece (the player in Tetris role, the bot otherwise) can shift it one cell sideways or rotate it. A sideways shift is throttled to one cell per snake step (`game.pieceMoveAcc` gate, shared by player and bot). A rotation that leaves the board sideways or overlaps a solid block is ignored.
+- **Piece control:** the side that controls the piece (the player in Tetris role, the bot otherwise) can shift it one cell sideways or rotate it. A sideways shift is throttled to one cell per snake step (`game.pieceMoveAcc` gate, shared by player and bot). Rotation follows the Super Rotation System: every tetromino has four rotation states, and a turn tries the five SRS wall-kick offsets in order, applying the first that keeps the piece inside the board and clear of solid blocks; if none fits, the turn is ignored. A rotation never interrupts the fall.
 - **Scoring:** two side scores. Snake: **+1 per eaten cell**, **+4 bonus** when a whole piece is eaten. Tetris: **+1 per landed cell**, **+10 per cleared row**. The high-score entry stores the score of the side the player played; the HUD shows both scores and never the role name.
 - **Difficulty ramp:** every **5 landed blocks**, fall speed ticks up one step (×1.08): base **0.04 cells/tick**, cap **0.9 cells/tick**.
 - **Death:** snake head overlaps own body, or touches a solid (landed) block → game over. Wrap-around is applied *before* the collision test. A piece that lands with no cell inside the grid (top-out) also ends the game.
@@ -50,7 +50,7 @@
 ## Building and Running
 
 - **Run:** no build step — `snaketris.html` loads `js/app.js` via `<script type="module" src="js/app.js">`; serve over HTTP (published site https://Brom95.github.io/snaketris, or a local static server). `file://` double-click is blocked for module scripts in some browsers (Chrome).
-- **Testing:** `node:test` only — `node --test "tests/**/*.test.js"` (109 checks). `tests/helpers/dom-stub.js` supplies the stubbed DOM, canvas, `localStorage` and gamepad, plus a seeded LCG RNG (seed 20240601) so the suite is deterministic. Static harnesses `scripts/verify-hud.mjs`, `scripts/verify-page-layout.mjs` and `scripts/verify-menu-geometry.mjs` check the page markup, the CSS constants and the menu behaviour; `scripts/verify-role-duel.mjs` and `scripts/verify-views.mjs` drive the real page headless with Playwright (the repo is served over `http://duel.test/` through `page.route`, so no local server is needed). Final playability is confirmed by the user against the per-task "verify" clauses in `tasks.md`. Ripwire's `quality_delta` (structure) and CLI `--test-gate` form the pre-PR self-check.
+- **Testing:** two layers, one command each. `npm test` runs `node --test "tests/**/*.test.js"` (120 checks); `npm run verify` runs `scripts/verify-all.mjs`, which runs all eight harness scripts one after another and prints every exit code. `scripts/harness.mjs` is the shared layer: `check`, `report`, `stubDom`, `servePage`, `waitFor`, `shown`, `snapshot`, plus the Playwright helpers (`freshPage`, `playRole`, `stateIs`, `boxesAtEverySelection`, …). `tests/helpers/dom-stub.js` stays separate: unit tests need a seeded LCG RNG (seed 20240601) for determinism. Playwright scripts serve the repo over `http://duel.test/` through `page.route`, so no local server is needed. Final playability is confirmed by the user against the per-task "verify" clauses in `tasks.md`. Ripwire's `quality_delta` (structure) and CLI `--test-gate` form the pre-PR self-check.
 
 ## Development Conventions
 

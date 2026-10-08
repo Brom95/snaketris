@@ -63,22 +63,26 @@ The system SHALL let the player move the starting menu selection with the D-pad 
 - **THEN** the highlighted item is confirmed: "Play" starts a new game, "Records" opens the records view, and "How to Play" opens the help view
 
 ### Requirement: Controller role selection
-The system SHALL let the player move the role selection with the D-pad up/down or the left-stick up/down, confirm the highlighted role with the A button, and return to the starting menu with the B button, matching the keyboard behaviour.
+The system SHALL let the player move the role-screen selection with the D-pad up/down or the left-stick up/down through "Snake", "Tetris" and "Back", confirm the highlighted item with the A button, and return to the starting menu with the B button, matching the keyboard behaviour. Confirming "Back" returns to the starting menu.
 
 #### Scenario: D-pad moves the role selection
-- **WHEN** the role sub-menu is shown and the player presses the D-pad down button
-- **THEN** the highlighted role moves to the other role
+- **WHEN** the role screen is shown and the player presses the D-pad down button
+- **THEN** the highlighted item moves to the next item in the cycle "Snake" → "Tetris" → "Back" → "Snake"
 
 #### Scenario: A confirms the role
-- **WHEN** the role sub-menu is shown and the player presses the A button
+- **WHEN** the role screen is shown with a role item highlighted and the player presses the A button
 - **THEN** the highlighted role is chosen and the game starts
+
+#### Scenario: A on Back returns to the menu
+- **WHEN** the role screen is shown with "Back" highlighted and the player presses the A button
+- **THEN** the starting menu is shown again and no game has started
 
 #### Scenario: B cancels the role sub-menu
 - **WHEN** the role sub-menu is shown and the player presses the B button
 - **THEN** the starting menu is shown again and no game has started
 
 ### Requirement: Controller piece control in Tetris role
-In Tetris role the system SHALL map the D-pad left/right buttons (standard gamepad buttons 14 and 15) to a sideways shift of the falling piece and the D-pad up/down buttons (standard gamepad buttons 12 and 13) to a rotation, and SHALL NOT use them to steer the snake.
+In Tetris role the system SHALL map the D-pad left/right buttons (standard gamepad buttons 14 and 15) to a sideways shift of the falling piece, the D-pad up/down buttons (standard gamepad buttons 12 and 13) to a rotation, and the A button (standard gamepad button 0) to a clockwise rotation. The system SHALL NOT use them to steer the snake. When a held shift and an A press occur in the same frame, the system SHALL apply the rotation and keep the shift for a later frame.
 
 #### Scenario: D-pad left shifts the piece left
 - **WHEN** the player presses the D-pad left button while a piece is falling in Tetris role
@@ -87,6 +91,14 @@ In Tetris role the system SHALL map the D-pad left/right buttons (standard gamep
 #### Scenario: D-pad up rotates the piece
 - **WHEN** the player presses the D-pad up button while a piece is falling in Tetris role
 - **THEN** the piece rotates one quarter turn
+
+#### Scenario: A rotates the piece clockwise
+- **WHEN** the player presses the A button while a piece is falling in Tetris role
+- **THEN** the piece rotates one quarter turn clockwise
+
+#### Scenario: A rotation is not lost while a direction is held
+- **WHEN** the player holds the D-pad left and presses A in the same frame
+- **THEN** the piece rotates clockwise, and the shift is applied on a later frame
 
 #### Scenario: Controller cannot steer the snake in Tetris role
 - **WHEN** the player presses any D-pad direction while a game is in progress in Tetris role
@@ -124,3 +136,10 @@ The system SHALL allow controller, keyboard, and touch/pointer input to coexist:
 #### Scenario: Controller connected does not disable touch
 - **WHEN** a gamepad is connected while the game is running
 - **THEN** touch and pointer input continue to work exactly as before, and the player may switch between controller and touch without any setting
+
+### Requirement: Controller A button is unused while the player controls the snake
+The system SHALL NOT change the snake's direction, the game state, or any score in response to the A button while a game is in progress in Snake role.
+
+#### Scenario: A does nothing in Snake role
+- **WHEN** a game is in progress in Snake role and the player presses the A button
+- **THEN** the snake's direction is unchanged and the game continues
