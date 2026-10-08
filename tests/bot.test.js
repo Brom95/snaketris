@@ -9,7 +9,7 @@ installDomStub();
 const { game } = await import('../js/state.js');
 const { chooseBotDir, choosePieceMove, botSystem } = await import('../js/bot.js');
 const { setCell, getCell } = await import('../js/grid.js');
-const { SOLID, COLS, ROWS, MAX_FALL } = await import('../js/constants.js');
+const { SOLID, COLS, ROWS, MAX_FALL, TETROMINOES } = await import('../js/constants.js');
 const { snakeTicksPerCell } = await import('../js/snake.js');
 const { piecesSystem, requestPieceShift, currentFallSpeed } = await import('../js/pieces.js');
 
@@ -20,10 +20,15 @@ function freshStart(role) {
   return game;
 }
 
-function placePiece(shape, col, row) {
+function placePiece(shape, col, row, type = 'O', state = 0) {
   game.pieces.length = 0;
-  game.pieces.push({ shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
+  game.pieces.push({ type, state, shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
   return game.pieces[0];
+}
+
+// Cell offsets sorted by row then column, so two shapes compare as sets.
+function cells(shape) {
+  return [...shape].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 }
 
 // ---------- Snake pursuit ----------
@@ -136,19 +141,19 @@ test('bot obeys the no-reverse rule like the player', () => {
 test('bot chooses the placement that completes a row', () => {
   freshStart('snake');
   for (let c = 2; c < COLS; c++) setCell(19, c, SOLID); // bottom row missing cols 0-1
-  const p = placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 5, 10); // O piece
+  const p = placePiece(TETROMINOES.O[0], 5, 10, 'O', 0);
   const target = choosePieceMove(p);
   assert.equal(target.col, 0);
-  assert.equal(target.rot, 0);
+  assert.equal(target.state, 0);
 });
 
-test('bot rotates to fill a gap when the shape fits better turned', () => {
+test('bot turns the piece when the turned shape scores better', () => {
   freshStart('snake');
-  for (let c = 1; c < COLS; c++) setCell(19, c, SOLID); // bottom row missing col 0
-  const p = placePiece([[0, 0], [0, 1], [0, 2], [0, 3]], 0, 10); // horizontal I at col 0
+  for (let c = 0; c < COLS - 1; c++) setCell(19, c, SOLID); // bottom row missing col 9
+  const p = placePiece(TETROMINOES.I[0], 6, 10, 'I', 0); // horizontal I
   const target = choosePieceMove(p);
-  assert.equal(target.col, 0);
-  assert.equal(target.rot, 1); // vertical I completes the bottom row
+  assert.equal(target.state, 1); // vertical I fills the missing cell
+  assert.equal(target.col, 7);
 });
 
 test('bot takes exactly one action per decision: one shift toward the target column', () => {
@@ -162,14 +167,14 @@ test('bot takes exactly one action per decision: one shift toward the target col
   assert.equal(p.col, 4);
 });
 
-test('bot rotates in place when the piece is already in the target column', () => {
+test('bot turns the piece in place when it is already in the target column', () => {
   freshStart('snake');
-  for (let c = 1; c < COLS; c++) setCell(19, c, SOLID);
-  const p = placePiece([[0, 0], [0, 1], [0, 2], [0, 3]], 0, 10);
-  const before = JSON.stringify([p.shape, p.col]);
+  for (let c = 0; c < COLS - 1; c++) setCell(19, c, SOLID); // bottom row missing col 9
+  const p = placePiece(TETROMINOES.I[0], 7, 10, 'I', 0);
   botSystem.update({});
-  assert.notEqual(JSON.stringify([p.shape, p.col]), before, 'the bot did not rotate');
-  assert.equal(p.col, 0);
+  assert.equal(p.state, 1, 'the bot did not rotate');
+  assert.equal(p.col, 7);
+  assert.deepEqual(cells(p.shape), cells(TETROMINOES.I[1]));
 });
 
 test('bot issues no piece action in Tetris role', () => {
@@ -199,7 +204,7 @@ test('bot does nothing outside PLAYING', () => {
 
 test('choosePieceMove is deterministic', () => {
   freshStart('snake');
-  const p = placePiece([[0, 1], [1, 0], [1, 1], [1, 2]], 3, 8);
+  const p = placePiece(TETROMINOES.T[0], 3, 8, 'T', 0);
   const a = choosePieceMove(p);
   const b = choosePieceMove(p);
   assert.deepEqual(a, b);
@@ -222,9 +227,9 @@ test('equal rows: the bot prefers the placement with no hole', () => {
     setCell(r, 5, SOLID);
     setCell(r, 6, SOLID);
   }
-  const p = placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 4, 10);
+  const p = placePiece(TETROMINOES.O[0], 4, 10, 'O', 0);
   const target = choosePieceMove(p);
-  assert.equal(target.rot, 0);
+  assert.equal(target.state, 0);
   assert.equal(target.col, 5, 'the bot avoided the column that buries a hole');
   // 2 full rows (18, 19), 0 holes, stack height 10.
   assert.equal(target.score, 10 * 2 - 2 * 0 - 10);
@@ -232,9 +237,9 @@ test('equal rows: the bot prefers the placement with no hole', () => {
 
 test('equal score ties break by rotation index then column', () => {
   freshStart('snake');
-  const p = placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 5, 10); // O piece
+  const p = placePiece(TETROMINOES.O[0], 5, 10, 'O', 0);
   const target = choosePieceMove(p);
-  assert.equal(target.rot, 0);
+  assert.equal(target.state, 0);
   assert.equal(target.col, 0);
 });
 

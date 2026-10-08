@@ -6,12 +6,17 @@ const stub = installDomStub();
 const app = await import(new URL('../js/app.js', import.meta.url));
 const { game, resetGame, startGame } = await import(new URL('../js/state.js', import.meta.url));
 const { moveSnake } = await import(new URL('../js/snake.js', import.meta.url));
-const { currentFallSpeed, spawnPiece, clearFullRows, movePiece, rotatePiece, requestPieceShift, landPiece } = await import(new URL('../js/pieces.js', import.meta.url));
+const { currentFallSpeed, spawnPiece, clearFullRows, movePiece, rotatePiece, turnedShape, shapeInState, setPieceState, stepPiece, requestPieceShift, landPiece } = await import(new URL('../js/pieces.js', import.meta.url));
 const { snakeTicksPerCell } = await import(new URL('../js/snake.js', import.meta.url));
 const { setCell, getCell } = await import(new URL('../js/grid.js', import.meta.url));
-const { TETROMINOES, EMPTY, SOLID } = await import(new URL('../js/constants.js', import.meta.url));
+const { TETROMINOES, PIECE_TYPES, EMPTY, SOLID, ROWS, COLS } = await import(new URL('../js/constants.js', import.meta.url));
 
 function freshStart() { resetGame(); startGame(); }
+
+// Cell offsets sorted by row then column, so two shapes compare as sets.
+function cells(shape) {
+  return [...shape].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+}
 
 test('sequential spawn: at most one falling piece at a time', () => {
   freshStart();
@@ -41,17 +46,18 @@ test('fully consumed piece is followed by a new spawn', () => {
   assert.ok(spawned, 'no new piece spawned');
 });
 
-test('spawn owns an independent shape copy', () => {
+test('spawn owns an independent shape copy and starts in state 0', () => {
   const before = JSON.stringify(TETROMINOES);
   freshStart();
   game.pieces.length = 0;
   spawnPiece();
   const p = game.pieces[0];
+  assert.ok(PIECE_TYPES.includes(p.type), 'spawned piece has no type');
+  assert.equal(p.state, 0);
   assert.equal(p.shape.length, 4);
-  assert.ok(TETROMINOES.every((t) => t !== p.shape), 'shape is the shared TETROMINOES array');
+  assert.notEqual(p.shape, TETROMINOES[p.type][0], 'shape is the shared table array');
   p.shape.length = 0; // simulate the snake eating the piece down to nothing
-  assert.ok(TETROMINOES.every((t) => t.length === 4) && JSON.stringify(TETROMINOES) === before,
-    'the table lost cells');
+  assert.equal(JSON.stringify(TETROMINOES), before, 'the table lost cells');
   game.pieces.length = 0;
   spawnPiece();
   assert.equal(game.pieces[0].shape.length, 4);
@@ -95,9 +101,9 @@ test('line clear: full row clears, +10 to the Tetris side, -10 landedBlocks', ()
 });
 
 // ---------- Sideways shift ----------
-function placePiece(shape, col, row) {
+function placePiece(shape, col, row, type = 'O', state = 0) {
   game.pieces.length = 0;
-  game.pieces.push({ shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
+  game.pieces.push({ type, state, shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
   return game.pieces[0];
 }
 
@@ -128,50 +134,127 @@ test('movePiece: a solid block in the target cell blocks the shift', () => {
   assert.equal(p.col, 4);
 });
 
-// ---------- Rotation ----------
-test('rotatePiece: every shape rotates legally in open space', () => {
-  for (const shape of TETROMINOES) {
-    freshStart();
-    const p = placePiece(shape, 4, 10);
-    assert.equal(rotatePiece(p, true), true, 'CW rotation rejected');
-    assert.equal(p.shape.length, 4);
-    for (const [dr, dc] of p.shape) {
-      const r = Math.floor(p.row + dr);
-      const c = p.col + dc;
-      assert.ok(r >= 0 && r < 20 && c >= 0 && c < 10, `rotated cell out of bounds: ${r},${c}`);
+// ---------- Rotation (Super Rotation System) ----------
+test('the table holds four states per piece, and O is identical in all four', () => {
+  for (const type of PIECE_TYPES) {
+    assert.equal(TETROMINOES[type].length, 4, `${type} has no four states`);
+    for (const state of TETROMINOES[type]) {
+      assert.equal(state.length, 4);
+      for (const [dr, dc] of state) {
+        assert.ok(Number.isInteger(dr) && Number.isInteger(dc));
+      }
     }
-    assert.equal(rotatePiece(p, false), true, 'CCW rotation back rejected');
-    assert.equal(p.shape.length, 4);
+  }
+  assert.deepEqual(TETROMINOES.O[0], TETROMINOES.O[3]);
+});
+
+test('a quarter turn of the real cells reproduces the next table state', () => {
+  for (const type of PIECE_TYPES) {
+    for (let state = 0; state < 4; state++) {
+      const turned = turnedShape(TETROMINOES[type][state], true, type);
+      assert.deepEqual(cells(turned), cells(TETROMINOES[type][(state + 1) % 4]),
+        `${type} state ${state} CW turn does not match state ${(state + 1) % 4}`);
+    }
   }
 });
 
-test('rotatePiece: a rotation that leaves the board is rejected', () => {
-  for (const shape of TETROMINOES) {
+test('rotatePiece: every piece turns legally in open space and returns to state 0 after four turns', () => {
+  for (const type of PIECE_TYPES) {
     freshStart();
-    // A piece anchored at the left edge whose rotated offsets reach a
-    // negative column. The horizontal I has no cell below its anchor, so it
-    // is turned vertical first.
-    const base = shape.some(([dr]) => dr > 0) ? shape : shape.map(([dr, dc]) => [dc, -dr]);
-    const p = placePiece(base, 0, 10);
-    const before = JSON.stringify([p.shape, p.row, p.col]);
-    assert.equal(rotatePiece(p, true), false, 'wall-blocked CW rotation accepted');
-    assert.equal(JSON.stringify([p.shape, p.row, p.col]), before, 'piece changed on a rejected rotation');
+    const p = placePiece(TETROMINOES[type][0], 4, 10, type, 0);
+    const original = cells(p.shape);
+    for (let turn = 0; turn < 4; turn++) {
+      assert.equal(rotatePiece(p, true), true, `${type} CW turn ${turn} rejected`);
+      assert.equal(p.state, (turn + 1) % 4, `${type} state did not advance`);
+      assert.equal(p.shape.length, 4);
+      for (const [dr, dc] of p.shape) {
+        const r = Math.floor(p.row + dr);
+        const c = p.col + dc;
+        assert.ok(r >= 0 && r < ROWS && c >= 0 && c < COLS, `${type} turned cell out of bounds: ${r},${c}`);
+      }
+    }
+    assert.equal(p.state, 0);
+    assert.deepEqual(cells(p.shape), original, `${type} did not return to its spawn shape`);
   }
 });
 
-test('rotatePiece: a rotation into a solid block is rejected', () => {
-  for (const shape of TETROMINOES) {
+test('the O rotation is a no-op: same cells, same anchor', () => {
+  freshStart();
+  const p = placePiece(TETROMINOES.O[0], 4, 10, 'O', 0);
+  assert.equal(rotatePiece(p, true), true);
+  assert.deepEqual(cells(p.shape), cells(TETROMINOES.O[0]));
+  assert.equal(p.row, 10);
+  assert.equal(p.col, 4);
+});
+
+test('a wall-blocked turn succeeds through a wall kick', () => {
+  freshStart();
+  // Vertical I anchored at col 7 occupies column 9. Turning it horizontal
+  // would need columns 7..10, so the second kick moves the anchor to col 6.
+  const p = placePiece(TETROMINOES.I[1], 7, 10, 'I', 1);
+  assert.equal(rotatePiece(p, true), true, 'the kick was not tried');
+  assert.equal(p.state, 2);
+  assert.equal(p.col, 6);
+  assert.equal(p.row, 10);
+  assert.deepEqual(cells(p.shape), cells(TETROMINOES.I[2]));
+});
+
+test('a turn with every kick blocked leaves the piece unchanged', () => {
+  for (const type of PIECE_TYPES) {
     freshStart();
-    const p = placePiece(shape, 4, 10);
+    const p = placePiece(TETROMINOES[type][0], 4, 10, type, 0);
     // Fill the whole board solid except the cells the piece itself occupies.
-    for (let r = 0; r < 20; r++) {
-      for (let c = 0; c < 10; c++) setCell(r, c, SOLID);
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) setCell(r, c, SOLID);
     }
     for (const [dr, dc] of p.shape) setCell(Math.floor(p.row + dr), p.col + dc, EMPTY);
-    const before = JSON.stringify([p.shape, p.row, p.col]);
-    assert.equal(rotatePiece(p, true), false, 'solid-blocked rotation accepted');
-    assert.equal(JSON.stringify([p.shape, p.row, p.col]), before, 'piece changed on a rejected rotation');
+    const before = JSON.stringify([cells(p.shape), p.row, p.col]);
+    const accepted = rotatePiece(p, true);
+    if (type === 'O') {
+      assert.equal(accepted, true, 'the O no-op turn was rejected');
+    } else {
+      assert.equal(accepted, false, `${type} rotation accepted with no free cell`);
+    }
+    assert.equal(JSON.stringify([cells(p.shape), p.row, p.col]), before, 'piece changed on a rejected rotation');
   }
+});
+
+test('setPieceState walks single turns to the requested state', () => {
+  freshStart();
+  const p = placePiece(TETROMINOES.T[0], 4, 10, 'T', 0);
+  assert.equal(setPieceState(p, 2), true);
+  assert.equal(p.state, 2);
+  assert.deepEqual(cells(p.shape), cells(TETROMINOES.T[2]));
+  assert.equal(setPieceState(p, 0), true);
+  assert.equal(p.state, 0);
+  assert.deepEqual(cells(p.shape), cells(TETROMINOES.T[0]));
+});
+
+test('shapeInState reports a state without moving the piece', () => {
+  freshStart();
+  const p = placePiece(TETROMINOES.L[0], 4, 10, 'L', 0);
+  const before = JSON.stringify([p.shape, p.row, p.col, p.state]);
+  assert.deepEqual(cells(shapeInState(p, 3)), cells(TETROMINOES.L[3]));
+  assert.equal(JSON.stringify([p.shape, p.row, p.col, p.state]), before);
+});
+
+test('rotation keeps cells the snake already ate gone', () => {
+  freshStart();
+  const p = placePiece(TETROMINOES.T[0], 4, 10, 'T', 0);
+  p.shape.splice(0, 1); // the snake ate one cell of the falling piece
+  assert.equal(rotatePiece(p, true), true);
+  assert.equal(p.shape.length, 3, 'rotation resurrected an eaten cell');
+});
+
+test('a rotation does not interrupt the fall', () => {
+  freshStart();
+  game.landedBlocks = 0;
+  const p = placePiece(TETROMINOES.T[0], 4, 10, 'T', 0);
+  const speed = currentFallSpeed();
+  assert.equal(rotatePiece(p, true), true);
+  const row = p.row;
+  stepPiece(p);
+  assert.ok(Math.abs(p.row - (row + speed)) < 1e-9, 'the piece did not fall one step after rotating');
 });
 
 // ---------- Shift cooldown gate ----------

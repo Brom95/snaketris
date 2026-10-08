@@ -29,6 +29,10 @@ export const MENU_ITEMS = ['Play', 'Records', 'How to Play'];
 export const ROLE_ITEMS = ['Snake', 'Tetris'];
 export const ROLE_MARKERS = { snake: '\u{1F40D}', tetris: '\u{1F3D7}\u{FE0F}' };
 
+// The role screen's selectable items in page order: the two roles plus Back.
+// The arrow cycles over this list; only the first two entries are roles.
+export const ROLE_SCREEN_ITEMS = ['Snake', 'Tetris', 'Back'];
+
 // URL for the GitHub repository.
 export const GITHUB_URL = 'https://github.com/Brom95/snaketris';
 
@@ -80,13 +84,81 @@ export const COLORS = {
   overlay: 'rgba(11,14,20,0.8)',
 };
 
-// The seven classic tetrominoes as [dr, dc] offsets from the anchor.
-export const TETROMINOES = [
-  [[0, 0], [0, 1], [0, 2], [0, 3]], // I
-  [[0, 0], [0, 1], [1, 0], [1, 1]], // O
-  [[0, 1], [1, 0], [1, 1], [1, 2]], // T
-  [[0, 1], [0, 2], [1, 0], [1, 1]], // S
-  [[0, 0], [0, 1], [1, 1], [1, 2]], // Z
-  [[0, 0], [1, 0], [2, 0], [2, 1]], // L
-  [[0, 2], [1, 2], [2, 1], [2, 2]], // J
-];
+// The seven classic tetrominoes in Super Rotation System order. Each entry
+// holds the four rotation states of one piece; state 0 is the spawn state.
+// Offsets are [dr, dc] from the top-left corner of the piece's bounding box:
+// 4x4 for I, 2x2 for O, 3x3 for T, S, Z, L and J.
+export const TETROMINOES = {
+  I: [
+    [[1, 0], [1, 1], [1, 2], [1, 3]],
+    [[0, 2], [1, 2], [2, 2], [3, 2]],
+    [[2, 0], [2, 1], [2, 2], [2, 3]],
+    [[0, 1], [1, 1], [2, 1], [3, 1]],
+  ],
+  O: [
+    [[0, 0], [0, 1], [1, 0], [1, 1]],
+    [[0, 0], [0, 1], [1, 0], [1, 1]],
+    [[0, 0], [0, 1], [1, 0], [1, 1]],
+    [[0, 0], [0, 1], [1, 0], [1, 1]],
+  ],
+  T: [
+    [[0, 1], [1, 0], [1, 1], [1, 2]],
+    [[0, 1], [1, 1], [1, 2], [2, 1]],
+    [[1, 0], [1, 1], [1, 2], [2, 1]],
+    [[0, 1], [1, 0], [1, 1], [2, 1]],
+  ],
+  S: [
+    [[0, 1], [0, 2], [1, 0], [1, 1]],
+    [[0, 1], [1, 1], [1, 2], [2, 2]],
+    [[1, 1], [1, 2], [2, 0], [2, 1]],
+    [[0, 0], [1, 0], [1, 1], [2, 1]],
+  ],
+  Z: [
+    [[0, 0], [0, 1], [1, 1], [1, 2]],
+    [[0, 2], [1, 1], [1, 2], [2, 1]],
+    [[1, 0], [1, 1], [2, 1], [2, 2]],
+    [[0, 1], [1, 0], [1, 1], [2, 0]],
+  ],
+  L: [
+    [[0, 0], [1, 0], [2, 0], [2, 1]],
+    [[0, 0], [0, 1], [0, 2], [1, 0]],
+    [[0, 1], [0, 2], [1, 2], [2, 2]],
+    [[1, 2], [2, 0], [2, 1], [2, 2]],
+  ],
+  J: [
+    [[0, 2], [1, 2], [2, 1], [2, 2]],
+    [[1, 0], [2, 0], [2, 1], [2, 2]],
+    [[0, 0], [0, 1], [1, 0], [2, 0]],
+    [[0, 0], [0, 1], [0, 2], [1, 2]],
+  ],
+};
+
+// The piece types, in the order they appear in TETROMINOES.
+export const PIECE_TYPES = ['I', 'O', 'T', 'S', 'Z', 'L', 'J'];
+
+// Side of the SRS bounding box of each piece. A turn rotates a cell offset
+// about the centre of this box.
+export const PIECE_BOX = { I: 4, O: 2, T: 3, S: 3, Z: 3, L: 3, J: 3 };
+
+// Wall-kick offsets [dc, dr] tried in order for every state transition.
+// T, S, Z, L and J share one table; I has its own. Keys are 'from->to', and
+// the I keys are prefixed with 'I:'. The published SRS tables use (x, y) with
+// y pointing up, so the grid offset is (dc, dr) = (x, -y).
+export const SRS_KICKS = {
+  '0->1': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+  '1->0': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+  '1->2': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+  '2->1': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+  '2->3': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+  '3->2': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+  '3->0': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+  '0->3': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+  'I:0->1': [[0, 0], [-2, 0], [1, 0], [-2, 1], [1, -2]],
+  'I:1->0': [[0, 0], [2, 0], [-1, 0], [2, -1], [-1, 2]],
+  'I:1->2': [[0, 0], [-1, 0], [2, 0], [-1, -2], [2, 1]],
+  'I:2->1': [[0, 0], [1, 0], [-2, 0], [1, 2], [-2, -1]],
+  'I:2->3': [[0, 0], [2, 0], [-1, 0], [2, -1], [-1, 2]],
+  'I:3->2': [[0, 0], [-2, 0], [1, 0], [-2, 1], [1, -2]],
+  'I:3->0': [[0, 0], [1, 0], [-2, 0], [1, 2], [-2, -1]],
+  'I:0->3': [[0, 0], [-1, 0], [2, 0], [-1, -2], [2, 1]],
+};

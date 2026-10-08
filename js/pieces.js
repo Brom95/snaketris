@@ -1,5 +1,5 @@
 // Piece lifecycle + difficulty ramp.
-import { COLS, ROWS, EMPTY, SOLID, TETROMINOES, BASE_FALL, MAX_FALL, SPAWN_INTERVAL, PLAYING, LINE_CLEAR_POINTS } from './constants.js';
+import { COLS, ROWS, EMPTY, SOLID, TETROMINOES, PIECE_TYPES, PIECE_BOX, SRS_KICKS, BASE_FALL, MAX_FALL, SPAWN_INTERVAL, PLAYING, LINE_CLEAR_POINTS } from './constants.js';
 import { game, gameOver } from './state.js';
 import { getCell, setCell } from './grid.js';
 import { consumePieceAtHead, snakeTicksPerCell } from './snake.js';
@@ -60,12 +60,18 @@ export function findPieceAt(r, c) {
 // (the previous one has landed and become solid, or been fully consumed).
 export function spawnPiece() {
   if (game.pieces.length !== 0) return;
-  const shape = TETROMINOES[Math.floor(Math.random() * TETROMINOES.length)];
+  const type = PIECE_TYPES[Math.floor(Math.random() * PIECE_TYPES.length)];
   const col = Math.floor(Math.random() * (COLS - 3)); // fits widest piece
   const row = -5; // above the top of the grid
-  // Copy the shape: eating splices a falling piece's shape in place, and the
-  // shared TETROMINOES table must stay intact for every future spawn.
-  game.pieces.push({ shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
+  // Copy the state offsets: eating splices a falling piece's shape in place,
+  // and the shared TETROMINOES table must stay intact for every future spawn.
+  game.pieces.push({
+    type,
+    state: 0,
+    shape: TETROMINOES[type][0].map(([dr, dc]) => [dr, dc]),
+    col,
+    row,
+  });
 }
 
 // Shift the falling piece sideways by one cell. Blocked by the left/right
@@ -77,26 +83,65 @@ export function movePiece(p, dc) {
   return true;
 }
 
-// Rotate the falling piece a quarter turn. CW: (dr, dc) -> (dc, -dr);
-// CCW: (dr, dc) -> (-dc, dr). The rotated offsets are normalised so their
-// minimum row and column are 0, and the anchor is moved by the same amount
-// so the piece keeps its absolute position. Rejected when the rotated shape
-// would leave the left/right edges, pass the bottom, or overlap a solid block.
+// Quarter-turn one cell offset about the centre of the piece's SRS box.
+function turnOffset(dr, dc, cw, size) {
+  return cw ? [dc, size - 1 - dr] : [size - 1 - dc, dr];
+}
+
+// Quarter-turn the piece's own cell offsets about the centre of its SRS
+// bounding box. The turn works on the cells that are still present, because
+// the snake can eat part of a falling piece; reading the state table instead
+// would resurrect the eaten cells.
+export function turnedShape(shape, cw, type) {
+  const size = PIECE_BOX[type];
+  return shape.map(([dr, dc]) => turnOffset(dr, dc, cw, size));
+}
+
+// The offsets this piece would have in a given state, reached by the shortest
+// path of single quarter turns. The piece is not moved.
+export function shapeInState(p, state) {
+  let steps = (state - p.state + 4) % 4;
+  const cw = steps <= 2;
+  if (!cw) steps = 4 - steps;
+  let shape = p.shape;
+  for (let i = 0; i < steps; i++) shape = turnedShape(shape, cw, p.type);
+  return shape;
+}
+
+// Rotate the falling piece a quarter turn through the Super Rotation System.
+// The turn is tried at the anchor first, then at each of the five wall-kick
+// offsets in table order. The first offset that fits is applied. When every
+// offset is blocked, the piece is unchanged and the function returns false.
+// The fall accumulator is untouched, so a rotation never interrupts the fall.
 export function rotatePiece(p, cw) {
-  const raw = p.shape.map(([dr, dc]) => (cw ? [dc, -dr] : [-dc, dr]));
-  let minR = 0;
-  let minC = 0;
-  for (const [dr, dc] of raw) {
-    if (dr < minR) minR = dr;
-    if (dc < minC) minC = dc;
+  const from = p.state;
+  const to = cw ? (from + 1) % 4 : (from + 3) % 4;
+  const shape = turnedShape(p.shape, cw, p.type);
+  const kicks = SRS_KICKS[(p.type === 'I' ? 'I:' : '') + from + '->' + to];
+  for (const [dc, dr] of kicks) {
+    const row = p.row + dr;
+    const col = p.col + dc;
+    if (shapeFits(shape, row, col)) {
+      p.shape = shape;
+      p.state = to;
+      p.row = row;
+      p.col = col;
+      return true;
+    }
   }
-  const shape = raw.map(([dr, dc]) => [dr - minR, dc - minC]);
-  const row = p.row + minR;
-  const col = p.col + minC;
-  if (!shapeFits(shape, row, col)) return false;
-  p.shape = shape;
-  p.row = row;
-  p.col = col;
+  return false;
+}
+
+// Move a piece to a named state by walking single quarter turns. The first
+// blocked step stops the walk and returns false, leaving the piece at the
+// state it reached.
+export function setPieceState(p, state) {
+  let steps = (state - p.state + 4) % 4;
+  const cw = steps <= 2;
+  if (!cw) steps = 4 - steps;
+  for (let i = 0; i < steps; i++) {
+    if (!rotatePiece(p, cw)) return false;
+  }
   return true;
 }
 

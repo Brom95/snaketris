@@ -5,7 +5,7 @@ import { COLS, ROWS, SOLID, PLAYING } from './constants.js';
 import { game } from './state.js';
 import { getCell } from './grid.js';
 import { handleIntent } from './input.js';
-import { requestPieceShift, rotatePiece, shapeFits } from './pieces.js';
+import { requestPieceShift, shapeInState, setPieceState, shapeFits } from './pieces.js';
 
 // Decision order for the snake: up, right, down, left. Ties are broken by this
 // order, which keeps the choice deterministic.
@@ -99,22 +99,6 @@ export function chooseBotDir() {
   return bestDir || game.dir;
 }
 
-// Rotated offsets of a shape, normalised so the bounding box starts at 0,0.
-function rotatedShape(shape, times) {
-  let s = shape.map(([dr, dc]) => [dr, dc]);
-  for (let i = 0; i < times; i++) {
-    const raw = s.map(([dr, dc]) => [dc, -dr]);
-    let minR = 0;
-    let minC = 0;
-    for (const [dr, dc] of raw) {
-      if (dr < minR) minR = dr;
-      if (dc < minC) minC = dc;
-    }
-    s = raw.map(([dr, dc]) => [dr - minR, dc - minC]);
-  }
-  return s;
-}
-
 // Cells the piece would occupy after falling to rest in `col` with `shape`.
 function landingCells(shape, col, startRow) {
   let row = startRow;
@@ -174,25 +158,40 @@ function simulateScore(cells) {
   return 10 * countFullRows(occ) - 2 * holes - height;
 }
 
-// Pure piece decision: best (rotation, column) pair. Ties keep the first
-// found, which is the lowest rotation index then the lowest column.
+// Anchor columns that keep every cell of a shape inside the playfield. The
+// SRS bounding box may stick out past an edge; only the occupied cells matter.
+function anchorRange(shape) {
+  let minDc = 0;
+  let maxDc = 0;
+  for (const [, dc] of shape) {
+    if (dc < minDc) minDc = dc;
+    if (dc > maxDc) maxDc = dc;
+  }
+  // minDc is never positive, so -minDc is the first legal anchor column.
+  // The `+ 0` keeps the result from being negative zero.
+  return [-minDc + 0, COLS - 1 - maxDc];
+}
+
+// Pure piece decision: best (state, column) pair. Ties keep the first found,
+// which is the lowest state index then the lowest column.
 export function choosePieceMove(p) {
   let best = null;
-  for (let rot = 0; rot < 4; rot++) {
-    const shape = rotatedShape(p.shape, rot);
-    for (let col = 0; col < COLS; col++) {
+  for (let state = 0; state < 4; state++) {
+    const shape = shapeInState(p, state);
+    const [firstCol, lastCol] = anchorRange(shape);
+    for (let col = firstCol; col <= lastCol; col++) {
       if (!shapeFits(shape, p.row, col)) continue;
       const cells = landingCells(shape, col, p.row);
       if (cells.length === 0) continue;
       const score = simulateScore(cells);
-      if (best === null || score > best.score) best = { score, rot, col, shape };
+      if (best === null || score > best.score) best = { score, state, col, shape };
     }
   }
   return best;
 }
 
-// One action per decision: move toward the target column, or rotate when the
-// piece is already in that column.
+// One action per decision: move toward the target column, or turn the piece
+// to the target state when it is already in that column.
 function applyBotPieceMove(p) {
   const target = choosePieceMove(p);
   if (!target) return;
@@ -200,8 +199,7 @@ function applyBotPieceMove(p) {
     requestPieceShift(target.col > p.col ? 1 : -1);
     return;
   }
-  if (target.rot === 0) return;
-  if (!rotatePiece(p, true)) rotatePiece(p, false);
+  setPieceState(p, target.state);
 }
 
 export const botSystem = {
