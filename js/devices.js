@@ -230,6 +230,9 @@ function heldDpadDir(s) {
 // Tetris role: left/right shift the piece while held; up/down rotate, edge-only,
 // so one press is one quarter turn.
 function pieceSteerIntent(s) {
+  // A is the dedicated clockwise-rotation button, so it wins over a held
+  // shift direction. One intent per frame keeps the poll contract stable.
+  if (s.aEdge) return { action: 'pieceRotate', cw: true };
   let dc = 0;
   if (s.leftNow) dc = -1;
   else if (s.rightNow) dc = 1;

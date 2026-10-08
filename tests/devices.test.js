@@ -115,6 +115,33 @@ test('gamepad held D-pad does not repeat a rotation edge', () => {
   assert.equal(devices.pollController(), null); // still held: no second edge
 });
 
+test('gamepad Tetris role: A alone rotates clockwise', () => {
+  startIn('PLAYING', 'tetris');
+  stub.gamepads.length = 0;
+  stub.gamepads.push(makePad([0])); // A, fresh press
+  assert.deepEqual(devices.pollController(), { action: 'pieceRotate', cw: true });
+});
+
+test('gamepad Tetris role: A wins over a held shift, which then still fires', () => {
+  startIn('PLAYING', 'tetris');
+  stub.gamepads.length = 0;
+  stub.gamepads.push(makePad([15])); // right held
+  assert.deepEqual(devices.pollController(), { action: 'pieceShift', dc: 1 });
+
+  stub.gamepads[0] = makePad([15, 0]); // A pressed while right stays held
+  assert.deepEqual(devices.pollController(), { action: 'pieceRotate', cw: true });
+
+  stub.gamepads[0] = makePad([15, 0]); // A is held, so no new edge
+  assert.deepEqual(devices.pollController(), { action: 'pieceShift', dc: 1 });
+});
+
+test('gamepad Snake role: A steers nothing', () => {
+  startIn('PLAYING', 'snake');
+  stub.gamepads.length = 0;
+  stub.gamepads.push(makePad([0]));
+  assert.equal(devices.pollController(), null);
+});
+
 test('gamepad absent clears poll state and yields no intent', () => {
   startIn('PLAYING', 'snake');
   stub.gamepads.length = 0;
