@@ -10,8 +10,9 @@
 //
 // Run: node scripts/verify-menu-geometry.mjs
 
-import { MENU_ITEMS, MENU, RECORDS, HELP, PLAYING } from '../js/constants.js';
-import { game, toMenu, startGame } from '../js/state.js';
+import { check, makeCanvas, report, stubDom } from './harness.mjs';
+import { MENU_ITEMS, MENU, SELECT_ROLE, RECORDS, HELP } from '../js/constants.js';
+import { game, toMenu } from '../js/state.js';
 import { initInput, onKey } from '../js/input.js';
 import { initUi, syncViews } from '../js/ui.js';
 import { readFileSync } from 'node:fs';
@@ -41,62 +42,17 @@ const highlightCss = /#menu-items li\.on\b/.test(page) || /li\.on\s*\{/.test(pag
 
 // ---------- Behavioural plumbing ----------
 
-let failures = 0;
-function check(cond, msg) {
-  if (cond) console.log('  \u2713 ' + msg);
-  else {
-    console.log('  \u2717 FAIL: ' + msg);
-    failures++;
-  }
-}
-
 // Rich enough DOM for ui.js: classList.toggle drives the view/highlight
 // visibility, getBoundingClientRect feeds the interface hit test.
-// Class state lives in one map keyed by id so every handle for an id agrees.
-const classState = new Map();
-const childState = new Map();
-const rects = new Map();
-function el(id) {
-  if (!classState.has(id)) classState.set(id, new Set());
-  if (!childState.has(id)) childState.set(id, []);
-  const classes = classState.get(id);
-  const children = childState.get(id);
-  return {
-    id,
-    style: {},
-    textContent: '',
-    classList: {
-      toggle: (name, on) => {
-        if (on === false) classes.delete(name);
-        else if (on === true) classes.add(name);
-        else if (classes.has(name)) classes.delete(name);
-        else classes.add(name);
-      },
-      contains: (name) => classes.has(name),
-    },
-    appendChild: (child) => {
-      children.push(child);
-    },
-    getBoundingClientRect: () => rects.get(id) || { left: 0, top: 0, right: 0, bottom: 0 },
-  };
-}
-
-const menuItems = [el('menu-item-play'), el('menu-item-records'), el('menu-item-help')];
-globalThis.document = {
-  getElementById: (id) => el(id),
-  querySelectorAll: (selector) => (selector === '#menu-items > li' ? menuItems : []),
-  createElement: (tag) => el('li'),
-  addEventListener: () => {},
-};
-globalThis.window = { innerWidth: 1280, innerHeight: 800, addEventListener: () => {} };
-
-initInput({
-  style: {},
-  getBoundingClientRect: () => ({ left: 0, top: 0, width: 240, height: 480 }),
-  setPointerCapture: () => {},
-  addEventListener: () => {},
-  removeEventListener: () => {},
+const dom = stubDom({
+  elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
+    'records-list', 'records-empty'],
+  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'] },
+  window: { innerWidth: 1280, innerHeight: 800 },
+  canvas: makeCanvas(),
 });
+
+initInput(dom.canvas);
 initUi();
 
 function press(key) {
@@ -122,7 +78,7 @@ syncViews(null);
 for (let sel = 0; sel < MENU_ITEMS.length; sel++) {
   game.menuSelect = sel;
   syncViews(null);
-  const on = menuItems.filter((it) => it.classList.contains('on')).map((it) => it.id);
+  const on = items.filter((it) => dom.classes(it.id).has('on')).map((it) => it.id);
   check(on.length === 1 && on[0] === items[sel].id,
     'menuSelect=' + sel + ' highlights only ' + items[sel].id);
 }
@@ -158,14 +114,15 @@ check(game.state === HELP, 'Space on "How to Play" opens HELP');
 press('escape');
 check(game.state === MENU, 'Escape in HELP returns to MENU');
 
+// "Play" no longer starts a game: it opens the role sub-menu.
 toMenu();
 game.menuSelect = 0;
 press('enter');
-check(game.state === PLAYING, 'Enter on "Play" starts the game');
+check(game.state === SELECT_ROLE, 'Enter on "Play" opens the role sub-menu');
 
 toMenu();
 press('r');
-check(game.state === PLAYING, 'R starts the game from the menu');
+check(game.state === SELECT_ROLE, 'R opens the role sub-menu from the menu');
 
 // A single press must not advance the selection twice.
 toMenu();
@@ -175,11 +132,4 @@ check(game.menuSelect === 1, 'one ArrowDown press advances exactly one step');
 
 // ---------- Summary ----------
 
-console.log('');
-if (failures === 0) {
-  console.log('All menu assertions passed.');
-  process.exit(0);
-} else {
-  console.log('Menu check FAILED: ' + failures + ' assertion(s) failed.');
-  process.exit(1);
-}
+report('Menu check');

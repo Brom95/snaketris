@@ -1,20 +1,11 @@
 // Headless check for the HUD: the score readout and the game-over message are
 // page elements driven by ui.js, and the canvas paints neither.
+import { check, report, stubDom } from './harness.mjs';
 import { readFileSync } from 'node:fs';
 
 const page = readFileSync(new URL('../snaketris.html', import.meta.url), 'utf8');
 const uiSrc = readFileSync(new URL('../js/ui.js', import.meta.url), 'utf8');
 const renderSrc = readFileSync(new URL('../js/render.js', import.meta.url), 'utf8');
-
-let failures = 0;
-function check(cond, label) {
-  if (cond) {
-    console.log('\x1b[32m✓\x1b[0m ' + label);
-  } else {
-    failures++;
-    console.log('\x1b[31m✗\x1b[0m ' + label);
-  }
-}
 
 // ---------- Page: the readout and the status message exist as elements ------
 check(/<p id="score"[^>]*>Score: 0<\/p>/.test(page), 'score readout is a page element starting at 0');
@@ -35,83 +26,59 @@ check(!/drawOverlay\(/.test(renderBody), 'the render path paints no game-over ov
 check(!/Game Over/.test(renderBody), 'the render path carries no game-over wording');
 
 // ---------- Behaviour: run syncViews over stub interface elements ----------
-// The stubs hand back a rich element so ui.js can drive the view toggle, the
-// readout's inline styles (placeScore) and the stacked-layout decision.
-function makeEl(id) {
-  const el = { id, textContent: '', classes: new Set(), children: [], style: {} };
-  el.classList = {
-    toggle: (name, on) => {
-      if (on) el.classes.add(name);
-      else el.classes.delete(name);
-    },
-    contains: (name) => el.classes.has(name),
-  };
-  el.appendChild = (child) => el.children.push(child);
-  // The play field is the only element placeScore measures; everything else
-  // reports a zero box so the readout's overlay position resolves to no-op.
-  el.getBoundingClientRect = () => FIELD_BOX;
-  return el;
-}
+// The play field is the only element placeScore measures; everything else
+// reports a zero box so the readout's overlay position resolves to no-op.
+const FIELD_BOX = { left: 40, top: 100, right: 340, bottom: 700, width: 300, height: 600 };
+const dom = stubDom({
+  elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
+    'records-list', 'records-empty'],
+  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'] },
+  rects: { game: FIELD_BOX },
+  // The stacked-layout decision reads the viewport; a phone width forces stacking.
+  window: { innerWidth: 390, innerHeight: 844 },
+});
 
-const FIELD_BOX = { left: 40, top: 100, width: 300, height: 600 };
-const registry = {};
-for (const id of ['ui', 'score', 'status', 'menu-view', 'records-view', 'help-view',
-                  'records-list', 'records-empty', 'game']) {
-  registry[id] = makeEl(id);
-}
-const menuItems = [makeEl('menu-item-play'), makeEl('menu-item-records'), makeEl('menu-item-help')];
+const { MENU, PLAYING, GAME_OVER } = await import('../js/constants.js');
+const { initUi, syncViews } = await import('../js/ui.js');
+const { game } = await import('../js/state.js');
 
-globalThis.document = {
-  getElementById: (id) => registry[id],
-  querySelectorAll: (selector) => menuItems,
-  createElement: (tag) => makeEl(tag),
-};
-// The stacked-layout decision reads the viewport; a phone width forces stacking.
-globalThis.window = { innerWidth: 390, innerHeight: 844 };
+initUi();
+syncViews(null);
 
-const consts = await import('../js/constants.js');
-const ui = await import('../js/ui.js');
-const state = await import('../js/state.js');
-const game = state.game;
-
-ui.initUi();
-ui.syncViews(null);
-
-check(game.state === consts.MENU, 'the stubbed game starts in MENU');
-check(registry.score.textContent === 'Snake 0  ·  Tetris 0', 'the readout shows both side scores at 0 at game start');
-check(registry['menu-view'].classes.has('on'), 'the menu view is on screen in MENU');
-check(!registry.status.classes.has('on'), 'the game-over message is hidden outside GAME_OVER');
-check(!registry['records-view'].classes.has('on'), 'the records view is hidden in MENU');
+check(game.state === MENU, 'the stubbed game starts in MENU');
+check(dom.el('score').textContent === 'Snake 0  ·  Tetris 0', 'the readout shows both side scores at 0 at game start');
+check(dom.classes('menu-view').has('on'), 'the menu view is on screen in MENU');
+check(!dom.classes('status').has('on'), 'the game-over message is hidden outside GAME_OVER');
+check(!dom.classes('records-view').has('on'), 'the records view is hidden in MENU');
 
 // Each side score is reported on its own, so stepping one side moves only
 // that side's number in the readout.
 game.snakeScore = 3;
 game.tetrisScore = 1;
-ui.syncViews(null);
-check(registry.score.textContent === 'Snake 3  ·  Tetris 1', 'the readout follows each side score');
+syncViews(null);
+check(dom.el('score').textContent === 'Snake 3  ·  Tetris 1', 'the readout follows each side score');
 
 // ---------- Field visibility and the readout's placement rule ---------------
 // The field is on screen only in PLAYING and GAME_OVER; while it is hidden the
 // readout returns to the interface flow (clears its inline styles), and it
 // stays in that flow on stacked layouts instead of overlaying the field.
-game.state = consts.MENU;
-ui.syncViews(null);
-check(!registry['game'].classes.has('on'), 'the field is hidden while MENU is shown');
-check(registry.score.style.position === '', 'the readout clears its inline styles while the field is hidden');
+game.state = MENU;
+syncViews(null);
+check(!dom.classes('game').has('on'), 'the field is hidden while MENU is shown');
+check(dom.styles('score').position === '', 'the readout clears its inline styles while the field is hidden');
 
-game.state = consts.PLAYING;
-ui.syncViews(null);
-check(registry['game'].classes.has('on'), 'the field is on screen in PLAYING');
-check(registry.score.style.position === '', 'the readout stays in normal flow (no overlay) on stacked layouts');
-check(registry.score.style.top === '', 'the readout does not pin to the field top edge');
+game.state = PLAYING;
+syncViews(null);
+check(dom.classes('game').has('on'), 'the field is on screen in PLAYING');
+check(dom.styles('score').position === '', 'the readout stays in normal flow (no overlay) on stacked layouts');
+check(dom.styles('score').top === '', 'the readout does not pin to the field top edge');
 
-game.state = consts.GAME_OVER;
-ui.syncViews(null);
-check(registry['game'].classes.has('on'), 'the final board stays visible in GAME_OVER');
-check(registry.status.classes.has('on'), 'the game-over message appears when a game ends');
-check(registry.score.textContent === 'Snake 3  ·  Tetris 1', 'the final side scores stay readable when the game ends');
-check(!registry['menu-view'].classes.has('on'), 'the menu view is hidden in GAME_OVER');
-check(!registry['help-view'].classes.has('on'), 'no other view leaks into GAME_OVER');
+game.state = GAME_OVER;
+syncViews(null);
+check(dom.classes('game').has('on'), 'the final board stays visible in GAME_OVER');
+check(dom.classes('status').has('on'), 'the game-over message appears when a game ends');
+check(dom.el('score').textContent === 'Snake 3  ·  Tetris 1', 'the final side scores stay readable when the game ends');
+check(!dom.classes('menu-view').has('on'), 'the menu view is hidden in GAME_OVER');
+check(!dom.classes('help-view').has('on'), 'no other view leaks into GAME_OVER');
 
-console.log(failures === 0 ? 'HUD check passed.' : 'HUD check failed: ' + failures);
-process.exitCode = failures === 0 ? 0 : 1;
+report('HUD check');

@@ -12,26 +12,20 @@
 //
 // Run: node scripts/verify-field-only.mjs
 
-// Imported first so the browser globals exist before js/input.js (and its
-// transitive imports) evaluate.
-import { docListeners } from './controller-stubs.mjs';
-
-import { COLS, ROWS, CELL, SOLID, COLORS, BOARD_W, BOARD_H, FIELD_V_GAP, UI_COLUMN_MIN, UI_STACK_MAX_WIDTH, MENU, PLAYING, GAME_OVER, RECORDS, HELP } from '../js/constants.js';
+import { check, report, stubDom } from './harness.mjs';
+import {
+  ROWS, SOLID, COLORS, BOARD_W, BOARD_H,
+  FIELD_V_GAP, FIELD_V_GAP_MOBILE, UI_COLUMN_MIN,
+  MENU, PLAYING, RECORDS, HELP, GAME_OVER,
+} from '../js/constants.js';
 import { initRender, render } from '../js/render.js';
 import { initGrid, setCell, getGrid } from '../js/grid.js';
 import { game, resetGame } from '../js/state.js';
-import { initInput, fitCanvas, toLogical, onPointerDown, onPointerMove, onPointerUp } from '../js/input.js';
+import { initInput, fitCanvas, handleIntent } from '../js/input.js';
+import { onPointerDown, onPointerMove, onPointerUp, toLogical } from '../js/devices.js';
 import { initUi, interfaceBandHeight } from '../js/ui.js';
 import { readFileSync } from 'node:fs';
 
-let failures = 0;
-function check(cond, msg) {
-  if (cond) console.log('\x1b[32m✓\x1b[0m ' + msg);
-  else {
-    failures++;
-    console.log('\x1b[31m✗ FAIL: \x1b[0m' + msg);
-  }
-}
 function near(a, b) {
   return Math.abs(a - b) < 1e-6;
 }
@@ -73,42 +67,37 @@ const FIELD_METHODS = new Set(['fillRect', 'beginPath', 'moveTo', 'lineTo', 'str
 const TEXT_METHODS = new Set(['fillText', 'strokeText', 'measureText', 'drawImage']);
 const FIELD_COLORS = new Set([COLORS.bg, COLORS.grid, COLORS.solid, COLORS.edible, COLORS.snake, COLORS.snakeHead]);
 
+// The displayed field box. fitCanvas writes the CSS size here; toLogical reads
+// it back, so the test can move the box and check the mapping.
 const canvasRect = { left: 0, top: 0, width: BOARD_W, height: BOARD_H };
 const canvas = {
   width: BOARD_W,
   height: BOARD_H,
   style: {},
-  getContext: (kind) => ctx,
+  getContext: () => ctx,
   getBoundingClientRect: () => canvasRect,
   setPointerCapture: () => {},
   addEventListener: () => {},
   removeEventListener: () => {},
 };
 
-// ---------- Interface page elements, sized by the page's own rule -----------
-const UI_BOX_HEIGHT = 150; // the tallest interface view at a phone viewport
-function makeEl(id, height) {
-  return { id, height, getBoundingClientRect: () => ({ left: 0, top: 0, width: UI_COLUMN_MIN, height }) };
-}
-const registry = {};
-for (const id of ['ui', 'score', 'status', 'menu-view', 'records-view', 'help-view', 'records-list', 'records-empty']) {
-  registry[id] = makeEl(id, id === 'ui' ? UI_BOX_HEIGHT : 0);
-}
-const menuItems = [makeEl('menu-item-play', 24), makeEl('menu-item-records', 24), makeEl('menu-item-help', 24)];
+// The tallest interface view at a phone viewport, as the page CSS lays it out.
+const UI_BOX_HEIGHT = 150;
 
-globalThis.document = {
-  getElementById: (id) => registry[id],
-  querySelectorAll: (selector) => (selector === '#menu-items > li' ? menuItems : []),
-  createElement: (tag) => ({ tag, textContent: '', appendChild: () => {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 }) }),
-  addEventListener: (type) => {
-    docListeners.set(type, (docListeners.get(type) || 0) + 1);
-  },
-};
+const dom = stubDom({
+  elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
+    'records-list', 'records-empty'],
+  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'] },
+  rects: { ui: { left: 0, top: 0, width: UI_COLUMN_MIN, height: UI_BOX_HEIGHT } },
+  window: { innerWidth: 1280, innerHeight: 800 },
+  canvas,
+});
 
 initUi();
 initRender(canvas);
 initInput(canvas);
-check(docListeners.get('pointerup') === 1, 'the interface pointer listener is registered once on the document');
+check(dom.listeners.document.get('pointerup') === 1,
+  'the interface pointer listener is registered once on the document');
 
 // ---------- 5.1 The canvas draws nothing but the field in every state -------
 initGrid();
@@ -146,8 +135,7 @@ function canvasSize() {
   return { w: parseFloat(canvas.style.width), h: parseFloat(canvas.style.height) };
 }
 
-globalThis.window.innerWidth = 1920;
-globalThis.window.innerHeight = 1080;
+dom.setViewport(1920, 1080);
 fitCanvas(0);
 const desktop = canvasSize();
 check(near(desktop.h, 1080 - 2 * FIELD_V_GAP) && near(desktop.w, BOARD_W * ((1080 - 2 * FIELD_V_GAP) / BOARD_H)),
@@ -155,12 +143,13 @@ check(near(desktop.h, 1080 - 2 * FIELD_V_GAP) && near(desktop.w, BOARD_W * ((108
 check(near(desktop.w / desktop.h, BOARD_W / BOARD_H), 'the desktop field keeps the board aspect ratio');
 check(near(1080 - desktop.h, 2 * FIELD_V_GAP), 'the desktop field keeps exactly the FIELD_V_GAP inset top and bottom');
 
-globalThis.window.innerWidth = 390;
-globalThis.window.innerHeight = 844;
+dom.setViewport(390, 844);
 fitCanvas(0);
 const phoneUnreserved = canvasSize();
-check(near(phoneUnreserved.h, 844 - 2 * FIELD_V_GAP), 'the phone field without a reservation would fill the height (' + phoneUnreserved.w + 'x' + phoneUnreserved.h + ')');
-check(844 - phoneUnreserved.h < 2 * FIELD_V_GAP + UI_BOX_HEIGHT, 'that leaves less than the interface needs, hence the reservation');
+check(near(phoneUnreserved.w, 390) && near(phoneUnreserved.h, 780),
+  'the phone field without a reservation is width-limited (390x780)');
+check(844 - phoneUnreserved.h < UI_BOX_HEIGHT + 2 * FIELD_V_GAP_MOBILE,
+  'that leaves less than the stacked interface needs, hence the reservation');
 
 // ---------- toLogical still resolves through getBoundingClientRect ----------
 canvasRect.left = 100;
@@ -177,52 +166,56 @@ canvasRect.width = BOARD_W;
 canvasRect.height = BOARD_H;
 
 // ---------- tap and swipe steering still queue through the no-reverse rule --
+function gesture(pointerId, x, y) {
+  handleIntent(onPointerUp({ pointerId, clientX: x, clientY: y }));
+}
+
 game.state = PLAYING;
 game.dir = { r: 0, c: 1 };
 game.nextDir = { r: 0, c: 1 };
 
 onPointerDown({ pointerId: 1, clientX: 120, clientY: 240 });
 onPointerMove({ pointerId: 1, clientX: 120, clientY: 100 });
-onPointerUp({ pointerId: 1, clientX: 120, clientY: 100 });
+gesture(1, 120, 100);
 check(game.nextDir.r === -1 && game.nextDir.c === 0, 'an upward swipe queues the upward direction');
 
 game.dir = { r: 0, c: 1 };
 game.nextDir = { r: 0, c: 1 };
 onPointerDown({ pointerId: 2, clientX: 200, clientY: 240 });
-onPointerUp({ pointerId: 2, clientX: 40, clientY: 240 });
+gesture(2, 40, 240);
 check(game.nextDir.r === 0 && game.nextDir.c === 1, 'a leftward swipe against a rightward heading is refused by the no-reverse rule');
 
 game.dir = { r: 0, c: 1 };
 onPointerDown({ pointerId: 3, clientX: 40, clientY: 100 });
-onPointerUp({ pointerId: 3, clientX: 42, clientY: 102 });
+gesture(3, 42, 102);
 check(game.nextDir.r === -1 && game.nextDir.c === 0, 'a tap above the centre queues the upward direction');
 
 game.state = MENU;
 onPointerDown({ pointerId: 4, clientX: 120, clientY: 240 });
-onPointerUp({ pointerId: 4, clientX: 120, clientY: 100 });
+gesture(4, 120, 100);
 check(game.nextDir.r === -1 && game.nextDir.c === 0, 'outside PLAYING a board gesture queues nothing new');
 
 // ---------- 5.3 Field and interface scale by separate rules -----------------
-globalThis.window.innerWidth = 1920;
-globalThis.window.innerHeight = 1080;
+dom.setViewport(1920, 1080);
 check(interfaceBandHeight() === 0, 'a 1920 px viewport keeps the interface beside the field and reserves no height');
 fitCanvas(interfaceBandHeight());
 const wide = canvasSize();
 check(near(wide.w, 492) && near(wide.h, 984), 'the desktop field is 492x984');
 check(1920 - wide.w >= UI_COLUMN_MIN + FIELD_V_GAP, 'the ' + (1920 - wide.w) + ' px beside the field hold the ' + UI_COLUMN_MIN + ' px interface column');
 
-globalThis.window.innerWidth = 390;
-globalThis.window.innerHeight = 844;
+dom.setViewport(390, 844);
 const band = interfaceBandHeight();
 check(band > 0, 'a 390 px viewport stacks the interface above the field and takes a band from the field height');
-check(near(band, UI_BOX_HEIGHT + FIELD_V_GAP), 'the stacked interface band is its box height plus the gap around the field (' + band + ' px)');
+check(near(band, UI_BOX_HEIGHT + FIELD_V_GAP_MOBILE),
+  'the stacked interface band is its box height plus the mobile gap around the field (' + band + ' px)');
 fitCanvas(band);
 const phone = canvasSize();
-check(near(phone.w, 275) && near(phone.h, 550), 'the phone field gives up that band and becomes 275x550');
-check(band + phone.h + 2 * FIELD_V_GAP <= 844 + 1e-6, 'field plus interface band plus insets fit 844 px, so the page does not scroll');
-check(phone.h < 844 - 2 * FIELD_V_GAP, 'the phone field is smaller than the unreserved contain-fit, which is the deviation this change records');
+check(near(phone.w, 311) && near(phone.h, 622), 'the phone field gives up that band and becomes 311x622');
+check(band + phone.h + 2 * FIELD_V_GAP_MOBILE <= 844 + 1e-6,
+  'field plus interface band plus insets fit 844 px, so the page does not scroll');
+check(phone.h < 844 - 2 * FIELD_V_GAP_MOBILE,
+  'the phone field is smaller than the unreserved contain-fit, which is the deviation this change records');
 
-check(near(wide.h, 984) && near(phone.h, 550), 'the field size follows the viewport while the interface column stays ' + UI_COLUMN_MIN + ' px at both');
+check(near(wide.h, 984) && near(phone.h, 622), 'the field size follows the viewport while the interface column stays ' + UI_COLUMN_MIN + ' px at both');
 
-console.log(failures === 0 ? 'field-only check passed.' : 'field-only check failed: ' + failures);
-process.exitCode = failures === 0 ? 0 : 1;
+report('field-only check');

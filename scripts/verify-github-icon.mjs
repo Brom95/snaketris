@@ -11,13 +11,14 @@
 // the anchor exists in snaketris.html with the exact href, target and rel, the
 // octocat SVG is inside it, it follows the three menu items in document order,
 // and no js/ file paints or opens the icon any more. Behaviour is driven through
-// the public API (initInput / onInterfacePointerUp / onPointerUp) with the
-// browser environment stubbed by controller-stubs.mjs.
+// the public API (initInput / onInterfacePointerUp / the pointer adapters in
+// js/devices.js) with the browser environment stubbed by harness.stubDom().
 //
 // Run: node scripts/verify-github-icon.mjs
 
-import { setMenuRects, makeCanvas } from './controller-stubs.mjs';
-import { initInput, onPointerUp, onPointerDown, onInterfacePointerUp } from '../js/input.js';
+import { check, makeCanvas, report, stubDom } from './harness.mjs';
+import { initInput, onInterfacePointerUp, onPointerUp } from '../js/input.js';
+import { onPointerDown } from '../js/devices.js';
 import { game } from '../js/state.js';
 import { MENU, RECORDS, HELP, GAME_OVER, MENU_ITEMS, GITHUB_URL } from '../js/constants.js';
 
@@ -60,15 +61,6 @@ const urlOnlyInConstants = jsFiles
 
 // ---------- Behavioural plumbing ----------
 
-let failures = 0;
-function check(cond, msg) {
-  if (cond) console.log('  \u2713 ' + msg);
-  else {
-    console.log('  \u2717 FAIL: ' + msg);
-    failures++;
-  }
-}
-
 // Fixed layout the stub hands back from getBoundingClientRect(): three stacked
 // item boxes and, below them, the anchor box.
 const ITEMS = [
@@ -77,10 +69,22 @@ const ITEMS = [
   { left: 40, top: 164, right: 200, bottom: 188 },
 ];
 const ANCHOR = { left: 100, top: 210, right: 124, bottom: 234 };
-setMenuRects(ITEMS);
 
-const canvasEl = makeCanvas();
-initInput(canvasEl); // installs the module-private canvas + the interface listener
+const dom = stubDom({
+  elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
+    'records-list', 'records-empty'],
+  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'] },
+  rects: {
+    'menu-item-play': ITEMS[0],
+    'menu-item-records': ITEMS[1],
+    'menu-item-help': ITEMS[2],
+    'github-link': ANCHOR,
+  },
+  window: { innerWidth: 1280, innerHeight: 800 },
+  canvas: makeCanvas(),
+});
+
+initInput(dom.canvas); // installs the module-private canvas + the interface listener
 
 function center(box) {
   return { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
@@ -132,9 +136,9 @@ clickPage(center(ITEMS[1]).x, center(ITEMS[1]).y);
 check(game.state === RECORDS && game.menuSelect === 1, 'click on "Records" selects item 1 and opens RECORDS');
 
 menuState();
-game.menuSelect = 2;
+game.menuSelect = 0;
 clickPage(center(ITEMS[0]).x, center(ITEMS[0]).y);
-check(game.state !== MENU, 'click on "Play" starts the game');
+check(game.state === 'SELECT_ROLE', 'click on "Play" opens the role sub-menu');
 
 // ---------- The anchor: the browser navigates, the game selects nothing ----------
 
@@ -160,7 +164,7 @@ check(game.menuSelect === 1 && game.state === MENU, 'click just above an item bo
 // A board gesture must never be handled by the interface listener.
 menuState();
 game.menuSelect = 1;
-onInterfacePointerUp({ target: canvasEl, clientX: center(ITEMS[2]).x, clientY: center(ITEMS[2]).y });
+onInterfacePointerUp({ target: dom.canvas, clientX: center(ITEMS[2]).x, clientY: center(ITEMS[2]).y });
 check(game.menuSelect === 1 && game.state === MENU,
   'a pointer release whose target is the canvas is ignored by the interface listener');
 
@@ -194,11 +198,4 @@ for (const [label, enter] of [
 
 // ---------- Summary ----------
 
-console.log('');
-if (failures === 0) {
-  console.log('All GitHub link assertions passed.');
-  process.exit(0);
-} else {
-  console.log('GitHub link check FAILED: ' + failures + ' assertion(s) failed.');
-  process.exit(1);
-}
+report('GitHub link check');

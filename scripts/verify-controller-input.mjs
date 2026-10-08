@@ -1,22 +1,19 @@
 // scripts/verify-controller-input.mjs
-// Headless verification harness for the controller-support change.
+// Headless check for the controller-support change.
 //
-// Mirrors the scripts/verify-menu-geometry.mjs pattern: a standalone Node
-// script with a check(cond, msg) helper and exit code 0/1. It stubs the
-// browser environment (navigator.getGamepads, localStorage, window/document)
-// via controller-stubs.mjs, imports js/input.js, and drives pollController() /
-// setDirection() / initInput() through the public API to verify every spec
-// scenario:
+// Stubs the browser environment with harness.stubDom(), then drives the public
+// API of js/devices.js (raw device reads) through js/input.js (the single
+// intent dispatcher) to verify every spec scenario:
 //
-//   - import resolves + setDirection/pollController/initInput are exported
+//   - import resolves + pollController / setDirection / initInput are exported
 //   - stick quantization: deadzone no-op, each pure axis, diagonal
 //     dominant-axis, mixed deadzone/active
-//   - D-pad steering (up/down/left/right) through the shared setDirection path
+//   - D-pad steering (up/down/left/right) through the shared steering path
 //   - D-pad precedence over stick when both pressed
 //   - no-reverse rejection
 //   - menu navigation with wrapping (D-pad and stick up/down)
 //   - A confirm for each of the three menu items
-//   - B back from Records and How-to-Play
+//   - B back from Records and How to Play
 //   - A from game over returning to the menu
 //   - edge detection (a held button does not re-fire)
 //   - gamepad disconnect stops input and clears stale held state
@@ -27,71 +24,54 @@
 //     keeps the existing keyboard/pointer listeners
 //
 // Run: node scripts/verify-controller-input.mjs
-
-// Imported first so the browser globals are in place before js/input.js
-// (and its transitive imports) evaluate.
-import { setGamepads, windowListeners, docListeners, canvasListeners, makeCanvas } from './controller-stubs.mjs';
-
-// The system under test (public API only; stickDir stays private and is
-// verified through the PLAYING steering path, per the design).
-import { pollController, setDirection, initInput, keyToDir } from '../js/input.js';
+import { check, makePad, report, stubDom } from './harness.mjs';
+import { pollController, keyToDir, tapToDir, swipeToDir, clearControllerPrev } from '../js/devices.js';
+import { initInput, handleIntent, setDirection } from '../js/input.js';
 import { game, toMenu, startGame, gameOver } from '../js/state.js';
-import { PLAYING, MENU, GAME_OVER, RECORDS, HELP, MENU_ITEMS } from '../js/constants.js';
+import { PLAYING, SELECT_ROLE, MENU, GAME_OVER, RECORDS, HELP, MENU_ITEMS } from '../js/constants.js';
 
-// ---------- Test harness plumbing ----------
+// DPAD_UP=12, DPAD_DOWN=13, DPAD_LEFT=14, DPAD_RIGHT=15, A=0, B=1.
+const A = 0;
+const B = 1;
+const UP = 12;
+const DOWN = 13;
+const LEFT = 14;
+const RIGHT = 15;
 
-let failures = 0;
-function check(cond, msg) {
-  if (cond) {
-    console.log('  ✓ ' + msg);
-  } else {
-    console.log('  ✗ FAIL: ' + msg);
-    failures++;
-  }
+const dom = stubDom({
+  elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
+    'records-list', 'records-empty'],
+  lists: {
+    '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'],
+    '#role-items > li': ['role-item-snake', 'role-item-tetris', 'role-back'],
+  },
+  window: { innerWidth: 1280, innerHeight: 800 },
+  canvas: {
+    width: 240,
+    height: 480,
+    style: {},
+    getContext: () => null,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 240, height: 480 }),
+    setPointerCapture: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  },
+});
+
+// A frame of controller input, applied through the dispatcher exactly as the
+// game loop does.
+function frame(pad) {
+  dom.setGamepads(pad === null ? [] : [pad]);
+  handleIntent(pollController());
 }
 
-function sameDir(a, b) {
-  return a && b && a.r === b.r && a.c === b.c;
+function frames(seq) {
+  for (const pad of seq) frame(pad);
 }
 
-// Build a stub gamepad on the standard W3C layout: buttons 0/1 = A/B,
-// 12/13/14/15 = D-pad up/down/left/right, 17 buttons total.
-function makePad({
-  a = false,
-  b = false,
-  up = false,
-  down = false,
-  left = false,
-  right = false,
-  ax = 0,
-  ay = 0
-} = {}) {
-  const buttons = Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
-  if (a) buttons[0].pressed = true;
-  if (b) buttons[1].pressed = true;
-  if (up) buttons[12].pressed = true;
-  if (down) buttons[13].pressed = true;
-  if (left) buttons[14].pressed = true;
-  if (right) buttons[15].pressed = true;
-  return { buttons, axes: [ax, ay] };
-}
-
-// Drive pollController() through a sequence of frames. A `null` entry means
-// "no gamepad connected" for that frame.
-function pollFrames(seq) {
-  for (const pad of seq) {
-    setGamepads(pad === null ? [] : [pad]);
-    pollController();
-  }
-}
-
-// Simulate a disconnect: poll one frame with no gamepad, which clears the
-// controller's edge-detection state (design D3). Needed between sub-tests that
-// reuse a held button so the previous sub-test's held state does not suppress
-// the fresh edge.
-function resetControllerPrev() {
-  setGamepads([]);
-  pollController();
+// Clear the edge-detection state between sub-tests that reuse a held button.
+function resetController() {
+  clearControllerPrev();
 }
 
 // Enter PLAYING with a controllable current direction. The no-reverse rule
@@ -103,91 +83,88 @@ function startPlaying(dir) {
   game.nextDir = dir;
 }
 
+function sameDir(a, b) {
+  return a && b && a.r === b.r && a.c === b.c;
+}
+
 // ---------- Trivial import / export assertions ----------
 
 console.log('=== Import & export assertions ===');
 check(typeof pollController === 'function', 'pollController is exported and callable');
 check(typeof setDirection === 'function', 'setDirection is exported and callable');
 check(typeof initInput === 'function', 'initInput is exported and callable');
-check(typeof keyToDir === 'function', 'keyToDir is exported and callable');
+check(typeof keyToDir === 'function', 'keyToDir is exported by js/devices.js');
+check(typeof tapToDir === 'function', 'tapToDir is exported by js/devices.js');
+check(typeof swipeToDir === 'function', 'swipeToDir is exported by js/devices.js');
 check(PLAYING === 'PLAYING' && MENU === 'MENU', 'state constants resolve');
 check(MENU_ITEMS.length === 3, 'menu has 3 items');
 
-// ---------- Stick quantization (verified via PLAYING steering path) ----------
+// ---------- Stick quantization (verified through the PLAYING steering path) ----------
 
 console.log('=== Stick quantization ===');
 
-// Deadzone: both axes inside the deadzone -> no direction applied.
+frame(makePad([], [0.1, 0.1]));
 startPlaying({ r: 0, c: 1 });
 const beforeDead = { ...game.nextDir };
-pollFrames([makePad({ ax: 0.1, ay: 0.1 })]);
+frames([makePad([], [0.1, 0.1])]);
 check(sameDir(game.nextDir, beforeDead), 'stick in deadzone (0.1, 0.1) is a no-op (nextDir unchanged)');
 
-// Pure X positive -> right.
 startPlaying({ r: 1, c: 0 }); // down (right not blocked)
-pollFrames([makePad({ ax: 0.8, ay: 0 })]);
+frames([makePad([], [0.8, 0])]);
 check(sameDir(game.nextDir, { r: 0, c: 1 }), 'stick right (0.8, 0)');
 
-// Pure Y negative -> up.
 startPlaying({ r: 0, c: 1 }); // right (up not blocked)
-pollFrames([makePad({ ax: 0, ay: -0.8 })]);
+frames([makePad([], [0, -0.8])]);
 check(sameDir(game.nextDir, { r: -1, c: 0 }), 'stick up (0, -0.8)');
 
-// Pure Y positive -> down.
 startPlaying({ r: 0, c: -1 }); // left (down not blocked)
-pollFrames([makePad({ ax: 0, ay: 0.8 })]);
+frames([makePad([], [0, 0.8])]);
 check(sameDir(game.nextDir, { r: 1, c: 0 }), 'stick down (0, 0.8)');
 
-// Pure X negative -> left.
 startPlaying({ r: -1, c: 0 }); // up (left not blocked)
-pollFrames([makePad({ ax: -0.8, ay: 0 })]);
+frames([makePad([], [-0.8, 0])]);
 check(sameDir(game.nextDir, { r: 0, c: -1 }), 'stick left (-0.8, 0)');
 
-// Diagonal X-dominant (0.8, 0.4) -> right (X wins).
 startPlaying({ r: 1, c: 0 }); // down
-pollFrames([makePad({ ax: 0.8, ay: 0.4 })]);
+frames([makePad([], [0.8, 0.4])]);
 check(sameDir(game.nextDir, { r: 0, c: 1 }), 'stick diagonal x-dominant (0.8, 0.4) resolves to right');
 
-// Diagonal Y-dominant (0.4, -0.8) -> up (Y wins).
 startPlaying({ r: 0, c: 1 }); // right
-pollFrames([makePad({ ax: 0.4, ay: -0.8 })]);
+frames([makePad([], [0.4, -0.8])]);
 check(sameDir(game.nextDir, { r: -1, c: 0 }), 'stick diagonal y-dominant (0.4, -0.8) resolves to up');
 
-// Mixed: one axis in deadzone, the other past it -> that axis wins.
 startPlaying({ r: 1, c: 0 }); // down
-pollFrames([makePad({ ax: 0.8, ay: 0.1 })]);
+frames([makePad([], [0.8, 0.1])]);
 check(sameDir(game.nextDir, { r: 0, c: 1 }), 'stick mixed (0.8, 0.1) -> right (y in deadzone)');
 
-// ---------- D-pad steering (through the shared setDirection path) ----------
+// ---------- D-pad steering ----------
 
 console.log('=== D-pad steering ===');
 
-// Each test sets game.dir to a non-opposite direction so the no-reverse
-// rule does not interfere; a release frame follows each press (edge-only).
-
+// Each test sets game.dir to a non-opposite direction so the no-reverse rule
+// does not interfere; a release frame follows each press (edge-only).
 startPlaying({ r: 0, c: 1 }); // right (up not blocked)
-pollFrames([makePad({ up: true }), makePad()]);
+frames([makePad([UP]), makePad()]);
 check(sameDir(game.nextDir, { r: -1, c: 0 }), 'D-pad up');
 
 startPlaying({ r: 0, c: 1 }); // right (down not blocked)
-pollFrames([makePad({ down: true }), makePad()]);
+frames([makePad([DOWN]), makePad()]);
 check(sameDir(game.nextDir, { r: 1, c: 0 }), 'D-pad down');
 
 startPlaying({ r: 0, c: 1 }); // right (left blocked by no-reverse; checked below)
-pollFrames([makePad({ left: true }), makePad()]);
+frames([makePad([LEFT]), makePad()]);
 check(sameDir(game.nextDir, { r: 0, c: 1 }), 'D-pad left while moving right is blocked (no-reverse rule)');
 
 startPlaying({ r: 0, c: -1 }); // left (left not blocked)
-pollFrames([makePad({ left: true }), makePad()]);
+frames([makePad([LEFT]), makePad()]);
 check(sameDir(game.nextDir, { r: 0, c: -1 }), 'D-pad left (moving left)');
 
 startPlaying({ r: 1, c: 0 }); // down (right not blocked)
-pollFrames([makePad({ right: true }), makePad()]);
+frames([makePad([RIGHT]), makePad()]);
 check(sameDir(game.nextDir, { r: 0, c: 1 }), 'D-pad right (moving down)');
 
-// D-pad takes precedence over stick when both are pressed.
 startPlaying({ r: 0, c: 1 }); // right (up not blocked)
-pollFrames([makePad({ up: true, ax: -0.8, ay: 0 }), makePad()]); // D-pad up + stick left
+frames([makePad([UP], [-0.8, 0]), makePad()]); // D-pad up + stick left
 check(sameDir(game.nextDir, { r: -1, c: 0 }), 'D-pad up wins over stick left when both pressed');
 
 // ---------- No-reverse rejection ----------
@@ -195,229 +172,210 @@ check(sameDir(game.nextDir, { r: -1, c: 0 }), 'D-pad up wins over stick left whe
 console.log('=== No-reverse rejection ===');
 
 startPlaying({ r: 0, c: 1 }); // right
-pollFrames([makePad({ up: true })]);
+frames([makePad([UP])]);
 check(sameDir(game.nextDir, { r: -1, c: 0 }), 'right -> up accepted');
-pollFrames([makePad({ down: true })]);
+frames([makePad([DOWN])]);
 check(sameDir(game.nextDir, { r: 1, c: 0 }), 'up -> down accepted');
 startPlaying({ r: 0, c: 1 }); // right again
-pollFrames([makePad({ left: true })]);
+frames([makePad([LEFT])]);
 check(sameDir(game.nextDir, { r: 0, c: 1 }), 'right -> left rejected (no-reverse)');
 
 // ---------- Menu navigation with wrapping ----------
 
-// Menu actions are edge-only (design D3): a held D-pad/stick advances the
-// selection once. These tests therefore model discrete presses: a press frame
-// followed by a release frame (buttons all clear).
-
+// Menu actions are edge-only: a held D-pad or stick advances the selection
+// once. These tests model discrete presses: a press frame then a release frame.
 console.log('=== Menu navigation (wrapping) ===');
 
 toMenu();
 check(game.menuSelect === 0, 'menu starts at 0 (Play)');
 
-pollFrames([makePad({ down: true }), makePad()]);
+frames([makePad([DOWN]), makePad()]);
 check(game.menuSelect === 1, 'D-pad down: 0 -> 1 (Records)');
-
-pollFrames([makePad({ down: true }), makePad()]);
+frames([makePad([DOWN]), makePad()]);
 check(game.menuSelect === 2, 'D-pad down: 1 -> 2 (How to Play)');
-
-pollFrames([makePad({ down: true }), makePad()]);
+frames([makePad([DOWN]), makePad()]);
 check(game.menuSelect === 0, 'D-pad down: 2 -> 0 (wraps)');
-
-pollFrames([makePad({ up: true }), makePad()]);
+frames([makePad([UP]), makePad()]);
 check(game.menuSelect === 2, 'D-pad up: 0 -> 2 (wraps)');
-
-pollFrames([makePad({ up: true }), makePad()]);
+frames([makePad([UP]), makePad()]);
 check(game.menuSelect === 1, 'D-pad up: 2 -> 1');
 
-// Left stick also moves the selection (design D1: left-stick up-down).
 toMenu();
-pollFrames([makePad({ ay: 0.8 }), makePad()]);
+frames([makePad([], [0, 0.8]), makePad()]);
 check(game.menuSelect === 1, 'stick down moves selection 0 -> 1');
-
-// Left stick up also moves the selection (wraps from 1 to 0).
-pollFrames([makePad({ ay: -0.8 }), makePad()]);
+frames([makePad([], [0, -0.8]), makePad()]);
 check(game.menuSelect === 0, 'stick up moves selection 1 -> 0 (wraps)');
 
 // ---------- A confirm for each of the three menu items ----------
 
 console.log('=== A confirm (each menu item) ===');
 
+resetController();
 toMenu();
 game.menuSelect = 0;
-pollFrames([makePad({ a: true })]);
-check(game.state === PLAYING, 'A on "Play" starts the game (PLAYING)');
+frames([makePad([A])]);
+check(game.state === SELECT_ROLE, 'A on "Play" opens the role screen (SELECT_ROLE)');
 
-resetControllerPrev(); // disconnect: clears the held A from the previous frame
+resetController();
 toMenu();
 game.menuSelect = 1;
-pollFrames([makePad({ a: true })]);
+frames([makePad([A])]);
 check(game.state === RECORDS, 'A on "Records" opens RECORDS');
 
-resetControllerPrev();
+resetController();
 toMenu();
 game.menuSelect = 2;
-pollFrames([makePad({ a: true })]);
+frames([makePad([A])]);
 check(game.state === HELP, 'A on "How to Play" opens HELP');
 
-// ---------- B back from Records and How-to-Play ----------
+// ---------- B back from Records and How to Play ----------
 
 console.log('=== B back to menu ===');
 
-resetControllerPrev(); // previous block ended with A held
+resetController();
 toMenu();
 game.menuSelect = 1;
-pollFrames([makePad({ a: true })]);
+frames([makePad([A])]);
 check(game.state === RECORDS, 'entering RECORDS via A');
-pollFrames([makePad({ b: true })]);
+frames([makePad([B])]);
 check(game.state === MENU, 'B from RECORDS returns to MENU');
 
-resetControllerPrev();
+resetController();
 toMenu();
 game.menuSelect = 2;
-pollFrames([makePad({ a: true })]);
+frames([makePad([A])]);
 check(game.state === HELP, 'entering HELP via A');
-pollFrames([makePad({ b: true })]);
+frames([makePad([B])]);
 check(game.state === MENU, 'B from HELP returns to MENU');
 
-// ---------- A from game over returns to menu ----------
+// ---------- A from game over returns to the menu ----------
 
 console.log('=== A from game over ===');
 
-resetControllerPrev();
+resetController();
 startGame();
 check(game.state === PLAYING, 'in PLAYING before game over');
 gameOver();
 check(game.state === GAME_OVER, 'game over state');
-pollFrames([makePad({ a: true })]);
+frames([makePad([A])]);
 check(game.state === MENU, 'A from GAME_OVER returns to MENU');
 
-// ---------- Edge detection: held button does not re-fire ----------
+// ---------- Edge detection: a held button does not re-fire ----------
 
 console.log('=== Edge detection (hold does not re-fire) ===');
 
-resetControllerPrev();
+resetController();
 toMenu();
 game.menuSelect = 0;
-pollFrames([makePad({ a: true }), makePad({ a: true }), makePad({ a: true })]);
-check(game.state === PLAYING, 'holding A in menu: fires once -> PLAYING (no re-fire)');
+frames([makePad([A]), makePad([A]), makePad([A])]);
+check(game.state === SELECT_ROLE, 'holding A in menu: fires once -> SELECT_ROLE (no re-fire)');
 
-resetControllerPrev();
+resetController();
 toMenu();
 game.menuSelect = 0;
-pollFrames([makePad({ down: true }), makePad({ down: true }), makePad({ down: true })]);
+frames([makePad([DOWN]), makePad([DOWN]), makePad([DOWN])]);
 check(game.menuSelect === 1, 'holding D-pad down: selection advances exactly once (0->1)');
 
-resetControllerPrev();
+resetController();
 toMenu();
 game.menuSelect = 1;
-pollFrames([makePad({ a: true })]);
-pollFrames([makePad({ b: true }), makePad({ b: true }), makePad({ b: true })]);
+frames([makePad([A])]);
+frames([makePad([B]), makePad([B]), makePad([B])]);
 check(game.state === MENU, 'holding B in RECORDS: returns to menu (idempotent, no crash)');
 
-// ---------- Gamepad disconnect stops input & clears stale state ----------
+// ---------- Disconnect stops input and clears stale state ----------
 
 console.log('=== Disconnect stops input & clears stale state ===');
 
-resetControllerPrev();
+resetController();
 startGame();
 gameOver();
 // Frame 1: A pressed (edge) -> toMenu() -> MENU.
-pollFrames([makePad({ a: true })]);
+frames([makePad([A])]);
 check(game.state === MENU, 'frame1 A edge in GAME_OVER -> MENU');
-// Frame 2: A still held -> no re-fire (prev[A]=true) -> stays MENU.
-pollFrames([makePad({ a: true })]);
+// Frame 2: A still held -> no re-fire -> stays MENU.
+frames([makePad([A])]);
 check(game.state === MENU, 'frame2 A held -> no re-fire (stays MENU)');
-// Frame 3: disconnect (no gamepad) -> pollController clears prev state.
-pollFrames([null]);
+// Frame 3: disconnect (no gamepad) clears the edge-detection state.
+frames([null]);
 // Frame 4: reconnect with A "still pressed". Because prev was cleared, this is
-// a fresh edge. In MENU with menuSelect 0, A confirms -> startGame -> PLAYING.
-pollFrames([makePad({ a: true })]);
-check(game.state === PLAYING, 'reconnect with A: fresh edge fires (prev cleared on disconnect) -> PLAYING');
+// a fresh edge. In MENU with menuSelect 0, A confirms -> SELECT_ROLE.
+frames([makePad([A])]);
+check(game.state === SELECT_ROLE,
+  'reconnect with A: fresh edge fires (prev cleared on disconnect) -> ' + game.state);
 
 // With no gamepad, steering is a no-op.
 startGame();
-pollFrames([null, null, null]);
+game.dir = { r: 0, c: 1 };
+game.nextDir = { r: 0, c: 1 };
+frames([null, null, null]);
 check(sameDir(game.nextDir, { r: 0, c: 1 }), 'no gamepad: steering is a no-op (nextDir unchanged)');
 
-// ---------- First connected pad in any slot (design D4) ----------
+// ---------- First connected pad in any slot ----------
 
 console.log('=== First connected pad in any slot ===');
 
 // A pad that reports in a non-zero slot drives the game: slot 0 is empty.
+resetController();
 startPlaying({ r: 0, c: 1 }); // right (up not blocked)
-setGamepads([null, makePad({ up: true })]);
-pollController();
+dom.setGamepads([null, makePad([UP])]);
+handleIntent(pollController());
 check(sameDir(game.nextDir, { r: -1, c: 0 }), 'pad in slot 1 steers up while slot 0 is empty');
-resetControllerPrev();
+resetController();
 
-// The first non-null entry wins, so slot 0 takes precedence over a second
-// connected pad (selecting a specific pad is out of scope).
+// The first non-null entry wins, so slot 0 takes precedence over a second pad.
 startPlaying({ r: 1, c: 0 }); // down (right not blocked)
-setGamepads([makePad({ right: true }), makePad({ up: true })]);
-pollController();
+dom.setGamepads([makePad([RIGHT]), makePad([UP])]);
+handleIntent(pollController());
 check(sameDir(game.nextDir, { r: 0, c: 1 }), 'slot 0 pad wins over slot 1 pad (first non-null entry)');
-resetControllerPrev();
+resetController();
 
 // Deeper slots resolve the same way.
 startPlaying({ r: 0, c: -1 }); // left (down not blocked)
-setGamepads([null, null, makePad({ down: true })]);
-pollController();
+dom.setGamepads([null, null, makePad([DOWN])]);
+handleIntent(pollController());
 check(sameDir(game.nextDir, { r: 1, c: 0 }), 'pad in slot 2 steers down while slots 0-1 are empty');
-resetControllerPrev();
+resetController();
 
-// ---------- Held left stick does not swallow a D-pad edge ----------
+// ---------- A held left stick does not swallow a D-pad edge ----------
 
 console.log('=== Held left stick does not swallow a D-pad edge ===');
 
-resetControllerPrev();
+resetController();
 toMenu();
 game.menuSelect = 0;
 
-// Frame 1: only the stick is held down -> the stick's own edge moves the
-// selection and records prevStickDir.
-setGamepads([makePad({ ay: 0.8 })]);
-pollController();
+// Frame 1: only the stick is held down -> its own edge moves the selection.
+dom.setGamepads([makePad([], [0, 0.8])]);
+handleIntent(pollController());
 check(game.menuSelect === 1, 'frame1 stick-down edge: 0 -> 1');
 
-// Frame 2: the stick is STILL held down while the D-pad down button (index 13)
-// is freshly pressed. The stick must not mark that button as already pressed,
-// so its unpressed->pressed edge fires and the selection advances again.
-setGamepads([makePad({ down: true, ay: 0.8 })]);
-pollController();
+// Frame 2: the stick is still held while the D-pad down button (index 13) is
+// freshly pressed. The stick must not mark that button as already pressed, so
+// its unpressed -> pressed edge fires and the selection advances again.
+dom.setGamepads([makePad([DOWN], [0, 0.8])]);
+handleIntent(pollController());
 check(game.menuSelect === 2, 'frame2 D-pad down edge while stick held: 1 -> 2 (edge not swallowed)');
 
 // Frame 3: D-pad released, stick still held -> no new edge on either channel.
-setGamepads([makePad({ ay: 0.8 })]);
-pollController();
+dom.setGamepads([makePad([], [0, 0.8])]);
+handleIntent(pollController());
 check(game.menuSelect === 2, 'frame3 stick held, no new edge: selection stays 2');
-resetControllerPrev();
+resetController();
 
-// ---------- initInput registers gamepad listeners once each ----------
+// ---------- initInput registers the gamepad listeners once each ----------
 
 console.log('=== initInput gamepad listeners ===');
 
-windowListeners.clear();
-docListeners.clear();
-canvasListeners.clear();
+initInput(dom.canvas);
 
-initInput(makeCanvas());
+check(dom.listeners.window.get('gamepadconnected') === 1, 'initInput registers gamepadconnected once');
+check(dom.listeners.window.get('gamepaddisconnected') === 1, 'initInput registers gamepaddisconnected once');
+check(dom.listeners.document.get('keydown') === 1, 'document keydown still registered');
+check(dom.listeners.canvas.get('pointerdown') === 1, 'canvas pointerdown still registered');
+check(dom.listeners.canvas.get('pointermove') === 1, 'canvas pointermove still registered');
+check(dom.listeners.canvas.get('pointerup') === 1, 'canvas pointerup still registered');
+check(dom.listeners.canvas.get('pointercancel') === 1, 'canvas pointercancel still registered');
+check(dom.listeners.canvas.get('keydown') === 1, 'canvas keydown still registered');
 
-check(windowListeners.get('gamepadconnected') === 1, 'initInput registers gamepadconnected once');
-check(windowListeners.get('gamepaddisconnected') === 1, 'initInput registers gamepaddisconnected once');
-check(docListeners.get('keydown') === 1, 'document keydown still registered');
-check(canvasListeners.get('pointerdown') === 1, 'canvas pointerdown still registered');
-check(canvasListeners.get('pointermove') === 1, 'canvas pointermove still registered');
-check(canvasListeners.get('pointerup') === 1, 'canvas pointerup still registered');
-check(canvasListeners.get('pointercancel') === 1, 'canvas pointercancel still registered');
-check(canvasListeners.get('keydown') === 1, 'canvas keydown still registered');
-
-// ---------- Summary ----------
-
-console.log('');
-if (failures === 0) {
-  console.log('All controller input assertions passed.');
-  process.exit(0);
-} else {
-  console.log(`Controller input check FAILED: ${failures} assertion(s) failed.`);
-  process.exit(1);
-}
+report('Controller input check');
