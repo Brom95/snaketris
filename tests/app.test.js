@@ -10,6 +10,7 @@ const app = await import('../js/app.js');
 const state = await import('../js/state.js');
 const { chooseBotDir } = await import('../js/bot.js');
 const { snakeTicksPerCell } = await import('../js/snake.js');
+const { MAX_SNAKE_LEN } = await import('../js/constants.js');
 
 test('init wired rAF (rafCb === frame)', async () => {
   assert.equal(stub.rafCb(), app.frame);
@@ -41,11 +42,14 @@ test('full-loop invariants (1000 ticks)', async () => {
   for (let t = 0; t < 1000; t++) {
     app.update();
   }
-  // Growth pays one segment per eaten cell; the whole-piece bonus pays score
-  // only, so score - (length - 3) is a multiple of PIECE_BONUS.
+  // Growth pays one segment per eaten cell until the cap; cells past the cap
+  // are overflow blocks. The whole-piece bonus pays score only, so
+  // score - ((min(length, MAX_SNAKE_LEN) - 3) + overflow) is a multiple of
+  // PIECE_BONUS.
   assert.ok(state.game.snake.length >= 3);
-  assert.ok(state.game.snakeScore >= state.game.snake.length - 3);
-  assert.equal((state.game.snakeScore - (state.game.snake.length - 3)) % 4, 0);
+  const eaten = Math.min(state.game.snake.length, MAX_SNAKE_LEN) - 3 + state.game.overflow;
+  assert.ok(state.game.snakeScore >= eaten);
+  assert.equal((state.game.snakeScore - eaten) % 4, 0);
   // Sequential spawn: at most one falling piece.
   assert.ok(state.game.pieces.length <= 1);
   // State is valid (either still PLAYING or hit GAME_OVER).

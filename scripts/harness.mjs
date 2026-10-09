@@ -279,6 +279,7 @@ export async function snapshot(page) {
       role: g.role,
       snakeScore: g.snakeScore,
       tetrisScore: g.tetrisScore,
+      overflow: g.overflow,
       head: g.snake[0],
       length: g.snake.length,
       landed: g.landedBlocks,

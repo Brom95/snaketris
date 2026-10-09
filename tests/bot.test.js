@@ -7,7 +7,7 @@ import { startIn } from './helpers/game.js';
 
 installDomStub();
 const { game } = await import('../js/state.js');
-const { chooseBotDir, choosePieceMove, botSystem } = await import('../js/bot.js');
+const { chooseBotDir, choosePieceMove, botSystem, bodyCells } = await import('../js/bot.js');
 const { setCell, getCell } = await import('../js/grid.js');
 const { SOLID, COLS, ROWS, MAX_FALL, TETROMINOES } = await import('../js/constants.js');
 const { snakeTicksPerCell } = await import('../js/snake.js');
@@ -282,4 +282,11 @@ test('bot lateral speed equals the player lateral speed at the ramped cap', () =
   assert.equal(snakeTicksPerCell(), 1);
   assert.equal(byBot, byPlayer);
   assert.ok(byBot > 0);
+});
+
+test('bodyCells excludes the tail: an 8-segment snake gives segments 0..6', () => {
+  freshStart('tetris');
+  game.snake = [];
+  for (let i = 0; i < 8; i++) game.snake.push({ r: 10, c: 6 - i });
+  assert.deepEqual(bodyCells(), game.snake.slice(0, 7)); // segments 0..6
 });

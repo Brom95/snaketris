@@ -1,5 +1,8 @@
 // Snake movement + speed model.
-import { COLS, ROWS, SOLID, PLAYING, SNAKE_SPEED_DELTA, MIN_SNAKE_TICKS, PIECE_BONUS } from './constants.js';
+import {
+  COLS, ROWS, SOLID, PLAYING, SNAKE_SPEED_DELTA, MIN_SNAKE_TICKS,
+  PIECE_BONUS, MAX_SNAKE_LEN,
+} from './constants.js';
 import { game, gameOver } from './state.js';
 import { getCell } from './grid.js';
 import { pieceTicksPerCell, findPieceAt } from './pieces.js';
@@ -48,10 +51,13 @@ export function moveSnake() {
   }
 
   // Eating: consume the edible cell of any falling piece here, +1 score.
-  const willGrow = eatPieceAt(nr, nc);
+  // Growth stops at the cap; an eaten cell past the cap is one overflow block.
+  const ate = eatPieceAt(nr, nc);
+  const grew = ate && game.snake.length < MAX_SNAKE_LEN;
+  if (ate && !grew) game.overflow += 1;
 
-  // Death: self-collision (tail is vacated only when not growing).
-  const bodyToCheck = willGrow ? game.snake : game.snake.slice(0, game.snake.length - 1);
+  // Death: self-collision (tail is vacated only when the snake does not grow).
+  const bodyToCheck = grew ? game.snake : game.snake.slice(0, game.snake.length - 1);
   for (const seg of bodyToCheck) {
     if (seg.r === nr && seg.c === nc) {
       gameOver();
@@ -59,20 +65,24 @@ export function moveSnake() {
     }
   }
 
-  // Classic growth: unshift the head; drop the tail only when not growing.
+  // Classic growth: unshift the head; drop the tail unless the snake grew.
   game.snake.unshift({ r: nr, c: nc });
-  if (!willGrow) game.snake.pop();
+  if (!grew) game.snake.pop();
 }
 
 // Eat any falling-piece cell the snake's HEAD now occupies. Runs after the
 // pieces step each tick, so a block that falls onto the head is eaten too.
 // Only the head eats — the body never consumes a piece. +1 score; the snake
-// grows one segment.
+// grows one segment until it reaches its length cap.
 export function consumePieceAtHead() {
   const head = game.snake[0];
   if (!eatPieceAt(head.r, head.c)) return 0;
-  const tail = game.snake[game.snake.length - 1];
-  game.snake.push({ r: tail.r, c: tail.c });
+  if (game.snake.length < MAX_SNAKE_LEN) {
+    const tail = game.snake[game.snake.length - 1];
+    game.snake.push({ r: tail.r, c: tail.c });
+  } else {
+    game.overflow += 1;
+  }
   return 1;
 }
 // Snake step + self-collision + wrap as an engine system. The accumulator

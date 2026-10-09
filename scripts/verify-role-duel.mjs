@@ -9,7 +9,7 @@
 // scripts/harness.mjs.
 import { chromium } from '@playwright/test';
 import path from 'node:path';
-import { BASE_FALL, SNAKE_SPEED_DELTA } from '../js/constants.js';
+import { BASE_FALL, SNAKE_SPEED_DELTA, MAX_SNAKE_LEN } from '../js/constants.js';
 import {
   boxesAtEverySelection,
   centreTapRotates,
@@ -170,8 +170,9 @@ if (played.snakeScore === 0) {
 }
 check(played.snakeScore > 0, 'the bot snake ate cells: Snake ' + played.snakeScore);
 check(played.tetrisScore > 0, 'a piece landed and paid the Tetris side: Tetris ' + played.tetrisScore);
-check((played.snakeScore - (played.length - 3)) % 4 === 0,
-  'snake score minus growth is a multiple of the whole-piece bonus: ' + played.snakeScore + ' - ' + (played.length - 3));
+const eaten = Math.min(played.length, MAX_SNAKE_LEN) - 3 + played.overflow;
+check((played.snakeScore - eaten) % 4 === 0,
+  'snake score minus growth is a multiple of the whole-piece bonus: ' + played.snakeScore + ' - ' + eaten);
 const hud = await tetrisPage.evaluate(() => document.getElementById('score').textContent);
 check(/Snake \d+  \u00b7  Tetris \d+/.test(hud), 'HUD shows both labelled scores: ' + hud);
 // Only a finished game writes its score to the board.

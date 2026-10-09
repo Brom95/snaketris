@@ -15,6 +15,8 @@ export const game = {
   snakeScore: 0,
   tetrisScore: 0,
   landedBlocks: 0,
+  // Eaten cells beyond MAX_SNAKE_LEN. Each one recolours one body segment.
+  overflow: 0,
   dir: { r: 0, c: 1 },
   nextDir: { r: 0, c: 1 },
   snakeAcc: 0,
@@ -44,6 +46,7 @@ export function resetGame() {
   game.snakeScore = 0;
   game.tetrisScore = 0;
   game.landedBlocks = 0;
+  game.overflow = 0;
   game.snakeAcc = 0;
   game.spawnAcc = 0;
   game.pieceMoveAcc = 0;

@@ -65,7 +65,7 @@ const ctx = new Proxy(ctxTarget, {
 
 const FIELD_METHODS = new Set(['fillRect', 'beginPath', 'moveTo', 'lineTo', 'stroke']);
 const TEXT_METHODS = new Set(['fillText', 'strokeText', 'measureText', 'drawImage']);
-const FIELD_COLORS = new Set([COLORS.bg, COLORS.grid, COLORS.solid, COLORS.edible, COLORS.snake, COLORS.snakeHead]);
+const FIELD_COLORS = new Set([COLORS.bg, COLORS.grid, COLORS.solid, COLORS.edible, COLORS.snakeHead, COLORS.snakeBody, COLORS.tierBlue, COLORS.tierPurple, COLORS.tierGold]);
 
 // The displayed field box. fitCanvas writes the CSS size here; toLogical reads
 // it back, so the test can move the box and check the mapping.

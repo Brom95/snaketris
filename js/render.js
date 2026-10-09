@@ -1,7 +1,7 @@
 // Rendering. The canvas + context are set by app.js (initRender); render()
 // reads the shared `game` state and the grid for painting.
 import {
-  COLS, ROWS, CELL, SOLID, COLORS,
+  COLS, ROWS, CELL, SOLID, COLORS, TIER_WIDTH,
 } from './constants.js';
 import { game } from './state.js';
 import { getGrid } from './grid.js';
@@ -9,6 +9,20 @@ import { pieceCells } from './pieces.js';
 
 let canvas = null;
 let ctx = null;
+
+// The tier colours of the snake body, in recolor order: blue, then purple,
+// then gold. After gold the body stays gold.
+const TIERS = [COLORS.tierBlue, COLORS.tierPurple, COLORS.tierGold];
+
+// The colour of the snake segment at index 0: the head is green; the body
+// is grey until overflow reaches it, then blue, purple and gold in that
+// order (Math.min(2, ...) keeps the body gold past the last tier).
+export function bodyColor(index) {
+  if (index === 0) return COLORS.snakeHead;
+  if (game.overflow < index) return COLORS.snakeBody;
+  const tier = Math.min(2, Math.floor((game.overflow - index) / TIER_WIDTH));
+  return TIERS[tier];
+}
 
 // Called by app.js after the canvas exists; stores it and its 2d context.
 export function initRender(canvasEl) {
@@ -59,7 +73,7 @@ export function render() {
 
   // Snake
   for (let i = 0; i < game.snake.length; i++) {
-    ctx.fillStyle = i === 0 ? COLORS.snakeHead : COLORS.snake;
+    ctx.fillStyle = bodyColor(i);
     drawCell(game.snake[i].r, game.snake[i].c);
   }
 }

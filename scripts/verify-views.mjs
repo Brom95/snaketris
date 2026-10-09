@@ -30,6 +30,9 @@ const recordsReturn = page.includes('<p id="records-return" class="return">Menu<
 const helpHeading = page.includes('<h2 id="help-title">How to Play</h2>');
 const controlsSection = page.includes('<section id="help-controls">') && page.includes('<h3>Controls</h3>');
 const rulesSection = page.includes('<section id="help-rules">') && page.includes('<h3>Rules</h3>');
+const snakeTierLine = page.includes(
+  '<li>The snake stops at 8 segments; later eaten cells recolour its body blue, then purple, then gold.</li>'
+);
 const helpReturn = page.includes('<p id="help-return" class="return">Menu</p>');
 
 // Every control line the page lists, in document order.
@@ -89,6 +92,7 @@ console.log('=== Help view is page markup ===');
 check(helpHeading, '<h2 id="help-title">How to Play</h2> exists');
 check(controlsSection, 'the controls block is <section id="help-controls"> with an <h3>Controls</h3>');
 check(rulesSection, 'the rules block is <section id="help-rules"> with an <h3>Rules</h3>');
+check(snakeTierLine, 'the snake tier line states the 8-segment cap and the blue, purple, gold recolour');
 check(helpLinesPresent, 'all ' + helpLines.length + ' control lines are selectable page text');
 check(helpReturn, 'the return control is a page element');
 

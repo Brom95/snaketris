@@ -27,8 +27,9 @@ function torusDelta(a, b, size) {
 }
 
 // Body cells that still block the board: the tail is excluded because it
-// vacates on the next step unless the snake grows.
-function bodyCells() {
+// vacates on the next step. At the length cap the snake never grows, so the
+// tail always vacates and its cell is free for the head to step onto.
+export function bodyCells() {
   return game.snake.slice(0, game.snake.length - 1);
 }
 

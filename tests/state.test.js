@@ -54,6 +54,16 @@ test('restart after a game keeps three segments and zeroes both scores', () => {
   assert.equal(state.game.role, 'tetris'); // role survives the reset
 });
 
+test('overflow counter is zero at start and clears on restart', () => {
+  fresh();
+  state.startGame();
+  assert.equal(state.game.overflow, 0);
+  state.game.overflow = 5;
+  state.gameOver();
+  state.startGame();
+  assert.equal(state.game.overflow, 0);
+});
+
 test('gameOver records the score of the side the player played', () => {
   globalThis.localStorage.setItem('snaketris.highscores', '[]');
   fresh();

@@ -105,6 +105,16 @@ test('scoring constants', () => {
   assert.equal(C.LINE_CLEAR_POINTS, 10);
 });
 
+test('snake cap and tier palette are defined', () => {
+  assert.equal(C.MAX_SNAKE_LEN, 8);
+  assert.equal(C.TIER_WIDTH, 7);
+  assert.equal(C.COLORS.snakeHead, '#4ade80');
+  assert.equal(C.COLORS.snakeBody, '#9ca3af');
+  assert.equal(C.COLORS.tierBlue, '#2563eb');
+  assert.equal(C.COLORS.tierPurple, '#8b5cf6');
+  assert.equal(C.COLORS.tierGold, '#facc15');
+});
+
 test('SRS table integrity: 7 types, 4 states each, 5 kick offsets per turn', () => {
   assert.equal(C.PIECE_TYPES.length, 7);
   for (const type of C.PIECE_TYPES) {

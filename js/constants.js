@@ -48,6 +48,12 @@ export const MAX_FALL = 0.9;       // hard cap so pieces never tunnel a cell
 export const SNAKE_SPEED_DELTA = 2;
 export const MIN_SNAKE_TICKS = 1;
 
+// Snake size: one head plus MAX_SNAKE_LEN - 1 body segments. Growth stops at
+// the cap; every later eaten cell is recorded as one overflow block, which
+// drives the body colour tiers.
+export const MAX_SNAKE_LEN = 8;
+export const TIER_WIDTH = MAX_SNAKE_LEN - 1; // body segments one tier colours
+
 // Scoring
 export const PIECE_BONUS = 4;       // extra points for eating a whole piece
 export const LINE_CLEAR_POINTS = 10; // points for one cleared row
@@ -76,8 +82,11 @@ export const UI_COLUMN_MIN = 320; // mirrors `#ui { width: min(320px, 92vw) }`
 export const COLORS = {
   bg: '#0b0e14',
   grid: 'rgba(255,255,255,0.05)',
-  snake: '#4ade80',
-  snakeHead: '#a7f3a0',
+  snakeHead: '#4ade80',
+  snakeBody: '#9ca3af',
+  tierBlue: '#2563eb',
+  tierPurple: '#8b5cf6',
+  tierGold: '#facc15',
   edible: '#7dd3fc',
   solid: '#f97316',
   text: '#e8ecf4',
