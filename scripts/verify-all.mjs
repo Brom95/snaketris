@@ -15,6 +15,10 @@ const SCRIPTS = [
   'verify-page-layout.mjs',
   'verify-role-duel.mjs',
   'verify-views.mjs',
+  'verify-control-model.mjs',
+  'verify-p2-constraint.mjs',
+  'verify-two-player-gating.mjs',
+  'verify-role-line.mjs',
 ];
 
 function run(script) {

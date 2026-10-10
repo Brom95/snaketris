@@ -8,7 +8,7 @@ import {
   PLAYING, MENU, SELECT_ROLE, RECORDS, HELP, GAME_OVER,
   MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS,
 } from './constants.js';
-import { game, toMenu, startGame } from './state.js';
+import { game, toMenu, startGame, confirmControlModel } from './state.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
 import {
   keyToIntent,
@@ -42,7 +42,11 @@ function confirmSelection() {
   if (game.state === MENU) {
     if (game.menuSelect === 0) game.state = SELECT_ROLE;
     else if (game.menuSelect === 1) game.state = RECORDS;
-    else game.state = HELP;
+    else if (game.menuSelect === 2) game.state = HELP;
+    else if (game.menuSelect === 3) {
+      game.twoPlayerMode = true;
+      game.state = SELECT_ROLE;
+    }
   } else if (game.state === SELECT_ROLE) {
     if (game.roleSelect === ROLE_SCREEN_ITEMS.length - 1) {
       toMenu();
@@ -92,6 +96,16 @@ export function handleIntent(intent) {
     case 'toMenu':
       toMenu();
       break;
+    case 'confirmP1Model':
+      if (game.state === SELECT_ROLE && game.twoPlayerMode) {
+        confirmControlModel(1, intent.model);
+      }
+      break;
+    case 'confirmP2Model':
+      if (game.state === SELECT_ROLE && game.twoPlayerMode) {
+        confirmControlModel(2, intent.model);
+      }
+      break;
   }
 }
 
@@ -109,6 +123,22 @@ export function setDirection(d) {
 // the device adapter in js/devices.js and routes it through handleIntent.
 
 export function onKey(e) {
+  // In SELECT_ROLE with two-player mode, WASD confirms P1's model, arrows
+  // confirm P2's. These are one-time confirmations; the key does not also
+  // drive navigation.
+  if (game.state === SELECT_ROLE && game.twoPlayerMode) {
+    const k = e.key;
+    if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
+      handleIntent({ action: 'confirmP1Model', model: 'wasd' });
+      e.preventDefault();
+      return;
+    }
+    if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') {
+      handleIntent({ action: 'confirmP2Model', model: 'arrows' });
+      e.preventDefault();
+      return;
+    }
+  }
   const i = keyToIntent(e.key);
   if (i) {
     handleIntent(i);
@@ -189,7 +219,11 @@ function openMenuItem(i) {
   game.menuSelect = i;
   if (i === 0) game.state = SELECT_ROLE;
   else if (i === 1) game.state = RECORDS;
-  else game.state = HELP;
+  else if (i === 2) game.state = HELP;
+  else if (i === 3) {
+    game.twoPlayerMode = true;
+    game.state = SELECT_ROLE;
+  }
 }
 
 export function onInterfacePointerUp(e) {

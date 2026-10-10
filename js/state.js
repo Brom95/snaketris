@@ -10,6 +10,11 @@ export const game = {
   menuSelect: 0,
   roleSelect: 0,
   role: 'snake',
+  p1Role: null,
+  p2Role: null,
+  twoPlayerMode: false,
+  p1Model: null,
+  p2Model: null,
   snake: [],
   pieces: [],
   snakeScore: 0,
@@ -53,6 +58,25 @@ export function resetGame() {
   game.spawnAcc = 0;
   game.pieceMoveAcc = 0;
   game.tick = 0;
+  game.p1Role = null;
+  game.p2Role = null;
+  game.twoPlayerMode = false;
+  game.p1Model = null;
+  game.p2Model = null;
+}
+
+// Confirm a player's control model. P1 sets their own; P2 is constrained by
+// P1's choice (no two players pick the same WASD/Arrows). Gamepad is always
+// shareable. Returns true on success, false if the model is blocked.
+export function confirmControlModel(player, model) {
+  if (player === 1) {
+    game.p1Model = model;
+    return true;
+  }
+  // P2: keyboard models are exclusive with P1; gamepad is shareable.
+  if (model !== 'gamepad' && game.p1Model === model) return false;
+  game.p2Model = model;
+  return true;
 }
 
 export function startGame() {
@@ -78,8 +102,21 @@ export function toMenu() {
   game.roleSelect = 0;
 }
 
+// P1 picks a role; P2 auto-gets the other. Sets the two-player mode flag
+// and assigns both roles.
+export function pickP1Role(role) {
+  game.p1Role = role;
+  game.p2Role = (role === 'snake') ? 'tetris' : 'snake';
+  game.twoPlayerMode = true;
+}
+
 export function gameOver() {
-  const playerScore = game.role === 'tetris' ? game.tetrisScore : game.snakeScore;
-  recordScore(playerScore, game.role);
+  if (game.twoPlayerMode) {
+    recordScore(game.snakeScore, 'snake');
+    recordScore(game.tetrisScore, 'tetris');
+  } else {
+    const playerScore = game.role === 'tetris' ? game.tetrisScore : game.snakeScore;
+    recordScore(playerScore, game.role);
+  }
   game.state = GAME_OVER;
 }

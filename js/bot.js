@@ -268,6 +268,7 @@ function applyBotPieceMove(p) {
 export const botSystem = {
   name: 'bot',
   update(ctx) {
+    if (game.twoPlayerMode) return; // both sides are human; no bot
     if (game.state !== PLAYING) return;
     if (game.role === 'tetris') {
       // The bot steers the snake through the shared steering path.

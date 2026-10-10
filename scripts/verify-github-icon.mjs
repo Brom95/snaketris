@@ -121,7 +121,7 @@ check(urlOnlyInConstants.length === 1 && urlOnlyInConstants[0] === 'constants.js
 
 console.log('=== Interface pointer selects the three items ===');
 
-check(MENU_ITEMS.length === 3, 'three selectable items: ' + MENU_ITEMS.join(', '));
+check(MENU_ITEMS.length === 4, 'four selectable items: ' + MENU_ITEMS.join(', '));
 check(!MENU_ITEMS.includes('GitHub') && !MENU_ITEMS.includes(GITHUB_URL),
   'the icon is not a selectable menu item');
 

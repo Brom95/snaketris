@@ -22,6 +22,8 @@ let recordsEmptyEl = null;
 let menuItemsEls = [];
 let roleItemsEls = [];
 let fieldEl = null;
+let twoPlayerItemEl = null;
+let roleLineEl = null;
 
 // Called by app.js once the page is parsed; stores the interface elements.
 export function initUi() {
@@ -37,6 +39,8 @@ export function initUi() {
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
   roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
   fieldEl = document.getElementById('game');
+  twoPlayerItemEl = document.getElementById('menu-item-two-player');
+  roleLineEl = document.getElementById('role-line');
 }
 
 // Shows or hides one interface element. `.view` hides by default, `.view.on`
@@ -116,11 +120,24 @@ export function syncViews(recordsBoard) {
   show(roleViewEl, state === SELECT_ROLE);
   show(recordsViewEl, state === RECORDS);
   show(helpViewEl, state === HELP);
+  // Two-player menu item: shown when the viewport is wide enough, hidden at or
+  // below UI_STACK_MAX_WIDTH.
+  if (twoPlayerItemEl) {
+    twoPlayerItemEl.style.display = window.innerWidth > UI_STACK_MAX_WIDTH ? '' : 'none';
+  }
   if (state === MENU) highlightItem(menuItemsEls, game.menuSelect);
   if (state === SELECT_ROLE) {
     // The menu is off screen here, so its highlight is cleared too.
     highlightItem(menuItemsEls, -1);
     highlightItem(roleItemsEls, game.roleSelect);
+    // Role line: "P1: X / P2: Y" above the model selection in two-player mode.
+    if (roleLineEl) {
+      roleLineEl.textContent = game.twoPlayerMode
+        ? 'P1: ' + game.p1Role + '  /  P2: ' + game.p2Role
+        : '';
+    }
+  } else if (roleLineEl) {
+    roleLineEl.textContent = '';
   }
   if (state === RECORDS) fillRecords(recordsBoard || []);
 }

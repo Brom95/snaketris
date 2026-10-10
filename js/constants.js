@@ -21,7 +21,7 @@ export const RECORDS = 'RECORDS';
 export const HELP = 'HELP';
 
 // The menu labels, in the order they appear as page elements in snaketris.html.
-export const MENU_ITEMS = ['Play', 'Records', 'How to Play'];
+export const MENU_ITEMS = ['Play', 'Records', 'How to Play', 'Two Players'];
 
 // The two roles, in the order they appear as page elements in snaketris.html.
 // Each role's marker is shown on the role sub-menu item and on every record

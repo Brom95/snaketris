@@ -25,7 +25,7 @@ const titleOk = /<h1 id="menu-title">[^<]*snaketris/i.test(page);
 const listOk = /<ul id="menu-items">/.test(page);
 
 // The three items, in document order, with their labels and tabindex attribute.
-const itemTagRe = /<li id="(menu-item-[a-z]+)"([^>]*)>([^<]*)<\/li>/g;
+const itemTagRe = /<li id="(menu-item-[a-z\-]+)"([^>]*)>([^<]*)<\/li>/g;
 const items = [];
 let m;
 while ((m = itemTagRe.exec(page)) !== null) {
@@ -47,7 +47,7 @@ const highlightCss = /#menu-items li\.on\b/.test(page) || /li\.on\s*\{/.test(pag
 const dom = stubDom({
   elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
     'records-list', 'records-empty'],
-  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'] },
+  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help', 'menu-item-two-player'] },
   window: { innerWidth: 1280, innerHeight: 800 },
   canvas: makeCanvas(),
 });
@@ -94,11 +94,13 @@ check(game.menuSelect === 1 && game.state === MENU, 'ArrowDown: 0 -> 1');
 press('arrowdown');
 check(game.menuSelect === 2 && game.state === MENU, 'ArrowDown: 1 -> 2');
 press('arrowdown');
-check(game.menuSelect === 0 && game.state === MENU, 'ArrowDown: 2 -> 0 (wraps)');
+check(game.menuSelect === 3 && game.state === MENU, 'ArrowDown: 2 -> 3 (Two Players)');
+press('arrowdown');
+check(game.menuSelect === 0 && game.state === MENU, 'ArrowDown: 3 -> 0 (wraps)');
 press('arrowup');
-check(game.menuSelect === 2 && game.state === MENU, 'ArrowUp: 0 -> 2 (wraps)');
+check(game.menuSelect === 3 && game.state === MENU, 'ArrowUp: 0 -> 3 (wraps)');
 press('arrowup');
-check(game.menuSelect === 1 && game.state === MENU, 'ArrowUp: 2 -> 1');
+check(game.menuSelect === 2 && game.state === MENU, 'ArrowUp: 3 -> 2');
 
 toMenu();
 game.menuSelect = 1;

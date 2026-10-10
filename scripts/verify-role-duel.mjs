@@ -9,7 +9,7 @@
 // scripts/harness.mjs.
 import { chromium } from '@playwright/test';
 import path from 'node:path';
-import { BASE_FALL, SNAKE_SPEED_DELTA, MAX_SNAKE_LEN } from '../js/constants.js';
+import { BASE_FALL, SNAKE_SPEED_DELTA, MAX_SNAKE_LEN, MENU_ITEMS } from '../js/constants.js';
 import {
   boxesAtEverySelection,
   centreTapRotates,
@@ -36,7 +36,7 @@ const context = await browser.newContext();
 console.log('=== Menu and role screen ===');
 const menu = await freshPage(context, ROOT);
 const menuItems = await menu.$$eval('#menu-items > li', (els) => els.map((e) => e.textContent));
-check(menuItems.length === 3, 'main menu has three items: ' + menuItems.join(', '));
+check(menuItems.length === MENU_ITEMS.length, 'main menu has ' + MENU_ITEMS.length + ' items: ' + menuItems.join(', '));
 await menu.click('#menu-item-play');
 await stateIs(menu, 'SELECT_ROLE');
 const roleTexts = await menu.$$eval('#role-items > li', (els) => els.map((e) => e.textContent));

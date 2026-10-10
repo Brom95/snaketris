@@ -32,11 +32,19 @@ The system SHALL render the starting menu's labels — the "snaketris" title and
 - **THEN** the leftmost label edge and the widest label's right edge are symmetric about the center of the menu's own area, so the block stays centered and no menu label is clipped
 
 ### Requirement: Three menu items
-The system SHALL present exactly three selectable items in the starting menu — "Play", "Records", and "How to Play" — with exactly one item highlighted as the current selection.
+The system SHALL present the starting menu items - "Play", "Two Players", "Records", and "How to Play" - with up to four selectable items, where "Two Players" appears only when the viewport is wide (desktop) and is hidden when narrow (mobile touch), with exactly one item highlighted as the current selection.
 
 #### Scenario: All items listed
 - **WHEN** the starting menu is shown
-- **THEN** the items "Play", "Records", and "How to Play" are listed and exactly one is highlighted
+- **THEN** the items "Play", "Records", and "How to Play" are listed, "Two Players" appears only when the viewport is wide, and exactly one is highlighted
+
+#### Scenario: Four items on a wide viewport
+- **WHEN** the viewport is wide (desktop)
+- **THEN** the menu also shows "Two Players" alongside the three existing items
+
+#### Scenario: Three items on a narrow viewport
+- **WHEN** the viewport is narrow (mobile touch)
+- **THEN** the menu hides "Two Players" and shows "Play", "Records", and "How to Play"
 
 ### Requirement: Keyboard navigation and confirmation
 The system SHALL let the player move the selection with the arrow keys (and W/S) and confirm the highlighted item with Enter or Space, whether or not the menu items are focusable page elements. A single confirmation SHALL perform exactly one menu action.

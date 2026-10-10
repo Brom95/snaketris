@@ -181,12 +181,32 @@ const BUTTON_A = 0;      // A: confirm / accept
 const BUTTON_B = 1;      // B: back / cancel
 const STICK_DEADZONE = 0.3; // ignore small axis values (stick drift)
 
-// Edge-detection state for the per-frame poll. `prevButtons` maps button
-// index -> was-pressed-last-frame; `null` means "no gamepad / not yet
-// polled". Cleared whenever a gamepad disconnects so stale state never
-// carries across.
-let prevButtons = null;
-let prevStickDir = null;
+// Per-pad edge-detection state, keyed by pad id. Each connected pad keeps
+// its own prevButtons and prevStickDir so two pads never share state.
+// `connectedPadIds` tracks connection order: index 0 is P1, index 1 is P2.
+let padStates = new Map();
+let connectedPadIds = [];
+
+function getPadState(id) {
+  if (!padStates.has(id)) {
+    padStates.set(id, { prevButtons: null, prevStickDir: null });
+  }
+  return padStates.get(id);
+}
+
+function routePads(pads) {
+  // Keep only currently-connected pads in connection order.
+  const connected = [];
+  for (const p of pads) {
+    if (p && !connectedPadIds.includes(p.id)) {
+      connectedPadIds.push(p.id);
+      connected.push(p);
+    } else if (p) {
+      connected.push(p);
+    }
+  }
+  return connected;
+}
 
 // Quantize the left thumbstick to a single cardinal direction. The axis with
 // the larger magnitude past STICK_DEADZONE wins; inside the deadzone the stick
@@ -263,12 +283,17 @@ export function pollController() {
     if (pads[i]) { gp = pads[i]; break; }
   }
   if (!gp) {
-    // No gamepad: clear previous poll state so a reconnect cannot inherit
-    // a stale held state (design D3).
-    prevButtons = null;
-    prevStickDir = null;
+    // No gamepad: clear the pad's previous poll state so a reconnect cannot
+    // inherit a stale held state (design D3).
+    for (const id of connectedPadIds) {
+      const s = getPadState(id);
+      s.prevButtons = null;
+      s.prevStickDir = null;
+    }
     return null;
   }
+  if (!connectedPadIds.includes(gp.id)) connectedPadIds.push(gp.id);
+  const padState = getPadState(gp.id);
   const buttons = gp.buttons;
   const stick = stickDir(gp);
 
@@ -282,7 +307,7 @@ export function pollController() {
   const leftNow = !!buttons[DPAD_LEFT].pressed;
   const rightNow = !!buttons[DPAD_RIGHT].pressed;
 
-  const prev = prevButtons || {};
+  const prev = padState.prevButtons || {};
   const aEdge = aNow && !prev[BUTTON_A];
   const bEdge = bNow && !prev[BUTTON_B];
   const upEdge = upNow && !prev[DPAD_UP];
@@ -290,8 +315,8 @@ export function pollController() {
 
   const stickUp = !!stick && stick.r === -1;
   const stickDown = !!stick && stick.r === 1;
-  const stickUpEdge = stickUp && !(prevStickDir && prevStickDir.r === -1);
-  const stickDownEdge = stickDown && !(prevStickDir && prevStickDir.r === 1);
+  const stickUpEdge = stickUp && !(padState.prevStickDir && padState.prevStickDir.r === -1);
+  const stickDownEdge = stickDown && !(padState.prevStickDir && padState.prevStickDir.r === 1);
 
   const intent = chooseIntent(game.state, game.role, {
     aEdge, bEdge, upEdge, downEdge,
@@ -301,7 +326,7 @@ export function pollController() {
 
   // Update previous poll state on every pass, including the pass that emits
   // an intent. Without this, a held button re-fires its edge each frame.
-  prevButtons = {
+  padState.prevButtons = {
     [BUTTON_A]: aNow,
     [BUTTON_B]: bNow,
     [DPAD_UP]: buttons[DPAD_UP].pressed,
@@ -309,7 +334,7 @@ export function pollController() {
     [DPAD_LEFT]: buttons[DPAD_LEFT].pressed,
     [DPAD_RIGHT]: buttons[DPAD_RIGHT].pressed
   };
-  prevStickDir = stick;
+  padState.prevStickDir = stick;
   return intent;
 }
 
@@ -325,9 +350,13 @@ function chooseIntent(state, role, s) {
   return null;
 }
 
-// Clears the gamepad edge-detection state. Called on gamepad connect/disconnect
-// (design D5) so no stale held state survives a gamepad change.
+// Clears the gamepad edge-detection state for every connected pad. Called on
+// gamepad connect/disconnect (design D5) so no stale held state survives a
+// gamepad change.
 export function clearControllerPrev() {
-  prevButtons = null;
-  prevStickDir = null;
+  for (const id of connectedPadIds) {
+    const s = getPadState(id);
+    s.prevButtons = null;
+    s.prevStickDir = null;
+  }
 }

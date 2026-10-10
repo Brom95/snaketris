@@ -148,3 +148,43 @@ test('gamepad absent clears poll state and yields no intent', () => {
   assert.equal(devices.pollController(), null);
   devices.clearControllerPrev();
 });
+
+// ---------- Per-pad edge-detection (two-player mode) ----------
+test('first pad is P1 and second is P2 with separate edge-detection state', () => {
+  startIn('PLAYING', 'snake');
+  const padA = { id: 'pad-a', buttons: [], axes: [0, 0] };
+  const padB = { id: 'pad-b', buttons: [], axes: [0, 0] };
+  for (let i = 0; i < 16; i++) { padA.buttons.push({ pressed: false }); padB.buttons.push({ pressed: false }); }
+
+  // P1 (pad A) presses D-pad up: poll picks the first non-null pad.
+  padA.buttons[12].pressed = true;
+  stub.gamepads.length = 0;
+  stub.gamepads.push(padA);
+  assert.deepEqual(devices.pollController(), { dir: { r: -1, c: 0 } });
+
+  // Disconnect P1, connect P2 (no buttons pressed). Pad B has its own fresh
+  // prev state — it must not inherit pad A's held D-pad.
+  stub.gamepads.length = 0;
+  stub.gamepads.push(padB);
+  assert.equal(devices.pollController(), null);
+});
+
+test('clearControllerPrev clears every connected pad on disconnect', () => {
+  startIn('PLAYING', 'snake');
+  const padA = { id: 'pad-a', buttons: [], axes: [0, 0] };
+  for (let i = 0; i < 16; i++) padA.buttons.push({ pressed: false });
+  stub.gamepads.length = 0;
+  stub.gamepads.push(padA);
+  assert.deepEqual(devices.pollController(), null); // no buttons pressed
+
+  // Simulate disconnect: clear the array and call clearControllerPrev.
+  stub.gamepads.length = 0;
+  devices.clearControllerPrev();
+
+  // Reconnect a fresh pad: it must not inherit stale prev state.
+  const padC = { id: 'pad-c', buttons: [], axes: [0, 0] };
+  for (let i = 0; i < 16; i++) padC.buttons.push({ pressed: false });
+  stub.gamepads.length = 0;
+  stub.gamepads.push(padC);
+  assert.equal(devices.pollController(), null);
+});

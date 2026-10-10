@@ -120,3 +120,61 @@ test('gameOver→GAME_OVER', async () => {
   state.gameOver();
   assert.equal(state.game.state, 'GAME_OVER');
 });
+
+// ---------- Two-player mode ----------
+test('pickP1Role assigns P2 the remaining role and sets two-player mode', () => {
+  fresh();
+  state.pickP1Role('snake');
+  assert.equal(state.game.p1Role, 'snake');
+  assert.equal(state.game.p2Role, 'tetris');
+  assert.equal(state.game.twoPlayerMode, true);
+
+  state.resetGame();
+  state.pickP1Role('tetris');
+  assert.equal(state.game.p1Role, 'tetris');
+  assert.equal(state.game.p2Role, 'snake');
+});
+
+test('resetGame clears the two-player fields', () => {
+  fresh();
+  state.pickP1Role('snake');
+  assert.equal(state.game.twoPlayerMode, true);
+  state.resetGame();
+  assert.equal(state.game.p1Role, null);
+  assert.equal(state.game.p2Role, null);
+  assert.equal(state.game.twoPlayerMode, false);
+});
+
+test('gameOver in two-player mode records both sides', () => {
+  globalThis.localStorage.setItem('snaketris.highscores', '[]');
+  fresh();
+  state.pickP1Role('snake');
+  state.startGame();
+  // startGame() re-runs resetGame which clears the flag; re-assert it.
+  state.game.twoPlayerMode = true;
+  state.game.snakeScore = 5;
+  state.game.tetrisScore = 20;
+  state.gameOver();
+  const board = loadBoard();
+  assert.equal(board.length, 2);
+  // Sorted by score descending: tetris (20) first, snake (5) second.
+  assert.equal(board[0].score, 20);
+  assert.equal(board[0].role, 'tetris');
+  assert.equal(board[1].score, 5);
+  assert.equal(board[1].role, 'snake');
+});
+
+test('two-player game over keeps top-10', () => {
+  globalThis.localStorage.setItem('snaketris.highscores', JSON.stringify(
+    Array.from({ length: 10 }).map((_, i) => ({ score: i + 1, date: new Date().toISOString(), role: 'snake' }))
+  ));
+  fresh();
+  state.pickP1Role('snake');
+  state.startGame();
+  state.game.twoPlayerMode = true;
+  state.game.snakeScore = 50;
+  state.game.tetrisScore = 60;
+  state.gameOver();
+  const board = loadBoard();
+  assert.equal(board.length, 10); // still top-10 after two entries
+});

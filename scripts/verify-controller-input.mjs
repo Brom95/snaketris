@@ -42,7 +42,7 @@ const dom = stubDom({
   elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
     'records-list', 'records-empty'],
   lists: {
-    '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'],
+    '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help', 'menu-item-two-player'],
     '#role-items > li': ['role-item-snake', 'role-item-tetris', 'role-back'],
   },
   window: { innerWidth: 1280, innerHeight: 800 },
@@ -97,7 +97,7 @@ check(typeof keyToDir === 'function', 'keyToDir is exported by js/devices.js');
 check(typeof tapToDir === 'function', 'tapToDir is exported by js/devices.js');
 check(typeof swipeToDir === 'function', 'swipeToDir is exported by js/devices.js');
 check(PLAYING === 'PLAYING' && MENU === 'MENU', 'state constants resolve');
-check(MENU_ITEMS.length === 3, 'menu has 3 items');
+check(MENU_ITEMS.length === 4, 'menu has 4 items');
 
 // ---------- Stick quantization (verified through the PLAYING steering path) ----------
 
@@ -194,11 +194,15 @@ check(game.menuSelect === 1, 'D-pad down: 0 -> 1 (Records)');
 frames([makePad([DOWN]), makePad()]);
 check(game.menuSelect === 2, 'D-pad down: 1 -> 2 (How to Play)');
 frames([makePad([DOWN]), makePad()]);
-check(game.menuSelect === 0, 'D-pad down: 2 -> 0 (wraps)');
+check(game.menuSelect === 3, 'D-pad down: 2 -> 3 (Two Players)');
+frames([makePad([DOWN]), makePad()]);
+check(game.menuSelect === 0, 'D-pad down: 3 -> 0 (wraps)');
+
+toMenu();
 frames([makePad([UP]), makePad()]);
-check(game.menuSelect === 2, 'D-pad up: 0 -> 2 (wraps)');
+check(game.menuSelect === 3, 'D-pad up: 0 -> 3 (wraps)');
 frames([makePad([UP]), makePad()]);
-check(game.menuSelect === 1, 'D-pad up: 2 -> 1');
+check(game.menuSelect === 2, 'D-pad up: 3 -> 2');
 
 toMenu();
 frames([makePad([], [0, 0.8]), makePad()]);

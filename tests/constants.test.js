@@ -40,12 +40,12 @@ test('static HTML: #ui interface column present', () => {
   assert.ok(html.includes('#ui'));
 });
 
-test('static HTML: role screen has three selectable items, main menu three', () => {
+test('static HTML: role screen has three selectable items, main menu four', () => {
   const roleBlock = html.match(/<ul id="role-items"[^>]*>([\s\S]*?)<\/ul>/);
   assert.ok(roleBlock, 'missing #role-items list');
   assert.equal((roleBlock[1].match(/<li/g) || []).length, 3);
   const menuBlock = html.match(/<ul id="menu-items">([\s\S]*?)<\/ul>/);
-  assert.equal((menuBlock[1].match(/<li/g) || []).length, 3);
+  assert.equal((menuBlock[1].match(/<li/g) || []).length, 4);
 });
 
 test('static HTML: role items carry the role markers', () => {
@@ -90,7 +90,7 @@ const C = await import(new URL('../js/constants.js', import.meta.url));
 
 test('state machine includes the role-select state', () => {
   assert.equal(C.SELECT_ROLE, 'SELECT_ROLE');
-  assert.equal(C.MENU_ITEMS.length, 3);
+  assert.equal(C.MENU_ITEMS.length, 4);
 });
 
 test('role items and markers are defined', () => {

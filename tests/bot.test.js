@@ -331,3 +331,23 @@ test('bodyCells excludes the tail: an 8-segment snake gives segments 0..6', () =
   for (let i = 0; i < 8; i++) game.snake.push({ r: 10, c: 6 - i });
   assert.deepEqual(bodyCells(), game.snake.slice(0, 7)); // segments 0..6
 });
+
+// ---------- Two-player mode: bot is a no-op ----------
+test('botSystem is a no-op in two-player mode (snake side untouched)', () => {
+  freshStart('tetris');
+  game.twoPlayerMode = true;
+  game.dir = { r: 0, c: 1 };
+  game.nextDir = { r: 0, c: 1 };
+  placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 6, 9);
+  botSystem.update({});
+  assert.deepEqual(game.nextDir, { r: 0, c: 1 }); // snake untouched
+});
+
+test('botSystem is a no-op in two-player mode (piece side untouched)', () => {
+  freshStart('snake');
+  game.twoPlayerMode = true;
+  const p = placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 5, 10);
+  botSystem.update({});
+  assert.equal(p.col, 5); // piece not shifted
+  assert.equal(p.state, 0); // piece not rotated
+});
