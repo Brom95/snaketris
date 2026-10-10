@@ -192,7 +192,8 @@ function stackStats(occ) {
 
 // Heuristic for a simulated landing: new full rows are good (already-full
 // rows give no credit), holes and tall stacks are bad, and landing on snake
-// body cells is penalized.
+// body cells is penalized. Also rewards filling a row that is close to being
+// completed (a "near-complete" bonus).
 function simulateScore(cells) {
   const baseOcc = occupancy([]);
   const occ = occupancy(cells);
@@ -202,7 +203,19 @@ function simulateScore(cells) {
   for (const [r, c] of cells) {
     if (baseOcc[r][c]) snakePenalty += 1;
   }
-  return 10 * newFull - 2 * holes - height - snakePenalty;
+  // Row progress: for each row that is not yet full but has most of its
+  // cells filled, reward placing the piece there.
+  let rowProgress = 0;
+  for (let r = 0; r < ROWS; r++) {
+    const baseRowFull = baseOcc[r].every((f) => f);
+    if (baseRowFull) continue;
+    let filled = 0;
+    for (let c = 0; c < COLS; c++) {
+      if (occ[r][c]) filled += 1;
+    }
+    if (filled >= COLS - 2 && !baseRowFull) rowProgress += 1;
+  }
+  return 10 * newFull + 3 * rowProgress - 2 * holes - height - snakePenalty;
 }
 
 // Anchor columns that keep every cell of a shape inside the playfield. The
@@ -219,8 +232,8 @@ function anchorRange(shape) {
   return [-minDc + 0, COLS - 1 - maxDc];
 }
 
-// Pure piece decision: best (state, column) pair. Ties keep the first found,
-// which is the lowest state index then the lowest column.
+// Pure piece decision: best (state, column) pair. Ties prefer the column
+// closest to center, then the lowest state index.
 export function choosePieceMove(p) {
   let best = null;
   for (let state = 0; state < 4; state++) {
@@ -231,7 +244,10 @@ export function choosePieceMove(p) {
       const cells = landingCells(shape, col, p.row);
       if (cells.length === 0) continue;
       const score = simulateScore(cells);
-      if (best === null || score > best.score) best = { score, state, col, shape };
+      if (best === null || score > best.score ||
+          (score === best.score && Math.abs(col - (COLS - 1) / 2) < Math.abs(best.col - (COLS - 1) / 2))) {
+        best = { score, state, col, shape };
+      }
     }
   }
   return best;

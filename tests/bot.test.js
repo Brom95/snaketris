@@ -271,17 +271,17 @@ test('equal rows: the bot prefers the placement with no hole', () => {
   const target = choosePieceMove(p);
   assert.equal(target.state, 0);
   assert.equal(target.col, 5, 'the bot avoided the column that buries a hole');
-  // Row 19 is already full (no new credit). 0 holes, stack height 10.
-  assert.equal(target.score, 10 * 0 - 2 * 0 - 10);
+  // Row 19 is already full (no new credit). 4 near-complete rows, 0 holes, height 10.
+  assert.equal(target.score, 10 * 0 + 3 * 4 - 2 * 0 - 10);
 });
 
-test('equal score ties break by rotation index then column', () => {
+test('equal score ties break toward the centre column', () => {
   freshStart('snake');
   game.snake = []; // remove the default snake so body cells do not affect occupancy
   const p = placePiece(TETROMINOES.O[0], 5, 10, 'O', 0);
   const target = choosePieceMove(p);
   assert.equal(target.state, 0);
-  assert.equal(target.col, 0);
+  assert.equal(target.col, 4, 'ties prefer the column closest to centre');
 });
 
 // Lateral speed parity: the bot and the player share the pieceMoveAcc gate.
