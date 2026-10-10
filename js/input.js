@@ -5,8 +5,8 @@
 
 import {
   BOARD_W, BOARD_H, FIELD_V_GAP, FIELD_V_GAP_MOBILE, UI_STACK_MAX_WIDTH,
-  PLAYING, MENU, SELECT_ROLE, RECORDS, HELP, GAME_OVER,
-  MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS,
+  PLAYING, MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER,
+  MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS, CONTROL_SCREEN_ITEMS,
 } from './constants.js';
 import { game, toMenu, startGame, confirmControlModel } from './state.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
@@ -24,6 +24,7 @@ import {
 let canvas = null;
 let menuItemsEls = [];
 let roleItemsEls = [];
+let controlItemsEls = [];
 
 // ---------- FLOW: single state machine (collapsed nav path) ----------
 // Move the highlight one step in the active list: the role list in the
@@ -31,13 +32,16 @@ let roleItemsEls = [];
 function moveSelection(step) {
   if (game.state === SELECT_ROLE) {
     game.roleSelect = (game.roleSelect + step + ROLE_SCREEN_ITEMS.length) % ROLE_SCREEN_ITEMS.length;
+  } else if (game.state === SELECT_CONTROL) {
+    game.controlSelect = (game.controlSelect + step + CONTROL_SCREEN_ITEMS.length) % CONTROL_SCREEN_ITEMS.length;
   } else {
     game.menuSelect = (game.menuSelect + step + MENU_ITEMS.length) % MENU_ITEMS.length;
   }
 }
 
 // Confirm the highlighted item. In MENU it opens the matching view; in
-// SELECT_ROLE it locks the role and starts the game.
+// SELECT_ROLE it locks the role and starts the game (or goes to control screen);
+// in SELECT_CONTROL it starts the game when both players have confirmed.
 function confirmSelection() {
   if (game.state === MENU) {
     if (game.menuSelect === 0) game.state = SELECT_ROLE;
@@ -53,7 +57,18 @@ function confirmSelection() {
       return;
     }
     game.role = ROLE_ITEMS[game.roleSelect].toLowerCase();
-    startGame();
+    if (game.twoPlayerMode) {
+      game.state = SELECT_CONTROL;
+    } else {
+      startGame();
+    }
+  } else if (game.state === SELECT_CONTROL) {
+    if (game.controlSelect === CONTROL_SCREEN_ITEMS.length - 1) {
+      toMenu();
+      return;
+    }
+    // Back item: return to role selection.
+    game.state = SELECT_ROLE;
   }
 }
 
@@ -97,12 +112,12 @@ export function handleIntent(intent) {
       toMenu();
       break;
     case 'confirmP1Model':
-      if (game.state === SELECT_ROLE && game.twoPlayerMode) {
+      if ((game.state === SELECT_ROLE || game.state === SELECT_CONTROL) && game.twoPlayerMode) {
         confirmControlModel(1, intent.model);
       }
       break;
     case 'confirmP2Model':
-      if (game.state === SELECT_ROLE && game.twoPlayerMode) {
+      if ((game.state === SELECT_ROLE || game.state === SELECT_CONTROL) && game.twoPlayerMode) {
         confirmControlModel(2, intent.model);
       }
       break;
@@ -131,6 +146,26 @@ export function onKey(e) {
       handleIntent({ action: 'confirmP1Model', model: 'wasd' });
     } else if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') {
       handleIntent({ action: 'confirmP2Model', model: 'arrows' });
+    }
+  }
+  // In SELECT_CONTROL with two-player mode, WASD keys confirm P1's model and
+  // arrow keys confirm P2's. When both are confirmed, they start the game.
+  if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
+    const k = e.key;
+    if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
+      handleIntent({ action: 'confirmP1Model', model: 'wasd' });
+      if (game.p1Model && game.p2Model) {
+        startGame();
+        e.preventDefault();
+        return;
+      }
+    } else if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') {
+      handleIntent({ action: 'confirmP2Model', model: 'arrows' });
+      if (game.p1Model && game.p2Model) {
+        startGame();
+        e.preventDefault();
+        return;
+      }
     }
   }
   const i = keyToIntent(e.key);
@@ -188,6 +223,7 @@ export function initInput(canvasEl) {
   // bails out for anything happening on the board (see onInterfacePointerUp).
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
   roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
+  controlItemsEls = Array.from(document.querySelectorAll('#control-items > li'));
   document.addEventListener('pointerup', onInterfacePointerUp);
 }
 
@@ -237,6 +273,14 @@ export function onInterfacePointerUp(e) {
     const item = firstHit(roleItemsEls, x, y);
     if (item >= 0) {
       game.roleSelect = item;
+      handleIntent({ action: 'confirm' });
+    }
+    return;
+  }
+  if (game.state === SELECT_CONTROL) {
+    const item = firstHit(controlItemsEls, x, y);
+    if (item >= 0) {
+      game.controlSelect = item;
       handleIntent({ action: 'confirm' });
     }
     return;

@@ -3,7 +3,7 @@
 // step with `game.state`, the single view authority. Imports only constants.js
 // and state.js, so the module graph stays one-way (app -> ui).
 import {
-  MENU, SELECT_ROLE, RECORDS, HELP, GAME_OVER, PLAYING,
+  MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER, PLAYING,
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
   ROLE_MARKERS,
 } from './constants.js';
@@ -15,12 +15,14 @@ let scoreEl = null;
 let statusEl = null;
 let menuViewEl = null;
 let roleViewEl = null;
+let controlViewEl = null;
 let recordsViewEl = null;
 let helpViewEl = null;
 let recordsListEl = null;
 let recordsEmptyEl = null;
 let menuItemsEls = [];
 let roleItemsEls = [];
+let controlItemsEls = [];
 let fieldEl = null;
 let twoPlayerItemEl = null;
 let roleLineEl = null;
@@ -32,12 +34,14 @@ export function initUi() {
   statusEl = document.getElementById('status');
   menuViewEl = document.getElementById('menu-view');
   roleViewEl = document.getElementById('role-view');
+  controlViewEl = document.getElementById('control-view');
   recordsViewEl = document.getElementById('records-view');
   helpViewEl = document.getElementById('help-view');
   recordsListEl = document.getElementById('records-list');
   recordsEmptyEl = document.getElementById('records-empty');
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
   roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
+  controlItemsEls = Array.from(document.querySelectorAll('#control-items > li'));
   fieldEl = document.getElementById('game');
   twoPlayerItemEl = document.getElementById('menu-item-two-player');
   roleLineEl = document.getElementById('role-line');
@@ -118,6 +122,7 @@ export function syncViews(recordsBoard) {
   // The role screen is a separate view: opening it hides the main menu.
   show(menuViewEl, state === MENU);
   show(roleViewEl, state === SELECT_ROLE);
+  show(controlViewEl, state === SELECT_CONTROL);
   show(recordsViewEl, state === RECORDS);
   show(helpViewEl, state === HELP);
   // Two-player menu item: shown when the viewport is wide enough, hidden at or
@@ -138,6 +143,14 @@ export function syncViews(recordsBoard) {
     }
   } else if (roleLineEl) {
     roleLineEl.textContent = '';
+  }
+  if (state === SELECT_CONTROL) {
+    highlightItem(menuItemsEls, -1);
+    highlightItem(roleItemsEls, -1);
+    highlightItem(controlItemsEls, game.controlSelect);
+  } else if (game.state !== MENU && game.state !== SELECT_ROLE) {
+    // Clear control items when not in either menu state.
+    highlightItem(controlItemsEls, -1);
   }
   if (state === RECORDS) fillRecords(recordsBoard || []);
 }

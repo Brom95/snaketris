@@ -15,6 +15,7 @@ export const CELL = 24; // cell size in CSS pixels
 // State machine
 export const MENU = 'MENU';
 export const SELECT_ROLE = 'SELECT_ROLE';
+export const SELECT_CONTROL = 'SELECT_CONTROL';
 export const PLAYING = 'PLAYING';
 export const GAME_OVER = 'GAME_OVER';
 export const RECORDS = 'RECORDS';
@@ -32,6 +33,11 @@ export const ROLE_MARKERS = { snake: '\u{1F40D}', tetris: '\u{1F3D7}\u{FE0F}' };
 // The role screen's selectable items in page order: the two roles plus Back.
 // The arrow cycles over this list; only the first two entries are roles.
 export const ROLE_SCREEN_ITEMS = ['Snake', 'Tetris', 'Back'];
+
+// The control confirmation screen's selectable items in page order: P1 confirm,
+// P2 confirm, Back. The arrow cycles over this list; only the last entry is
+// Back (index 2).
+export const CONTROL_SCREEN_ITEMS = ['P1 Confirm', 'P2 Confirm', 'Back'];
 
 // URL for the GitHub repository.
 export const GITHUB_URL = 'https://github.com/Brom95/snaketris';

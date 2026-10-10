@@ -9,6 +9,7 @@ export const game = {
   state: MENU,
   menuSelect: 0,
   roleSelect: 0,
+  controlSelect: 0,
   role: 'snake',
   p1Role: null,
   p2Role: null,
