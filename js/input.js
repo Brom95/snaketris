@@ -63,12 +63,17 @@ function confirmSelection() {
       startGame();
     }
   } else if (game.state === SELECT_CONTROL) {
+    // Back item: return to role selection.
     if (game.controlSelect === CONTROL_SCREEN_ITEMS.length - 1) {
       toMenu();
       return;
     }
-    // Back item: return to role selection.
-    game.state = SELECT_ROLE;
+    // Start item: start the game when both players have confirmed.
+    if (game.controlSelect === 2 && game.controlConfirmed) {
+      startGame();
+      return;
+    }
+    // P1/P2 confirm items are handled by key presses in onKey().
   }
 }
 
@@ -138,35 +143,26 @@ export function setDirection(d) {
 // the device adapter in js/devices.js and routes it through handleIntent.
 
 export function onKey(e) {
-  // In SELECT_ROLE with two-player mode, WASD keys confirm P1's model and
-  // arrow keys confirm P2's. The keys also drive navigation (fall-through).
-  if (game.state === SELECT_ROLE && game.twoPlayerMode) {
-    const k = e.key;
-    if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
-      handleIntent({ action: 'confirmP1Model', model: 'wasd' });
-    } else if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') {
-      handleIntent({ action: 'confirmP2Model', model: 'arrows' });
-    }
-  }
-  // In SELECT_CONTROL with two-player mode, WASD keys confirm P1's model and
-  // arrow keys confirm P2's. When both are confirmed, they start the game.
+  // In SELECT_CONTROL with two-player mode, any key goes to the player who
+  // hasn't confirmed yet. P2 cannot pick the same keyboard layout as P1.
   if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
     const k = e.key;
-    if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
-      handleIntent({ action: 'confirmP1Model', model: 'wasd' });
-      if (game.p1Model && game.p2Model) {
-        startGame();
-        e.preventDefault();
-        return;
-      }
-    } else if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') {
-      handleIntent({ action: 'confirmP2Model', model: 'arrows' });
-      if (game.p1Model && game.p2Model) {
-        startGame();
-        e.preventDefault();
-        return;
-      }
+    const isWasd = k === 'w' || k === 'a' || k === 's' || k === 'd';
+    const isArrow = k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight';
+    if (!isWasd && !isArrow) {
+      // Not a control key — let it fall through to navigation.
+    } else if (!game.p1Model) {
+      // P1 not confirmed: WASD or arrows confirm P1's model.
+      handleIntent({ action: 'confirmP1Model', model: isWasd ? 'wasd' : 'arrows' });
+      e.preventDefault();
+      return;
+    } else if (!game.p2Model) {
+      // P2 not confirmed: try to confirm P2 with this layout.
+      handleIntent({ action: 'confirmP2Model', model: isWasd ? 'wasd' : 'arrows' });
+      e.preventDefault();
+      return;
     }
+    // Both confirmed: keys fall through to navigation (Start/Back).
   }
   const i = keyToIntent(e.key);
   if (i) {

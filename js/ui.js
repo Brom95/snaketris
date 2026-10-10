@@ -23,6 +23,8 @@ let recordsEmptyEl = null;
 let menuItemsEls = [];
 let roleItemsEls = [];
 let controlItemsEls = [];
+let controlErrorEl = null;
+let controlItemStartEl = null;
 let fieldEl = null;
 let twoPlayerItemEl = null;
 let roleLineEl = null;
@@ -42,6 +44,8 @@ export function initUi() {
   menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
   roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
   controlItemsEls = Array.from(document.querySelectorAll('#control-items > li'));
+  controlErrorEl = document.getElementById('control-error');
+  controlItemStartEl = document.getElementById('control-item-start');
   fieldEl = document.getElementById('game');
   twoPlayerItemEl = document.getElementById('menu-item-two-player');
   roleLineEl = document.getElementById('role-line');
@@ -148,7 +152,15 @@ export function syncViews(recordsBoard) {
     highlightItem(menuItemsEls, -1);
     highlightItem(roleItemsEls, -1);
     highlightItem(controlItemsEls, game.controlSelect);
-  } else if (game.state !== MENU && game.state !== SELECT_ROLE) {
+    // Show error message when P2 tries same layout as P1.
+    show(controlErrorEl, state === SELECT_CONTROL && !!game.controlError);
+    if (controlErrorEl) controlErrorEl.textContent = game.controlError || '';
+    // Show Start button only when both players confirm without conflict.
+    show(controlItemStartEl, state === SELECT_CONTROL && game.controlConfirmed);
+  } else if (state !== SELECT_CONTROL && controlErrorEl) {
+    controlErrorEl.textContent = '';
+  }
+  if (game.state !== MENU && game.state !== SELECT_ROLE && game.state !== SELECT_CONTROL) {
     // Clear control items when not in either menu state.
     highlightItem(controlItemsEls, -1);
   }

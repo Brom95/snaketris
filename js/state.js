@@ -16,6 +16,8 @@ export const game = {
   twoPlayerMode: false,
   p1Model: null,
   p2Model: null,
+  controlError: '', // error message shown when P2 tries same layout as P1
+  controlConfirmed: false, // true when both players confirm without conflict
   snake: [],
   pieces: [],
   snakeScore: 0,
@@ -64,19 +66,30 @@ export function resetGame() {
   game.twoPlayerMode = false;
   game.p1Model = null;
   game.p2Model = null;
+  game.controlError = '';
+  game.controlConfirmed = false;
 }
 
-// Confirm a player's control model. P1 sets their own; P2 is constrained by
-// P1's choice (no two players pick the same WASD/Arrows). Gamepad is always
-// shareable. Returns true on success, false if the model is blocked.
+// Confirm a player's control model. P1 sets their own (wasd or arrows).
+// P2 is constrained: cannot use the same keyboard layout as P1. Gamepad is
+// always shareable. On success both confirm, sets controlConfirmed = true.
+// Returns true on success, false if the model is blocked by conflict.
 export function confirmControlModel(player, model) {
+  game.controlError = ''; // clear any previous error
   if (player === 1) {
     game.p1Model = model;
     return true;
   }
   // P2: keyboard models are exclusive with P1; gamepad is shareable.
-  if (model !== 'gamepad' && game.p1Model === model) return false;
+  if (model !== 'gamepad' && game.p1Model === model) {
+    game.controlError = 'P2: cannot use the same layout as P1';
+    return false;
+  }
   game.p2Model = model;
+  // Both confirmed without conflict: enable Start button.
+  if (game.p1Model && game.p2Model) {
+    game.controlConfirmed = true;
+  }
   return true;
 }
 
