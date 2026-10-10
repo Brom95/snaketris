@@ -137,6 +137,27 @@ test('bot obeys the no-reverse rule like the player', () => {
   assert.notDeepEqual(game.nextDir, { r: 0, c: -1 });
 });
 
+test('bot avoids a landing cell when a safe direction exists', () => {
+  freshStart('tetris');
+  game.dir = { r: 0, c: 1 }; // heading east
+  setCell(11, 7, SOLID); // blocks the piece below row 10 in col 7
+  placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 7, 5, 'O', 0); // horizontal O at col 7, row 5
+  // The piece lands at row 9: cells (9,7),(9,8),(10,7),(10,8).
+  // East of the head (10,6) is (10,7), a landing cell.
+  const dir = chooseBotDir();
+  assert.notDeepEqual(dir, { r: 0, c: 1 }, 'bot stepped into a landing cell');
+});
+
+test('bot prefers a direction with an exit over one without', () => {
+  freshStart('tetris');
+  game.dir = { r: 0, c: 1 }; // heading east
+  setCell(9, 7, SOLID); // blocks right from (9,6)
+  setCell(9, 5, SOLID); // blocks left from (9,6)
+  placePiece([[0, 0]], 3, 3); // single cell at (3,3), nearest via up
+  const dir = chooseBotDir();
+  assert.deepEqual(dir, { r: -1, c: 0 }, 'bot did not prefer a direction with an exit');
+});
+
 // ---------- Piece placement ----------
 test('bot chooses the placement that completes a row', () => {
   freshStart('snake');
@@ -154,6 +175,24 @@ test('bot turns the piece when the turned shape scores better', () => {
   const target = choosePieceMove(p);
   assert.equal(target.state, 1); // vertical I fills the missing cell
   assert.equal(target.col, 7);
+});
+
+test('bot does not drop a block on the snake body', () => {
+  freshStart('snake');
+  game.snake = [{ r: 19, c: 3 }, { r: 18, c: 3 }]; // head at (19,3), body in bodyCells
+  placePiece(TETROMINOES.O[0], 5, 10, 'O', 0);
+  const target = choosePieceMove(game.pieces[0]);
+  assert.notEqual(target.col, 3, 'bot dropped a block on the snake head');
+});
+
+test('bot rotates a piece that needs both a shift and a rotation', () => {
+  freshStart('snake');
+  for (let c = 0; c < COLS - 1; c++) setCell(19, c, SOLID); // bottom row missing col 9
+  const p = placePiece(TETROMINOES.I[0], 6, 10, 'I', 0); // horizontal I at col 6
+  game.pieceMoveAcc = snakeTicksPerCell();
+  botSystem.update({});
+  assert.notEqual(p.state, 0, 'the bot did not rotate the piece');
+  assert.notEqual(p.col, 6, 'the bot did not shift toward the target column');
 });
 
 test('bot takes exactly one action per decision: one shift toward the target column', () => {
@@ -212,6 +251,7 @@ test('choosePieceMove is deterministic', () => {
 
 test('equal rows: the bot prefers the placement with no hole', () => {
   freshStart('snake');
+  game.snake = []; // remove the default snake so body cells do not affect occupancy
   // Rows 10..19 are solid outside cols 4, 5 and 6. Col 4 is solid only from
   // row 18, cols 5 and 6 from row 16. The O piece can only start in col 4 or
   // col 5, and both land at the same height and complete the same two rows
@@ -237,6 +277,7 @@ test('equal rows: the bot prefers the placement with no hole', () => {
 
 test('equal score ties break by rotation index then column', () => {
   freshStart('snake');
+  game.snake = []; // remove the default snake so body cells do not affect occupancy
   const p = placePiece(TETROMINOES.O[0], 5, 10, 'O', 0);
   const target = choosePieceMove(p);
   assert.equal(target.state, 0);

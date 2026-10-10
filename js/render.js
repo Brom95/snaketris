@@ -65,15 +65,16 @@ export function render() {
     }
   }
 
-  // Falling pieces (edible while falling)
-  ctx.fillStyle = COLORS.edible;
-  for (const p of game.pieces) {
-    for (const cell of pieceCells(p)) drawCell(cell.r, cell.c);
-  }
-
   // Snake
   for (let i = 0; i < game.snake.length; i++) {
     ctx.fillStyle = bodyColor(i);
     drawCell(game.snake[i].r, game.snake[i].c);
+  }
+
+  // Falling pieces (edible while falling), drawn after the snake so they
+  // appear on top of it.
+  ctx.fillStyle = COLORS.edible;
+  for (const p of game.pieces) {
+    for (const cell of pieceCells(p)) drawCell(cell.r, cell.c);
   }
 }

@@ -81,23 +81,39 @@ export function chooseBotDir() {
   const target = nearestTargetCell(head);
   if (!target) return game.dir;
 
-  let bestDir = null;
-  let bestDist = Infinity;
-  let bestExits = -1;
+  // Cells where a falling piece will come to rest, treated as solid.
+  const landingSet = new Set();
+  for (const p of game.pieces) {
+    const cells = landingCells(p.shape, p.col, Math.floor(p.row));
+    for (const [r, c] of cells) landingSet.add(`${r},${c}`);
+  }
+
+  // Collect safe directions. A landing cell is unsafe.
+  const candidates = [];
   for (const d of DIRS) {
     if (d.r === -game.dir.r && d.c === -game.dir.c) continue;
     const nr = wrap(head.r + d.r, ROWS);
     const nc = wrap(head.c + d.c, COLS);
     if (!isSafeCell(nr, nc)) continue;
+    if (landingSet.has(`${nr},${nc}`)) continue;
     const dist = torusDelta(nr, target.r, ROWS) + torusDelta(nc, target.c, COLS);
     const exits = exitCount(nr, nc, d);
-    if (dist < bestDist || (dist === bestDist && exits > bestExits)) {
-      bestDir = d;
-      bestDist = dist;
-      bestExits = exits;
+    candidates.push({ d, dist, exits });
+  }
+
+  if (candidates.length === 0) return game.dir;
+
+  // Primary: prefer directions that keep an exit. Fall back to all safe.
+  const withExits = candidates.filter((cand) => cand.exits > 0);
+  const pool = withExits.length > 0 ? withExits : candidates;
+
+  let best = null;
+  for (const cand of pool) {
+    if (!best || cand.dist < best.dist || (cand.dist === best.dist && cand.exits > best.exits)) {
+      best = cand;
     }
   }
-  return bestDir || game.dir;
+  return best.d;
 }
 
 // Cells the piece would occupy after falling to rest in `col` with `shape`.
@@ -120,6 +136,12 @@ function occupancy(cells) {
     const row = [];
     for (let c = 0; c < COLS; c++) row.push(getCell(r, c) === SOLID);
     occ.push(row);
+  }
+  // Snake body cells are occupied: a landed block on a snake cell is penalized.
+  for (const seg of bodyCells()) {
+    if (seg.r >= 0 && seg.r < ROWS && seg.c >= 0 && seg.c < COLS) {
+      occ[seg.r][seg.c] = true;
+    }
   }
   for (const [r, c] of cells) occ[r][c] = true;
   return occ;
@@ -196,11 +218,11 @@ export function choosePieceMove(p) {
 function applyBotPieceMove(p) {
   const target = choosePieceMove(p);
   if (!target) return;
+  // Always try to rotate, not only when in the target column.
+  setPieceState(p, target.state);
   if (p.col !== target.col) {
     requestPieceShift(target.col > p.col ? 1 : -1);
-    return;
   }
-  setPieceState(p, target.state);
 }
 
 export const botSystem = {
