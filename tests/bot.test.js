@@ -271,8 +271,8 @@ test('equal rows: the bot prefers the placement with no hole', () => {
   const target = choosePieceMove(p);
   assert.equal(target.state, 0);
   assert.equal(target.col, 5, 'the bot avoided the column that buries a hole');
-  // 2 full rows (18, 19), 0 holes, stack height 10.
-  assert.equal(target.score, 10 * 2 - 2 * 0 - 10);
+  // Row 19 is already full (no new credit). 0 holes, stack height 10.
+  assert.equal(target.score, 10 * 0 - 2 * 0 - 10);
 });
 
 test('equal score ties break by rotation index then column', () => {

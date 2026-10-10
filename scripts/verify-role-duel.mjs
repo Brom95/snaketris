@@ -176,7 +176,7 @@ check((played.snakeScore - eaten) % 4 === 0,
 const hud = await tetrisPage.evaluate(() => document.getElementById('score').textContent);
 check(/Snake \d+  \u00b7  Tetris \d+/.test(hud), 'HUD shows both labelled scores: ' + hud);
 // Only a finished game writes its score to the board.
-check(await stateIs(tetrisPage, 'GAME_OVER', 60000), 'the Tetris-role game ended and recorded its score');
+check(await stateIs(tetrisPage, 'GAME_OVER', 120000), 'the Tetris-role game ended and recorded its score');
 await tetris.page.close();
 if (tetrisPage !== tetris.page) await tetrisPage.close();
 

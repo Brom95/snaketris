@@ -79,7 +79,24 @@ export function chooseBotDir() {
   const head = game.snake[0];
   if (!head) return game.dir;
   const target = nearestTargetCell(head);
-  if (!target) return game.dir;
+  // When no falling piece remains, the snake must not chase a cell that is
+  // already solid (a piece that just landed). If the current direction leads
+  // into a solid cell, steer to a safe direction instead.
+  if (!target) {
+    const hr = head.r;
+    const hc = head.c;
+    // If the current direction is safe, keep it. Otherwise steer to a safe
+    // direction (the first safe one in DIRS order).
+    const curR = wrap(hr + game.dir.r, ROWS);
+    const curC = wrap(hc + game.dir.c, COLS);
+    if (isSafeCell(curR, curC)) return game.dir;
+    for (const d of DIRS) {
+      const nr = wrap(hr + d.r, ROWS);
+      const nc = wrap(hc + d.c, COLS);
+      if (isSafeCell(nr, nc)) return d;
+    }
+    return game.dir;
+  }
 
   // Cells where a falling piece will come to rest, treated as solid.
   const landingSet = new Set();
@@ -173,12 +190,19 @@ function stackStats(occ) {
   return { holes, height };
 }
 
-// Heuristic for a simulated landing: full rows are good, holes and tall
-// stacks are bad. Existing solid blocks are part of the stack.
+// Heuristic for a simulated landing: new full rows are good (already-full
+// rows give no credit), holes and tall stacks are bad, and landing on snake
+// body cells is penalized.
 function simulateScore(cells) {
+  const baseOcc = occupancy([]);
   const occ = occupancy(cells);
+  const newFull = countFullRows(occ) - countFullRows(baseOcc);
   const { holes, height } = stackStats(occ);
-  return 10 * countFullRows(occ) - 2 * holes - height;
+  let snakePenalty = 0;
+  for (const [r, c] of cells) {
+    if (baseOcc[r][c]) snakePenalty += 1;
+  }
+  return 10 * newFull - 2 * holes - height - snakePenalty;
 }
 
 // Anchor columns that keep every cell of a shape inside the playfield. The
