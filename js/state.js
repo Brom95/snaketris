@@ -82,9 +82,15 @@ export function confirmControlModel(player, model) {
 export function startGame() {
   if (game.state === PLAYING) return;
   const role = game.role;
+  const twoPlayer = game.twoPlayerMode;
   resetGame();
   // resetGame clears the menu state; the role chosen before the game is kept.
   game.role = role;
+  if (twoPlayer) {
+    game.twoPlayerMode = true;
+    game.p1Role = role;
+    game.p2Role = role === 'snake' ? 'tetris' : 'snake';
+  }
   game.state = PLAYING;
   // Prime the spawn accumulator so the first piece appears on the very next
   // update tick (matching the original immediate-spawn feel). Subsequent

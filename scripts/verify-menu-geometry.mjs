@@ -47,7 +47,7 @@ const highlightCss = /#menu-items li\.on\b/.test(page) || /li\.on\s*\{/.test(pag
 const dom = stubDom({
   elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
     'records-list', 'records-empty'],
-  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help', 'menu-item-two-player'] },
+  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-two-player', 'menu-item-records', 'menu-item-help'] },
   window: { innerWidth: 1280, innerHeight: 800 },
   canvas: makeCanvas(),
 });
@@ -105,16 +105,14 @@ check(game.menuSelect === 2 && game.state === MENU, 'ArrowUp: 3 -> 2');
 toMenu();
 game.menuSelect = 1;
 press('enter');
-check(game.state === RECORDS, 'Enter on "Records" opens RECORDS (one action)');
-press('enter');
-check(game.state === MENU, 'Enter in RECORDS returns to MENU');
+check(game.twoPlayerMode && game.state === SELECT_ROLE, 'Enter on "Two Players" opens two-player role select');
 
 toMenu();
 game.menuSelect = 2;
 press(' ');
-check(game.state === HELP, 'Space on "How to Play" opens HELP');
+check(game.state === RECORDS, 'Space on "Records" opens RECORDS');
 press('escape');
-check(game.state === MENU, 'Escape in HELP returns to MENU');
+check(game.state === MENU, 'Escape in RECORDS returns to MENU');
 
 // "Play" no longer starts a game: it opens the role sub-menu.
 toMenu();

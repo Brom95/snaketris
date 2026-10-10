@@ -41,12 +41,12 @@ function moveSelection(step) {
 function confirmSelection() {
   if (game.state === MENU) {
     if (game.menuSelect === 0) game.state = SELECT_ROLE;
-    else if (game.menuSelect === 1) game.state = RECORDS;
-    else if (game.menuSelect === 2) game.state = HELP;
-    else if (game.menuSelect === 3) {
+    else if (game.menuSelect === 1) {
       game.twoPlayerMode = true;
       game.state = SELECT_ROLE;
     }
+    else if (game.menuSelect === 2) game.state = RECORDS;
+    else if (game.menuSelect === 3) game.state = HELP;
   } else if (game.state === SELECT_ROLE) {
     if (game.roleSelect === ROLE_SCREEN_ITEMS.length - 1) {
       toMenu();
@@ -123,20 +123,14 @@ export function setDirection(d) {
 // the device adapter in js/devices.js and routes it through handleIntent.
 
 export function onKey(e) {
-  // In SELECT_ROLE with two-player mode, WASD confirms P1's model, arrows
-  // confirm P2's. These are one-time confirmations; the key does not also
-  // drive navigation.
+  // In SELECT_ROLE with two-player mode, WASD keys confirm P1's model and
+  // arrow keys confirm P2's. The keys also drive navigation (fall-through).
   if (game.state === SELECT_ROLE && game.twoPlayerMode) {
     const k = e.key;
     if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
       handleIntent({ action: 'confirmP1Model', model: 'wasd' });
-      e.preventDefault();
-      return;
-    }
-    if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') {
+    } else if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') {
       handleIntent({ action: 'confirmP2Model', model: 'arrows' });
-      e.preventDefault();
-      return;
     }
   }
   const i = keyToIntent(e.key);
@@ -218,12 +212,12 @@ function firstHit(items, x, y) {
 function openMenuItem(i) {
   game.menuSelect = i;
   if (i === 0) game.state = SELECT_ROLE;
-  else if (i === 1) game.state = RECORDS;
-  else if (i === 2) game.state = HELP;
-  else if (i === 3) {
+  else if (i === 1) {
     game.twoPlayerMode = true;
     game.state = SELECT_ROLE;
   }
+  else if (i === 2) game.state = RECORDS;
+  else if (i === 3) game.state = HELP;
 }
 
 export function onInterfacePointerUp(e) {

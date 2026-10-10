@@ -67,17 +67,19 @@ const ITEMS = [
   { left: 40, top: 100, right: 160, bottom: 124 },
   { left: 40, top: 132, right: 180, bottom: 156 },
   { left: 40, top: 164, right: 200, bottom: 188 },
+  { left: 40, top: 196, right: 220, bottom: 220 },
 ];
-const ANCHOR = { left: 100, top: 210, right: 124, bottom: 234 };
+const ANCHOR = { left: 100, top: 230, right: 124, bottom: 254 };
 
 const dom = stubDom({
   elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
     'records-list', 'records-empty'],
-  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'] },
+  lists: { '#menu-items > li': ['menu-item-play', 'menu-item-two-player', 'menu-item-records', 'menu-item-help'] },
   rects: {
     'menu-item-play': ITEMS[0],
-    'menu-item-records': ITEMS[1],
-    'menu-item-help': ITEMS[2],
+    'menu-item-two-player': ITEMS[1],
+    'menu-item-records': ITEMS[2],
+    'menu-item-help': ITEMS[3],
     'github-link': ANCHOR,
   },
   window: { innerWidth: 1280, innerHeight: 800 },
@@ -127,13 +129,13 @@ check(!MENU_ITEMS.includes('GitHub') && !MENU_ITEMS.includes(GITHUB_URL),
 
 menuState();
 game.menuSelect = 0;
-clickPage(center(ITEMS[2]).x, center(ITEMS[2]).y);
-check(game.state === HELP && game.menuSelect === 2, 'click on "How to Play" selects item 2 and opens HELP');
+clickPage(center(ITEMS[3]).x, center(ITEMS[3]).y);
+check(game.state === HELP && game.menuSelect === 3, 'click on "How to Play" selects item 3 and opens HELP');
 
 menuState();
 game.menuSelect = 0;
-clickPage(center(ITEMS[1]).x, center(ITEMS[1]).y);
-check(game.state === RECORDS && game.menuSelect === 1, 'click on "Records" selects item 1 and opens RECORDS');
+clickPage(center(ITEMS[2]).x, center(ITEMS[2]).y);
+check(game.state === RECORDS && game.menuSelect === 2, 'click on "Records" selects item 2 and opens RECORDS');
 
 menuState();
 game.menuSelect = 0;

@@ -42,7 +42,7 @@ const dom = stubDom({
   elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
     'records-list', 'records-empty'],
   lists: {
-    '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help', 'menu-item-two-player'],
+    '#menu-items > li': ['menu-item-play', 'menu-item-two-player', 'menu-item-records', 'menu-item-help'],
     '#role-items > li': ['role-item-snake', 'role-item-tetris', 'role-back'],
   },
   window: { innerWidth: 1280, innerHeight: 800 },
@@ -190,11 +190,11 @@ toMenu();
 check(game.menuSelect === 0, 'menu starts at 0 (Play)');
 
 frames([makePad([DOWN]), makePad()]);
-check(game.menuSelect === 1, 'D-pad down: 0 -> 1 (Records)');
+check(game.menuSelect === 1, 'D-pad down: 0 -> 1 (Two Players)');
 frames([makePad([DOWN]), makePad()]);
-check(game.menuSelect === 2, 'D-pad down: 1 -> 2 (How to Play)');
+check(game.menuSelect === 2, 'D-pad down: 1 -> 2 (Records)');
 frames([makePad([DOWN]), makePad()]);
-check(game.menuSelect === 3, 'D-pad down: 2 -> 3 (Two Players)');
+check(game.menuSelect === 3, 'D-pad down: 2 -> 3 (How to Play)');
 frames([makePad([DOWN]), makePad()]);
 check(game.menuSelect === 0, 'D-pad down: 3 -> 0 (wraps)');
 
@@ -224,11 +224,17 @@ resetController();
 toMenu();
 game.menuSelect = 1;
 frames([makePad([A])]);
-check(game.state === RECORDS, 'A on "Records" opens RECORDS');
+check(game.twoPlayerMode && game.state === SELECT_ROLE, 'A on "Two Players" opens two-player role select');
 
 resetController();
 toMenu();
 game.menuSelect = 2;
+frames([makePad([A])]);
+check(game.state === RECORDS, 'A on "Records" opens RECORDS');
+
+resetController();
+toMenu();
+game.menuSelect = 3;
 frames([makePad([A])]);
 check(game.state === HELP, 'A on "How to Play" opens HELP');
 
@@ -238,7 +244,7 @@ console.log('=== B back to menu ===');
 
 resetController();
 toMenu();
-game.menuSelect = 1;
+game.menuSelect = 2;
 frames([makePad([A])]);
 check(game.state === RECORDS, 'entering RECORDS via A');
 frames([makePad([B])]);
@@ -246,7 +252,7 @@ check(game.state === MENU, 'B from RECORDS returns to MENU');
 
 resetController();
 toMenu();
-game.menuSelect = 2;
+game.menuSelect = 3;
 frames([makePad([A])]);
 check(game.state === HELP, 'entering HELP via A');
 frames([makePad([B])]);
@@ -282,7 +288,7 @@ check(game.menuSelect === 1, 'holding D-pad down: selection advances exactly onc
 
 resetController();
 toMenu();
-game.menuSelect = 1;
+game.menuSelect = 2;
 frames([makePad([A])]);
 frames([makePad([B]), makePad([B]), makePad([B])]);
 check(game.state === MENU, 'holding B in RECORDS: returns to menu (idempotent, no crash)');
