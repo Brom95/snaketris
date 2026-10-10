@@ -23,7 +23,7 @@ function cappedSnake() {
 
 test('speed relationship: snake always strictly faster than a falling piece', () => {
   for (let n = 0; n <= 200; n += 1) {
-    game.landedBlocks = n;
+    game.completedPieces = n;
     const st = snakeTicksPerCell();
     const pt = pieceTicksPerCell();
     assert.ok(st < pt, `landed=${n} st=${st} pt=${pt}`);
@@ -31,12 +31,12 @@ test('speed relationship: snake always strictly faster than a falling piece', ()
 });
 
 test('speed relationship: snake interval = 23 at base', () => {
-  game.landedBlocks = 0;
+  game.completedPieces = 0;
   assert.ok(Math.abs(snakeTicksPerCell() - 23) < 1e-9);
 });
 
 test('speed relationship: snake interval = 1 at cap', () => {
-  game.landedBlocks = 205;
+  game.completedPieces = 123; // floor(123/3) = 41 tiers — past the 0.9 cap
   assert.ok(Math.abs(snakeTicksPerCell() - 1) < 1e-9);
 });
 
@@ -83,11 +83,11 @@ test('growth stops at the cap and the extra cell is recorded as overflow', () =>
   game.pieces.push({ shape: [[0, 0], [0, 1], [0, 2]], col: 7, row: MID });
   const s0 = game.snakeScore;
 
-  moveSnake(); // 7 segments -> 8
+  moveSnake(); // 9 segments -> 10 (the cap)
   assert.equal(game.snake.length, MAX_SNAKE_LEN);
   assert.equal(game.overflow, 0);
 
-  moveSnake(); // at the cap: the cell is eaten, the length stays 8
+  moveSnake(); // at the cap: the cell is eaten, the length stays 10
   assert.equal(game.snake.length, MAX_SNAKE_LEN);
   assert.equal(game.overflow, 1);
   assert.equal(game.snakeScore, s0 + 2);
@@ -99,7 +99,8 @@ test('a capped head still vacates its tail, so it may step onto the tail cell', 
   // Head at column 1, tail at column 0: the head steps left onto the tail cell.
   game.snake = [
     { r: MID, c: 1 }, { r: MID, c: 2 }, { r: MID, c: 3 }, { r: MID, c: 4 },
-    { r: MID, c: 5 }, { r: MID, c: 6 }, { r: MID, c: 7 }, { r: MID, c: 0 },
+    { r: MID, c: 5 }, { r: MID, c: 6 }, { r: MID, c: 7 }, { r: MID, c: 8 },
+    { r: MID, c: 9 }, { r: MID, c: 0 },
   ];
   game.dir = { r: 0, c: -1 };
   game.nextDir = { r: 0, c: -1 };
@@ -116,10 +117,11 @@ test('a capped head still vacates its tail, so it may step onto the tail cell', 
 test('a piece falling onto a capped head records overflow instead of growing', () => {
   freshStart();
   const MID = Math.floor(20 / 2);
-  // A full-length snake at the cap: head at column 6, tail wrapped to column 9.
+  // A full-length snake at the cap: head at column 6, tail wrapped to column 8.
   game.snake = [
     { r: MID, c: 6 }, { r: MID, c: 5 }, { r: MID, c: 4 }, { r: MID, c: 3 },
     { r: MID, c: 2 }, { r: MID, c: 1 }, { r: MID, c: 0 }, { r: MID, c: 9 },
+    { r: MID, c: 8 }, { r: MID, c: 7 },
   ];
   game.dir = { r: 0, c: 1 };
   game.nextDir = { r: 0, c: 1 };

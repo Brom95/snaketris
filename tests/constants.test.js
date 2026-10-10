@@ -106,8 +106,8 @@ test('scoring constants', () => {
 });
 
 test('snake cap and tier palette are defined', () => {
-  assert.equal(C.MAX_SNAKE_LEN, 8);
-  assert.equal(C.TIER_WIDTH, 7);
+  assert.equal(C.MAX_SNAKE_LEN, 10);
+  assert.equal(C.TIER_WIDTH, 9);
   assert.equal(C.COLORS.snakeHead, '#4ade80');
   assert.equal(C.COLORS.snakeBody, '#9ca3af');
   assert.equal(C.COLORS.tierBlue, '#2563eb');

@@ -51,7 +51,7 @@ export const MIN_SNAKE_TICKS = 1;
 // Snake size: one head plus MAX_SNAKE_LEN - 1 body segments. Growth stops at
 // the cap; every later eaten cell is recorded as one overflow block, which
 // drives the body colour tiers.
-export const MAX_SNAKE_LEN = 8;
+export const MAX_SNAKE_LEN = 10;
 export const TIER_WIDTH = MAX_SNAKE_LEN - 1; // body segments one tier colours
 
 // Scoring

@@ -255,9 +255,9 @@ function countShifts(drive, ticks) {
   return count;
 }
 
-function parityRun(role, ticks, landedBlocks) {
+function parityRun(role, ticks, completedPieces) {
   freshStart(role);
-  game.landedBlocks = landedBlocks;
+  game.completedPieces = completedPieces;
   for (let c = 2; c < COLS; c++) setCell(19, c, SOLID); // target column is 0
   placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 5, 10);
   game.pieceMoveAcc = 0;
@@ -276,8 +276,8 @@ test('bot lateral speed equals the player lateral speed at base speed', () => {
 });
 
 test('bot lateral speed equals the player lateral speed at the ramped cap', () => {
-  const byBot = parityRun('snake', 6, 205);
-  const byPlayer = parityRun('tetris', 6, 205);
+  const byBot = parityRun('snake', 6, 123);
+  const byPlayer = parityRun('tetris', 6, 123);
   assert.equal(currentFallSpeed(), MAX_FALL);
   assert.equal(snakeTicksPerCell(), 1);
   assert.equal(byBot, byPlayer);

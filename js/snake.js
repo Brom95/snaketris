@@ -28,6 +28,7 @@ function eatPieceAt(r, c) {
   game.snakeScore += 1;
   if (p.shape.length === 0) {
     game.snakeScore += PIECE_BONUS;
+    game.completedPieces += 1;
     const idx = game.pieces.indexOf(p);
     if (idx >= 0) game.pieces.splice(idx, 1);
   }

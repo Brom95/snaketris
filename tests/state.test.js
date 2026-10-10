@@ -44,12 +44,14 @@ test('restart after a game keeps three segments and zeroes both scores', () => {
   state.game.snakeScore = 7;
   state.game.tetrisScore = 12;
   state.game.landedBlocks = 30;
+  state.game.completedPieces = 5;
   state.gameOver();
   state.startGame();
   assert.equal(state.game.state, 'PLAYING');
   assert.equal(state.game.snakeScore, 0);
   assert.equal(state.game.tetrisScore, 0);
   assert.equal(state.game.landedBlocks, 0);
+  assert.equal(state.game.completedPieces, 0);
   assert.equal(state.game.snake.length, 3);
   assert.equal(state.game.role, 'tetris'); // role survives the reset
 });

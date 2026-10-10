@@ -63,24 +63,25 @@ test('spawn owns an independent shape copy and starts in state 0', () => {
   assert.equal(game.pieces[0].shape.length, 4);
 });
 
-test('difficulty ramp: 0.04 -> 0.0432 -> ... -> 0.9', () => {
-  game.landedBlocks = 0;
+test('difficulty ramp: one step per three completed pieces, capped at 0.9', () => {
+  game.completedPieces = 0;
   assert.ok(Math.abs(currentFallSpeed() - 0.04) < 1e-9);
-  game.landedBlocks = 4;
+  game.completedPieces = 2;
   assert.ok(Math.abs(currentFallSpeed() - 0.04) < 1e-9);
-  game.landedBlocks = 5;
+  game.completedPieces = 3;
   assert.ok(Math.abs(currentFallSpeed() - 0.04 * 1.08) < 1e-9);
-  game.landedBlocks = 9;
+  game.completedPieces = 5;
   assert.ok(Math.abs(currentFallSpeed() - 0.04 * 1.08) < 1e-9);
-  game.landedBlocks = 10;
+  game.completedPieces = 6;
   assert.ok(Math.abs(currentFallSpeed() - 0.04 * 1.08 * 1.08) < 1e-9);
-  game.landedBlocks = 100;
-  assert.ok(Math.abs(currentFallSpeed() - Math.min(0.9, 0.04 * Math.pow(1.08, 20))) < 1e-9);
+  game.completedPieces = 123; // floor(123/3) = 41 tiers — past the 0.9 cap
+  assert.ok(Math.abs(currentFallSpeed() - Math.min(0.9, 0.04 * Math.pow(1.08, 41))) < 1e-9);
 });
 
-test('line clear: full row clears, +10 to the Tetris side, -10 landedBlocks', () => {
+test('line clear: full row clears, +10 to the Tetris side, no landed-block rollback', () => {
   freshStart();
   for (let c = 0; c < 10; c++) setCell(19, c, SOLID); // fill bottom row
+  setCell(18, 3, SOLID); // a solid block above the cleared row
   game.landedBlocks = 50;
   const t0 = game.tetrisScore;
   const s0 = game.snakeScore;
@@ -89,15 +90,32 @@ test('line clear: full row clears, +10 to the Tetris side, -10 landedBlocks', ()
   assert.equal(getCell(19, 9), EMPTY);
   assert.equal(game.tetrisScore, t0 + 10);
   assert.equal(game.snakeScore, s0); // the snake side is untouched
-  assert.equal(game.landedBlocks, 40);
-  // Multiple full rows in one tick.
+  assert.equal(game.landedBlocks, 50); // no rollback on clear
+  // The solid block above the cleared row dropped by one.
+  assert.equal(getCell(18, 3), EMPTY);
+  assert.equal(getCell(19, 3), SOLID);
+});
+
+test('two full rows in one tick: blocks above both drop by two, snake stays put', () => {
+  freshStart();
+  // Fill rows 18 and 17 completely; a solid block sits at row 16 above both.
   for (let c = 0; c < 10; c++) { setCell(18, c, SOLID); setCell(17, c, SOLID); }
+  setCell(16, 4, SOLID); // solid above both cleared rows
+  game.snake = [{ r: 16, c: 5 }]; // a snake segment above both cleared rows
+  const t0 = game.tetrisScore;
+  const s0 = game.snakeScore;
   clearFullRows();
+  // Both rows cleared.
   assert.equal(getCell(18, 0), EMPTY);
   assert.equal(getCell(17, 0), EMPTY);
-  assert.equal(game.tetrisScore, t0 + 30);
+  // The solid at row 16 dropped by two (one per cleared row) to row 18.
+  assert.equal(getCell(16, 4), EMPTY);
+  assert.equal(getCell(18, 4), SOLID);
+  // Each cleared row awards +10; the snake side is untouched.
+  assert.equal(game.tetrisScore, t0 + 20);
   assert.equal(game.snakeScore, s0);
-  assert.equal(game.landedBlocks, 20);
+  // Snake segments do not move on a line clear.
+  assert.deepEqual(game.snake, [{ r: 16, c: 5 }]);
 });
 
 // ---------- Sideways shift ----------
@@ -248,7 +266,7 @@ test('rotation keeps cells the snake already ate gone', () => {
 
 test('a rotation does not interrupt the fall', () => {
   freshStart();
-  game.landedBlocks = 0;
+  game.completedPieces = 0;
   const p = placePiece(TETROMINOES.T[0], 4, 10, 'T', 0);
   const speed = currentFallSpeed();
   assert.equal(rotatePiece(p, true), true);
@@ -260,7 +278,7 @@ test('a rotation does not interrupt the fall', () => {
 // ---------- Shift cooldown gate ----------
 test('shift gate: two presses inside one interval move the piece one cell', () => {
   freshStart();
-  game.landedBlocks = 0;
+  game.completedPieces = 0;
   const p = placePiece([[0, 0], [0, 1]], 4, 10);
   const interval = snakeTicksPerCell();
   game.pieceMoveAcc = interval;
@@ -275,7 +293,7 @@ test('shift gate: two presses inside one interval move the piece one cell', () =
 
 test('shift gate: a blocked shift does not consume the interval', () => {
   freshStart();
-  game.landedBlocks = 0;
+  game.completedPieces = 0;
   const p = placePiece([[0, 0], [0, 1]], 0, 10);
   game.pieceMoveAcc = snakeTicksPerCell();
   assert.equal(requestPieceShift(-1), false);
@@ -286,10 +304,10 @@ test('shift gate: a blocked shift does not consume the interval', () => {
 
 test('shift gate: the interval follows the speed ramp', () => {
   freshStart();
-  game.landedBlocks = 0;
+  game.completedPieces = 0;
   const base = snakeTicksPerCell();
   assert.ok(Math.abs(base - 23) < 1e-9);
-  game.landedBlocks = 205; // ramped to the 0.9 cap
+  game.completedPieces = 123; // floor(123/3) = 41 tiers — past the 0.9 cap
   const fast = snakeTicksPerCell();
   assert.ok(Math.abs(fast - 1) < 1e-9);
   const p = placePiece([[0, 0], [0, 1]], 4, 10);

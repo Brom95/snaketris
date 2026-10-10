@@ -4,10 +4,10 @@ import { game, gameOver } from './state.js';
 import { getCell, setCell } from './grid.js';
 import { consumePieceAtHead, snakeTicksPerCell } from './snake.js';
 
-// Difficulty ramp: fall speed (cells/tick) ticks up one step every five
-// landed blocks, from BASE_FALL, capped at MAX_FALL.
+// Difficulty ramp: fall speed (cells/tick) ticks up one step every three
+// completed pieces, from BASE_FALL, capped at MAX_FALL.
 export function currentFallSpeed() {
-  const tier = Math.floor(game.landedBlocks / 5);
+  const tier = Math.floor(game.completedPieces / 3);
   return Math.min(MAX_FALL, BASE_FALL * Math.pow(1.08, tier));
 }
 
@@ -175,20 +175,35 @@ export function stepPiece(p) {
   p.row = nextRow;
 }
 
-// Clear full rows: scan every row; if all COLS cells are SOLID, set them to EMPTY,
-// award LINE_CLEAR_POINTS to the Tetris side per cleared row, subtract 10 from
-// landedBlocks (clamp to ≥0).
+// Clear full rows: identify every row where all COLS cells are SOLID, clear
+// them to EMPTY, shift each SOLID cell above a cleared row down by one (snake
+// segments untouched), and award LINE_CLEAR_POINTS per cleared row. There is
+// no landed-block rollback.
 export function clearFullRows() {
+  const cleared = [];
   for (let r = 0; r < ROWS; r++) {
     let full = true;
     for (let c = 0; c < COLS; c++) {
       if (getCell(r, c) !== SOLID) { full = false; break; }
     }
-    if (!full) continue;
-    for (let c = 0; c < COLS; c++) setCell(r, c, EMPTY);
-    game.tetrisScore += LINE_CLEAR_POINTS;
-    game.landedBlocks = Math.max(0, game.landedBlocks - 10);
+    if (full) cleared.push(r);
   }
+  for (const r of cleared) {
+    for (let c = 0; c < COLS; c++) setCell(r, c, EMPTY);
+  }
+  // Shift SOLID cells above each cleared row down by one. Processing in
+  // ascending order lets a block above several cleared rows drop once per clear.
+  for (const r of cleared) {
+    for (let i = r - 1; i >= 0; i--) {
+      for (let c = 0; c < COLS; c++) {
+        if (getCell(i, c) === SOLID) {
+          setCell(i + 1, c, SOLID);
+          setCell(i, c, EMPTY);
+        }
+      }
+    }
+  }
+  game.tetrisScore += cleared.length * LINE_CLEAR_POINTS;
 }
 
 // Snap the piece to the grid as SOLID blocks and remove it from the list.
@@ -205,6 +220,7 @@ export function landPiece(p) {
       landedCells += 1;
     }
   }
+  game.completedPieces += 1;
   const idx = game.pieces.indexOf(p);
   if (idx >= 0) game.pieces.splice(idx, 1);
   clearFullRows();
