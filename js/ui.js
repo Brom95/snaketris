@@ -28,6 +28,7 @@ let controlItemStartEl = null;
 let fieldEl = null;
 let twoPlayerItemEl = null;
 let roleLineEl = null;
+let controlKeyHintsEl = null;
 let controlP1StatusEl = null;
 let controlP2StatusEl = null;
 let controlSummaryEl = null;
@@ -54,6 +55,7 @@ export function initUi() {
   fieldEl = document.getElementById('game');
   twoPlayerItemEl = document.getElementById('menu-item-two-player');
   roleLineEl = document.getElementById('role-line');
+  controlKeyHintsEl = document.getElementById('control-key-hints');
   controlP1StatusEl = document.getElementById('control-p1-status');
   controlP2StatusEl = document.getElementById('control-p2-status');
   controlSummaryEl = document.getElementById('control-summary');
@@ -161,7 +163,33 @@ export function syncViews(recordsBoard) {
   if (state === SELECT_CONTROL) {
     highlightItem(menuItemsEls, -1);
     highlightItem(roleItemsEls, -1);
-    highlightItem(controlItemsEls, game.controlSelect);
+    // Step-by-step: show only the current step's item.
+    const p1Sel = game.p1Selection;
+    const p1Mod = game.p1Model;
+    const p2Sel = game.p2Selection;
+    const p2Mod = game.p2Model;
+    const confirmed = game.controlConfirmed;
+    let step;
+    if (!p1Mod && !p1Sel) { step = 0; } // P1 select
+    else if (p1Sel && !p1Mod) { step = 1; } // P1 confirm
+    else if (p1Mod && !p2Sel && !p2Mod) { step = 2; } // P2 select
+    else if (p2Sel && !p2Mod) { step = 3; } // P2 confirm
+    else if (confirmed) { step = 4; } // Start
+    for (let i = 0; i < controlItemsEls.length; i++) {
+      show(controlItemsEls[i], i === step);
+    }
+    // Key hints per step.
+    if (controlKeyHintsEl) {
+      const hints = [
+        'W / A / S / D  ·  ↑ ↓ ← →  ·  🎯',
+        'Enter / Space',
+        'W / A / S / D  ·  ↑ ↓ ← →  ·  🎯',
+        'Enter / Space',
+        'Enter / Space'
+      ];
+      controlKeyHintsEl.textContent = hints[step] || '';
+      show(controlKeyHintsEl, true);
+    }
     // Show error message when P2 tries same layout as P1.
     show(controlErrorEl, state === SELECT_CONTROL && !!game.controlError);
     if (controlErrorEl) controlErrorEl.textContent = game.controlError || '';
