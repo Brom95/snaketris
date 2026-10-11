@@ -28,6 +28,11 @@ let controlItemStartEl = null;
 let fieldEl = null;
 let twoPlayerItemEl = null;
 let roleLineEl = null;
+let controlP1StatusEl = null;
+let controlP2StatusEl = null;
+let controlSummaryEl = null;
+let summaryLine1El = null;
+let summaryLine2El = null;
 
 // Called by app.js once the page is parsed; stores the interface elements.
 export function initUi() {
@@ -49,6 +54,11 @@ export function initUi() {
   fieldEl = document.getElementById('game');
   twoPlayerItemEl = document.getElementById('menu-item-two-player');
   roleLineEl = document.getElementById('role-line');
+  controlP1StatusEl = document.getElementById('control-p1-status');
+  controlP2StatusEl = document.getElementById('control-p2-status');
+  controlSummaryEl = document.getElementById('control-summary');
+  summaryLine1El = document.getElementById('summary-line-1');
+  summaryLine2El = document.getElementById('summary-line-2');
 }
 
 // Shows or hides one interface element. `.view` hides by default, `.view.on`
@@ -157,6 +167,25 @@ export function syncViews(recordsBoard) {
     if (controlErrorEl) controlErrorEl.textContent = game.controlError || '';
     // Show Start button only when both players confirm without conflict.
     show(controlItemStartEl, state === SELECT_CONTROL && game.controlConfirmed);
+    // Per-player status feedback.
+    if (controlP1StatusEl) {
+      controlP1StatusEl.textContent = game.p1Model
+        ? 'P1: ' + game.p1Model.toUpperCase() + '\u2714'
+        : (game.p1Selection ? 'P1 selecting...' : '');
+    }
+    if (controlP2StatusEl) {
+      controlP2StatusEl.textContent = game.p2Model
+        ? 'P2: ' + game.p2Model.toUpperCase() + '\u2714'
+        : (game.p2Selection ? 'P2 selecting...' : '');
+    }
+    // Summary screen when both confirmed.
+    if (controlSummaryEl) {
+      show(controlSummaryEl, state === SELECT_CONTROL && game.controlConfirmed);
+      if (summaryLine1El && summaryLine2El) {
+        summaryLine1El.textContent = 'P1: ' + (game.p1Role || game.role) + '  /  ' + (game.p1Model || '');
+        summaryLine2El.textContent = 'P2: ' + (game.p2Role || '') + '  /  ' + (game.p2Model || '');
+      }
+    }
   } else if (state !== SELECT_CONTROL && controlErrorEl) {
     controlErrorEl.textContent = '';
   }

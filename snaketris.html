@@ -82,6 +82,10 @@
     #records-title, #help-title { font-size: 24px; margin: 0; }
     #records-list { margin: 0; padding: 0; list-style: decimal inside; }
     #records-list li { font-size: 14px; }
+    #control-p1-status, #control-p2-status { font-size: 16px; }
+    #control-summary { display: none; }
+    #control-summary.on { display: block; }
+    #summary-line-1, #summary-line-2 { font-size: 14px; }
     #records-empty, .return { font-size: 14px; }
     #help-controls, #help-rules { margin: 0; }
     #help-controls h3, #help-rules h3 { font-size: 16px; margin: 0; }
@@ -142,6 +146,12 @@
         <li id="control-back" tabindex="-1">Back</li>
       </ul>
       <p id="control-error" class="view"></p>
+      <p id="control-p1-status" class="view"></p>
+      <p id="control-p2-status" class="view"></p>
+      <div id="control-summary" class="view">
+        <p id="summary-line-1"></p>
+        <p id="summary-line-2"></p>
+      </div>
     </div>
     <div id="records-view" class="view">
       <h2 id="records-title">Records</h2>
