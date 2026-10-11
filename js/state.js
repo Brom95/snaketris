@@ -14,6 +14,8 @@ export const game = {
   p1Role: null,
   p2Role: null,
   twoPlayerMode: false,
+  p1Selection: null,
+  p2Selection: null,
   p1Model: null,
   p2Model: null,
   controlError: '', // error message shown when P2 tries same layout as P1
@@ -64,6 +66,8 @@ export function resetGame() {
   game.p1Role = null;
   game.p2Role = null;
   game.twoPlayerMode = false;
+  game.p1Selection = null;
+  game.p2Selection = null;
   game.p1Model = null;
   game.p2Model = null;
   game.controlError = '';
@@ -74,18 +78,27 @@ export function resetGame() {
 // P2 is constrained: cannot use the same keyboard layout as P1. Gamepad is
 // always shareable. On success both confirm, sets controlConfirmed = true.
 // Returns true on success, false if the model is blocked by conflict.
-export function confirmControlModel(player, model) {
+export function selectControlModel(player, model) {
   game.controlError = ''; // clear any previous error
   if (player === 1) {
-    game.p1Model = model;
+    game.p1Selection = model;
     return true;
   }
-  // P2: keyboard models are exclusive with P1; gamepad is shareable.
+  // P2: keyboard models are exclusive with P1's confirmed model; gamepad is shareable.
   if (model !== 'gamepad' && game.p1Model === model) {
     game.controlError = 'P2: cannot use the same layout as P1';
     return false;
   }
-  game.p2Model = model;
+  game.p2Selection = model;
+  return true;
+}
+
+export function confirmControlModel(player) {
+  if (player === 1) {
+    game.p1Model = game.p1Selection;
+  } else {
+    game.p2Model = game.p2Selection;
+  }
   // Both confirmed without conflict: enable Start button.
   if (game.p1Model && game.p2Model) {
     game.controlConfirmed = true;
@@ -120,6 +133,11 @@ export function toMenu() {
   game.state = MENU;
   game.menuSelect = 0;
   game.roleSelect = 0;
+}
+
+// Back from SELECT_CONTROL returns to the role selection screen.
+export function backToRoleSelect() {
+  game.state = 'SELECT_ROLE';
 }
 
 // P1 picks a role; P2 auto-gets the other. Sets the two-player mode flag

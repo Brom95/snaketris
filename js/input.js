@@ -8,7 +8,7 @@ import {
   PLAYING, MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER,
   MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS, CONTROL_SCREEN_ITEMS,
 } from './constants.js';
-import { game, toMenu, startGame, confirmControlModel } from './state.js';
+import { game, toMenu, startGame, selectControlModel, confirmControlModel, backToRoleSelect } from './state.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
 import {
   keyToIntent,
@@ -65,7 +65,7 @@ function confirmSelection() {
   } else if (game.state === SELECT_CONTROL) {
     // Back item: return to role selection.
     if (game.controlSelect === CONTROL_SCREEN_ITEMS.length - 1) {
-      toMenu();
+      backToRoleSelect();
       return;
     }
     // Start item: start the game when both players have confirmed.
@@ -116,14 +116,24 @@ export function handleIntent(intent) {
     case 'toMenu':
       toMenu();
       break;
+    case 'selectP1Model':
+      if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
+        selectControlModel(1, intent.model);
+      }
+      break;
+    case 'selectP2Model':
+      if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
+        selectControlModel(2, intent.model);
+      }
+      break;
     case 'confirmP1Model':
       if ((game.state === SELECT_ROLE || game.state === SELECT_CONTROL) && game.twoPlayerMode) {
-        confirmControlModel(1, intent.model);
+        confirmControlModel(1);
       }
       break;
     case 'confirmP2Model':
       if ((game.state === SELECT_ROLE || game.state === SELECT_CONTROL) && game.twoPlayerMode) {
-        confirmControlModel(2, intent.model);
+        confirmControlModel(2);
       }
       break;
   }
@@ -143,26 +153,32 @@ export function setDirection(d) {
 // the device adapter in js/devices.js and routes it through handleIntent.
 
 export function onKey(e) {
-  // In SELECT_CONTROL with two-player mode, any key goes to the player who
-  // hasn't confirmed yet. P2 cannot pick the same keyboard layout as P1.
+  // In SELECT_CONTROL with two-player mode, WASD/arrows select a layout for
+  // the player who has not yet confirmed; Space/Enter confirm (lock) the selection.
   if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
     const k = e.key;
     const isWasd = k === 'w' || k === 'a' || k === 's' || k === 'd';
     const isArrow = k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight';
-    if (!isWasd && !isArrow) {
-      // Not a control key — let it fall through to navigation.
-    } else if (!game.p1Model) {
-      // P1 not confirmed: WASD or arrows confirm P1's model.
-      handleIntent({ action: 'confirmP1Model', model: isWasd ? 'wasd' : 'arrows' });
+    if (isWasd || isArrow) {
+      // Layout key: select for whoever hasn't confirmed yet.
+      if (!game.p1Model) {
+        handleIntent({ action: 'selectP1Model', model: isWasd ? 'wasd' : 'arrows' });
+      } else if (!game.p2Model) {
+        handleIntent({ action: 'selectP2Model', model: isWasd ? 'wasd' : 'arrows' });
+      }
       e.preventDefault();
       return;
-    } else if (!game.p2Model) {
-      // P2 not confirmed: try to confirm P2 with this layout.
-      handleIntent({ action: 'confirmP2Model', model: isWasd ? 'wasd' : 'arrows' });
+    } else if (k === ' ' || k === 'Enter') {
+      // Space/Enter: confirm the selection for whoever hasn't confirmed yet.
+      if (!game.p1Model) {
+        handleIntent({ action: 'confirmP1Model' });
+      } else if (!game.p2Model) {
+        handleIntent({ action: 'confirmP2Model' });
+      }
       e.preventDefault();
       return;
     }
-    // Both confirmed: keys fall through to navigation (Start/Back).
+    // Both confirmed (or non-layout key): fall through to navigation.
   }
   const i = keyToIntent(e.key);
   if (i) {

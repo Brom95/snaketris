@@ -1,9 +1,8 @@
 // Headless browser check for control-model confirmation (task 3.1).
 // Drives the real page in Chromium: enters SELECT_ROLE with two-player mode,
-// presses WASD to confirm P1's model, presses an arrow key to confirm P2's,
-// and asserts a gamepad button confirms Gamepad.
-//
-// Run: node scripts/verify-control-model.mjs
+// selects a role to reach SELECT_CONTROL, selects WASD for P1 then confirms,
+// selects an arrow key for P2 then confirms, and asserts a gamepad button
+// confirms Gamepad.
 
 import { chromium } from '@playwright/test';
 import path from 'node:path';
@@ -18,15 +17,27 @@ const page = await freshPage(context, ROOT);
 await page.click('#menu-item-two-player');
 check(await stateIs(page, 'SELECT_ROLE'), 'clicking Two Players opens the role screen');
 
-// WASD key confirms P1's model.
-await page.keyboard.press('w');
-check(await waitFor(page, () => window.__game.p1Model === 'wasd', undefined, 3000),
-  'pressing W confirms P1\'s model as WASD');
+// Select a role to reach SELECT_CONTROL.
+await page.click('#role-item-snake');
+check(await stateIs(page, 'SELECT_CONTROL'), 'selecting a role reaches SELECT_CONTROL');
 
-// Arrow key confirms P2's model.
+// WASD key selects P1's model; Enter confirms it.
+await page.keyboard.press('w');
+check(await waitFor(page, () => window.__game.p1Selection === 'wasd', undefined, 3000),
+  'pressing W selects P1\'s model as WASD');
+
+await page.keyboard.press('Enter');
+check(await waitFor(page, () => window.__game.p1Model === 'wasd', undefined, 3000),
+  'pressing Enter confirms P1\'s model as WASD');
+
+// Arrow key selects P2's model; Enter confirms it.
 await page.keyboard.press('ArrowUp');
+check(await waitFor(page, () => window.__game.p2Selection === 'arrows', undefined, 3000),
+  'pressing an arrow key selects P2\'s model as Arrows');
+
+await page.keyboard.press('Enter');
 check(await waitFor(page, () => window.__game.p2Model === 'arrows', undefined, 3000),
-  'pressing an arrow key confirms P2\'s model as Arrows');
+  'pressing Enter confirms P2\'s model as Arrows');
 
 // Gamepad button confirms Gamepad (simulated via a direct state check).
 await page.evaluate(() => {

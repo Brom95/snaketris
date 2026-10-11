@@ -178,3 +178,49 @@ test('two-player game over keeps top-10', () => {
   const board = loadBoard();
   assert.equal(board.length, 10); // still top-10 after two entries
 });
+
+// ---------- Select/Confirm flow ----------
+test('select sets the correct field', () => {
+  fresh();
+  state.selectControlModel(1, 'wasd');
+  assert.equal(state.game.p1Selection, 'wasd');
+  state.selectControlModel(2, 'arrows');
+  assert.equal(state.game.p2Selection, 'arrows');
+});
+
+test('different layout replaces previous selection', () => {
+  fresh();
+  state.selectControlModel(1, 'wasd');
+  assert.equal(state.game.p1Selection, 'wasd');
+  state.selectControlModel(1, 'arrows');
+  assert.equal(state.game.p1Selection, 'arrows');
+});
+
+test('confirm locks the selection into model', () => {
+  fresh();
+  state.selectControlModel(1, 'wasd');
+  state.confirmControlModel(1);
+  assert.equal(state.game.p1Model, 'wasd');
+  state.selectControlModel(2, 'arrows');
+  state.confirmControlModel(2);
+  assert.equal(state.game.p2Model, 'arrows');
+});
+
+test('conflict error when P2 picks same keyboard layout as P1', () => {
+  fresh();
+  state.selectControlModel(1, 'wasd');
+  state.confirmControlModel(1);
+  const result = state.selectControlModel(2, 'wasd');
+  assert.equal(result, false);
+  assert.equal(state.game.controlError, 'P2: cannot use the same layout as P1');
+});
+
+test('Start hidden until both confirmed', () => {
+  fresh();
+  state.selectControlModel(1, 'wasd');
+  state.confirmControlModel(1);
+  assert.equal(state.game.controlConfirmed, false);
+  state.selectControlModel(2, 'arrows');
+  state.confirmControlModel(2);
+  assert.equal(state.game.controlConfirmed, true);
+});

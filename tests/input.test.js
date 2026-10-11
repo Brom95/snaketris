@@ -154,3 +154,12 @@ test('mobile fit (fitCanvas)', async () => {
   assert.equal(stub.canvas.style.width, '360px');
   assert.equal(stub.canvas.style.height, '720px');
 });
+
+test('Back from SELECT_CONTROL returns to SELECT_ROLE', () => {
+  fresh();
+  state.game.state = 'SELECT_CONTROL';
+  state.game.twoPlayerMode = true;
+  state.game.controlSelect = 3; // Back item (last in CONTROL_SCREEN_ITEMS)
+  input.handleIntent({ action: 'confirm' });
+  assert.equal(state.game.state, 'SELECT_ROLE');
+});
