@@ -34,10 +34,10 @@ export const ROLE_MARKERS = { snake: '\u{1F40D}', tetris: '\u{1F3D7}\u{FE0F}' };
 // The arrow cycles over this list; only the first two entries are roles.
 export const ROLE_SCREEN_ITEMS = ['Snake', 'Tetris', 'Back'];
 
-// The control confirmation screen's selectable items in page order: P1 confirm,
-// P2 confirm, Start (enabled after both confirm), Back. The arrow cycles over
-// this list; Start is enabled only when both players confirm without conflict.
-export const CONTROL_SCREEN_ITEMS = ['P1 Confirm', 'P2 Confirm', 'Start', 'Back'];
+// The control confirmation screen's selectable items in page order: P1 select,
+// P2 select, Start (enabled after both confirm). Back is a separate always-
+// visible button outside this list.
+export const CONTROL_SCREEN_ITEMS = ['P1 Select', 'P2 Select', 'Start'];
 
 // URL for the GitHub repository.
 export const GITHUB_URL = 'https://github.com/Brom95/snaketris';

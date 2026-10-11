@@ -24,15 +24,19 @@
 
 ## Working Rules (user instructions)
 
-- **Ripwire MCP — actively used for all code work** (tools `mcp__ripwire__*`):
-  - Start of non-trivial work: `quality_baseline` — pins the quality floor at git HEAD.
-  - Orientation before reading files: `analyze` (architecture map / call graph) or `batch` (up to 16 read sub-queries in one turn: `for`, `grep`, `find_symbol`, `callers`, `callees`, `uses`, `impact`, `mentions`, `exemplar`, `fetch_body`, `slice`, …).
-  - Before editing a symbol: `edit_check` (contract/arity change vs HEAD; can pass `new_body` as a pre-apply preview); `affected` — which test files the change transitively reaches.
-  - Before declaring a change DONE: `quality_delta` — reports only what the working tree made worse vs the baseline/HEAD across 10 failure modes.
-  - Before trusting a design doc or plan: `doc_drift` — verifies checkable doc anchors (file:line refs, symbol mentions, `= N` constants) against the live index.
-  - Note: some ripwire commands are CLI-only (not exposed via MCP), e.g. `ripwire <dir> --rank-by=churn` and `--test-gate`.
-- **All code work goes through the OpenSpec pipeline** — no off-pipeline changes.
-- Ripwire quality tools compare against **git HEAD** → the repo must be a git repo for them to work.
+### MANDATORY: ripwire for ALL code interactions
+
+Ripwire is **required** for every interaction with code. No ad-hoc grep, read, or edit bypasses it when a ripwire verb covers the operation. This is an obligation, not a preference.
+
+- **Before reading any source file:** `analyze` (architecture map) or `batch` (up to 16 read sub-queries in one turn: `for`, `grep`, `find_symbol`, `callers`, `callees`, `uses`, `impact`, `mentions`, `exemplar`, `fetch_body`, `slice`, …).
+- **Before editing a symbol:** `edit_check` (contract/arity change vs HEAD; can pass `new_body` as a pre-apply preview); `affected` — which test files the change transitively reaches.
+- **Start of non-trivial work:** `quality_baseline` — pins the quality floor at git HEAD.
+- **Before declaring a change DONE:** `quality_delta` — reports only what the working tree made worse vs the baseline/HEAD across 10 failure modes.
+- **Before trusting a design doc or plan:** `doc_drift` — verifies checkable doc anchors (file:line refs, symbol mentions, `= N` constants) against the live index.
+- Note: some ripwire commands are CLI-only (not exposed via MCP), e.g. `ripwire <dir> --rank-by=churn` and `--test-gate`.
+
+**All code work goes through the OpenSpec pipeline** — no off-pipeline changes.
+Ripwire quality tools compare against **git HEAD** → the repo must be a git repo for them to work.
 
 ## Game Mechanics (source of truth: spec.md + design.md)
 

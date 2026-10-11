@@ -34,6 +34,9 @@ let controlP2StatusEl = null;
 let controlSummaryEl = null;
 let summaryLine1El = null;
 let summaryLine2El = null;
+let controlBackEl = null;
+let reassignP1El = null;
+let reassignP2El = null;
 
 // Called by app.js once the page is parsed; stores the interface elements.
 export function initUi() {
@@ -61,6 +64,9 @@ export function initUi() {
   controlSummaryEl = document.getElementById('control-summary');
   summaryLine1El = document.getElementById('summary-line-1');
   summaryLine2El = document.getElementById('summary-line-2');
+  controlBackEl = document.getElementById('control-back');
+  reassignP1El = document.getElementById('control-reassign-p1');
+  reassignP2El = document.getElementById('control-reassign-p2');
 }
 
 // Shows or hides one interface element. `.view` hides by default, `.view.on`
@@ -195,7 +201,7 @@ export function syncViews(recordsBoard) {
     if (controlErrorEl) controlErrorEl.textContent = game.controlError || '';
     // Show Start button only when both players confirm without conflict.
     show(controlItemStartEl, state === SELECT_CONTROL && game.controlConfirmed);
-    // Per-player status feedback.
+    // Per-player status feedback (assigned layout).
     if (controlP1StatusEl) {
       controlP1StatusEl.textContent = game.p1Model
         ? 'P1: ' + game.p1Model.toUpperCase() + '\u2714'
@@ -208,6 +214,11 @@ export function syncViews(recordsBoard) {
         : (game.p2Selection ? 'P2 selecting...' : '');
       show(controlP2StatusEl, !!controlP2StatusEl.textContent);
     }
+    // Back button: always visible during SELECT_CONTROL.
+    if (controlBackEl) show(controlBackEl, true);
+    // Reassign buttons: visible only during confirm steps (step 1 or 3).
+    if (reassignP1El) show(reassignP1El, step === 1 || step === 4);
+    if (reassignP2El) show(reassignP2El, step === 3 || step === 4);
     // Summary screen when both confirmed.
     if (controlSummaryEl) {
       show(controlSummaryEl, state === SELECT_CONTROL && game.controlConfirmed);

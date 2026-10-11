@@ -82,15 +82,19 @@
     #records-title, #help-title { font-size: 24px; margin: 0; }
     #records-list { margin: 0; padding: 0; list-style: decimal inside; }
     #records-list li { font-size: 14px; }
-    #control-p1-status, #control-p2-status { font-size: 16px; }
+    #control-p1-status, #control-p2-status { font-size: 18px; color: #a7f3a0; }
     #control-key-hints { font-size: 14px; color: #8899aa; }
     #control-items li { font-size: 20px; padding: 20px 0; text-align: center; }
     #control-items li::before { content: '\25b6 '; opacity: 0; }
     #control-items li.on { color: #a7f3a0; }
     #control-items li.on::before { opacity: 1; }
-    #control-summary { display: none; }
-    #control-summary.on { display: block; }
-    #summary-line-1, #summary-line-2 { font-size: 14px; }
+    #control-assignments { font-size: 18px; }
+    #control-actions { display: flex; gap: 12px; }
+    #control-back, #control-reassign-p1, #control-reassign-p2 {
+      background: transparent; border: 1px solid #445; color: #e8ecf4;
+      padding: 8px 16px; cursor: pointer; font-size: 16px;
+    }
+    #control-back.on, #control-reassign-p1.on, #control-reassign-p2.on { display: block; }
     #records-empty, .return { font-size: 14px; }
     #help-controls, #help-rules { margin: 0; }
     #help-controls h3, #help-rules h3 { font-size: 16px; margin: 0; }
@@ -143,20 +147,25 @@
     </div>
     <div id="control-view" class="view">
       <h2 id="control-title">Confirm controls</h2>
-      <p id="control-line" class="view"></p>
       <ul id="control-items">
-        <li id="control-item-p1" class="view" tabindex="-1">🎮 P1: select a layout (WASD / Arrows / Gamepad)</li>
-        <li id="control-item-p2" class="view" tabindex="-1">🕹 P2: select a layout (WASD / Arrows / Gamepad)</li>
+        <li id="control-item-p1" class="view" tabindex="-1">🎮 P1: Select your controls</li>
+        <li id="control-item-p2" class="view" tabindex="-1">🕹 P2: Select your controls</li>
         <li id="control-item-start" class="view" tabindex="-1">▶️ Start</li>
-        <li id="control-back" class="view" tabindex="-1">⬅ Back</li>
       </ul>
       <p id="control-key-hints" class="view"></p>
       <p id="control-error" class="view"></p>
-      <p id="control-p1-status" class="view"></p>
-      <p id="control-p2-status" class="view"></p>
+      <div id="control-assignments" class="view">
+        <p id="control-p1-status" class="view"></p>
+        <p id="control-p2-status" class="view"></p>
+      </div>
       <div id="control-summary" class="view">
         <p id="summary-line-1"></p>
         <p id="summary-line-2"></p>
+      </div>
+      <div id="control-actions" class="view">
+        <span id="control-back" class="view" role="button" tabindex="-1">⬅ Back</span>
+        <span id="control-reassign-p1" class="view" role="button" tabindex="-1">🎮 Reassign P1</span>
+        <span id="control-reassign-p2" class="view" role="button" tabindex="-1">🕹 Reassign P2</span>
       </div>
     </div>
     <div id="records-view" class="view">

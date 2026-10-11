@@ -8,7 +8,7 @@ import {
   PLAYING, MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER,
   MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS, CONTROL_SCREEN_ITEMS,
 } from './constants.js';
-import { game, toMenu, startGame, selectControlModel, confirmControlModel, backToRoleSelect } from './state.js';
+import { game, toMenu, startGame, selectControlModel, confirmControlModel, backToRoleSelect, reassignP1, reassignP2 } from './state.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
 import {
   keyToIntent,
@@ -63,13 +63,8 @@ function confirmSelection() {
       startGame();
     }
   } else if (game.state === SELECT_CONTROL) {
-    // Back item: return to role selection.
-    if (game.controlSelect === CONTROL_SCREEN_ITEMS.length - 1) {
-      backToRoleSelect();
-      return;
-    }
     // Start item: start the game when both players have confirmed.
-    if (game.controlSelect === 2 && game.controlConfirmed) {
+    if (game.controlSelect === CONTROL_SCREEN_ITEMS.length - 1 && game.controlConfirmed) {
       startGame();
       return;
     }
@@ -294,6 +289,24 @@ export function onInterfacePointerUp(e) {
     if (item >= 0) {
       game.controlSelect = item;
       handleIntent({ action: 'confirm' });
+      return;
+    }
+    // Separate Back button: hit-test the element directly.
+    const backEl = document.getElementById('control-back');
+    if (backEl && hit(backEl, x, y)) {
+      backToRoleSelect();
+      return;
+    }
+    // Reassign buttons: clear a player's selection so they can pick again.
+    const reP1 = document.getElementById('control-reassign-p1');
+    if (reP1 && hit(reP1, x, y)) {
+      reassignP1();
+      return;
+    }
+    const reP2 = document.getElementById('control-reassign-p2');
+    if (reP2 && hit(reP2, x, y)) {
+      reassignP2();
+      return;
     }
     return;
   }

@@ -1,6 +1,6 @@
-# Project instructions — ripwire MCP
+# Project instructions — ripwire MCP (MANDATORY)
 
-This repo is configured with the **ripwire** MCP server (global, `C:\Users\wasal\.config\opencode\opencode.jsonc` → `mcp.servers.ripwire`, stdio, cached at `C:/Users/wasal/AppData/Local/Temp/opencode/ripwire`). **Use ripwire for any work with code** — navigation, symbol lookup, contract checks, and edits — instead of ad-hoc grepping/reading when a ripwire verb fits.
+This repo is configured with the **ripwire** MCP server (global, `C:\Users\wasal\.config\opencode\opencode.jsonc` → `mcp.servers.ripwire`, stdio, cached at `C:/Users/wasal/AppData/Local/Temp/opencode/ripwire`). **Ripwire is required for every interaction with code** — navigation, symbol lookup, contract checks, and edits. No ad-hoc grep, read, or edit bypasses ripwire when a ripwire verb covers the operation. This is an obligation, not a preference.
 
 ## Navigation (before reading or editing)
 - `tools.ripwire.batch` — one sweep for several read verbs: `analyze` (architecture map), `find_symbol` (handle + line), `uses`/`called_by` (1-hop edges), `lego` (impls of an interface/base).

@@ -159,7 +159,8 @@ test('Back from SELECT_CONTROL returns to SELECT_ROLE', () => {
   fresh();
   state.game.state = 'SELECT_CONTROL';
   state.game.twoPlayerMode = true;
-  state.game.controlSelect = 3; // Back item (last in CONTROL_SCREEN_ITEMS)
-  input.handleIntent({ action: 'confirm' });
+  // Back is now a separate button (handled by onInterfacePointerUp), not an item index.
+  // Verify the state transition: backToRoleSelect sets SELECT_ROLE.
+  state.backToRoleSelect();
   assert.equal(state.game.state, 'SELECT_ROLE');
 });

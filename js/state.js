@@ -106,6 +106,17 @@ export function confirmControlModel(player) {
   return true;
 }
 
+// Reassign: clear a player's selection so they can pick a new layout.
+export function reassignP1() {
+  game.p1Selection = null;
+  game.p1Model = null;
+}
+
+export function reassignP2() {
+  game.p2Selection = null;
+  game.p2Model = null;
+}
+
 export function startGame() {
   if (game.state === PLAYING) return;
   const role = game.role;
