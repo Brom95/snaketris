@@ -26,6 +26,12 @@ await page.keyboard.press('w');
 check(await waitFor(page, () => window.__game.p1Selection === 'wasd', undefined, 3000),
   'pressing W selects P1\'s model as WASD');
 
+// The P1 status element becomes visible when a selection is made.
+check(await waitFor(page, () => {
+  const el = document.getElementById('control-p1-status');
+  return el && el.classList.contains('on');
+}, undefined, 3000), 'P1 status element is visible after selection');
+
 await page.keyboard.press('Enter');
 check(await waitFor(page, () => window.__game.p1Model === 'wasd', undefined, 3000),
   'pressing Enter confirms P1\'s model as WASD');
@@ -35,9 +41,22 @@ await page.keyboard.press('ArrowUp');
 check(await waitFor(page, () => window.__game.p2Selection === 'arrows', undefined, 3000),
   'pressing an arrow key selects P2\'s model as Arrows');
 
+// The P2 status element becomes visible when a selection is made.
+check(await waitFor(page, () => {
+  const el = document.getElementById('control-p2-status');
+  return el && el.classList.contains('on');
+}, undefined, 3000), 'P2 status element is visible after selection');
+
 await page.keyboard.press('Enter');
 check(await waitFor(page, () => window.__game.p2Model === 'arrows', undefined, 3000),
   'pressing Enter confirms P2\'s model as Arrows');
+
+// The Start button and summary become visible when both confirmed.
+check(await waitFor(page, () => {
+  const start = document.getElementById('control-item-start');
+  const summary = document.getElementById('control-summary');
+  return start && start.classList.contains('on') && summary && summary.classList.contains('on');
+}, undefined, 3000), 'Start and summary are visible after both confirm');
 
 // Gamepad button confirms Gamepad (simulated via a direct state check).
 await page.evaluate(() => {
