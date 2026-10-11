@@ -17,6 +17,14 @@ The system SHALL let each player select a control model (WASD, Arrows, or Gamepa
 - **WHEN** a player presses a key from a different layout before confirming
 - **THEN** the new selection replaces the previous one
 
+#### Scenario: Confirm with the model's key
+- **WHEN** P1 selects WASD
+- **THEN** pressing a WASD key confirms P1's model and the flow moves to P2's confirmation
+
+#### Scenario: Player can change their choice
+- **WHEN** a player presses the "Change" button for their item
+- **THEN** the player's confirmation is cleared and they can press a key again to re-confirm
+
 #### Scenario: Visual feedback shows selected layout
 - **WHEN** a player selects or confirms their control model
 - **THEN** the player's item shows a checkmark and the layout name (e.g. "P1: WASD ✓")

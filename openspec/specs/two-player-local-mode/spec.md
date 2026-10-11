@@ -27,26 +27,38 @@ The system SHALL show a line "P1: X / P2: Y" above the control-model selection n
 - **THEN** the line reads "P1: Snake / P2: Tetris" above the model selection
 
 ### Requirement: Control model confirmed by pressed key
-The system SHALL let each player confirm their control model (WASD, Arrows, or Gamepad) by pressing that model's key. The system SHALL show each player's current selection with a checkmark and layout name, indicate which player is choosing next, allow each player to undo/change their choice via a "Change" button, display an error message when P2 tries to pick the same keyboard layout as P1 without locking P2 out, and keep the Start button hidden until both players confirm without conflict.
+The system SHALL let each player select a control model (WASD, Arrows, or Gamepad) by pressing that model's key. Selection and confirmation are separate stages: pressing a layout key selects that layout for the player who has not yet chosen; an explicit confirm action (Space, Enter, click on Start, or A on gamepad) locks the selection. If a different layout is pressed before confirmation, it replaces the previous selection. The system SHALL show each player's current selection with a checkmark and layout name, indicate which player is choosing next, display an error message when P2 tries to pick the same keyboard layout as P1 without locking P2 out, and keep the Start button hidden until both players confirm without conflict.
+
+#### Scenario: Select with any layout key
+- **WHEN** a player presses WASD, arrows, or a gamepad button
+- **THEN** that layout is selected for the player who has not yet chosen
+
+#### Scenario: Confirmation locks the selection
+- **WHEN** a player presses Space, Enter, clicks Start, or presses A on gamepad
+- **THEN** the player's selection is locked and the flow moves to the next player
+
+#### Scenario: Different layout replaces previous selection
+- **WHEN** a player presses a key from a different layout before confirming
+- **THEN** the new selection replaces the previous one
 
 #### Scenario: Confirm with the model's key
 - **WHEN** P1 selects WASD
 - **THEN** pressing a WASD key confirms P1's model and the flow moves to P2's confirmation
 
+#### Scenario: Player can change their choice
+- **WHEN** a player presses the "Change" button for their item
+- **THEN** the player's confirmation is cleared and they can press a key again to re-confirm
+
 #### Scenario: Visual feedback shows selected layout
-- **WHEN** a player confirms their control model
+- **WHEN** a player selects or confirms their control model
 - **THEN** the player's item shows a checkmark and the layout name (e.g. "P1: WASD ✓")
 
 #### Scenario: Who is choosing next is indicated
 - **WHEN** P1 has confirmed but P2 has not
 - **THEN** the screen highlights or indicates that P2 is choosing next
 
-#### Scenario: Player can change their choice
-- **WHEN** a player presses the "Change" button for their item
-- **THEN** the player's confirmation is cleared and they can press a key again to re-confirm
-
 #### Scenario: Error when P2 picks same layout as P1
-- **WHEN** P2 presses a key that matches P1's selected keyboard layout
+- **WHEN** P2 selects a keyboard layout that matches P1's selected layout
 - **THEN** an error message displays "P2: cannot use the same layout as P1" and P2 has not confirmed
 
 #### Scenario: Start button hidden until both confirm
