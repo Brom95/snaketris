@@ -158,20 +158,26 @@ export function onKey(e) {
       // Layout key: select for whoever hasn't confirmed yet.
       if (!game.p1Model) {
         handleIntent({ action: 'selectP1Model', model: isWasd ? 'wasd' : 'arrows' });
+        e.preventDefault();
+        return;
       } else if (!game.p2Model) {
         handleIntent({ action: 'selectP2Model', model: isWasd ? 'wasd' : 'arrows' });
+        e.preventDefault();
+        return;
       }
-      e.preventDefault();
-      return;
+      // Both confirmed: fall through to navigation.
     } else if (k === ' ' || k === 'Enter') {
       // Space/Enter: confirm the selection for whoever hasn't confirmed yet.
       if (!game.p1Model) {
         handleIntent({ action: 'confirmP1Model' });
+        e.preventDefault();
+        return;
       } else if (!game.p2Model) {
         handleIntent({ action: 'confirmP2Model' });
+        e.preventDefault();
+        return;
       }
-      e.preventDefault();
-      return;
+      // Both confirmed: fall through to navigation.
     }
     // Both confirmed (or non-layout key): fall through to navigation.
   }
