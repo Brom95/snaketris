@@ -172,11 +172,13 @@ export function syncViews(recordsBoard) {
       controlP1StatusEl.textContent = game.p1Model
         ? 'P1: ' + game.p1Model.toUpperCase() + '\u2714'
         : (game.p1Selection ? 'P1 selecting...' : '');
+      show(controlP1StatusEl, !!controlP1StatusEl.textContent);
     }
     if (controlP2StatusEl) {
       controlP2StatusEl.textContent = game.p2Model
         ? 'P2: ' + game.p2Model.toUpperCase() + '\u2714'
         : (game.p2Selection ? 'P2 selecting...' : '');
+      show(controlP2StatusEl, !!controlP2StatusEl.textContent);
     }
     // Summary screen when both confirmed.
     if (controlSummaryEl) {
