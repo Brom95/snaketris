@@ -8,7 +8,7 @@ import {
   PLAYING, MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER,
   MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS, CONTROL_SCREEN_ITEMS,
 } from './constants.js';
-import { game, toMenu, startGame, selectControlModel, confirmControlModel, backToRoleSelect, reassignP1, reassignP2 } from './state.js';
+import { game, toMenu, startGame, lockControlModel, currentControlPlayer, backToRoleSelect, reassignP1, reassignP2 } from './state.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
 import {
   keyToIntent,
@@ -63,12 +63,11 @@ function confirmSelection() {
       startGame();
     }
   } else if (game.state === SELECT_CONTROL) {
-    // Start item: start the game when both players have confirmed.
-    if (game.controlSelect === CONTROL_SCREEN_ITEMS.length - 1 && game.controlConfirmed) {
+    // Start item: start the game once both players have locked a model.
+    if (game.p1Model && game.p2Model) {
       startGame();
       return;
     }
-    // P1/P2 confirm items are handled by key presses in onKey().
   }
 }
 
@@ -111,24 +110,13 @@ export function handleIntent(intent) {
     case 'toMenu':
       toMenu();
       break;
-    case 'selectP1Model':
+    case 'lockModel':
+      // Any layout key immediately locks the current player's choice.
       if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
-        selectControlModel(1, intent.model);
-      }
-      break;
-    case 'selectP2Model':
-      if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
-        selectControlModel(2, intent.model);
-      }
-      break;
-    case 'confirmP1Model':
-      if ((game.state === SELECT_ROLE || game.state === SELECT_CONTROL) && game.twoPlayerMode) {
-        confirmControlModel(1);
-      }
-      break;
-    case 'confirmP2Model':
-      if ((game.state === SELECT_ROLE || game.state === SELECT_CONTROL) && game.twoPlayerMode) {
-        confirmControlModel(2);
+        const player = currentControlPlayer();
+        if (player) {
+          lockControlModel(player, intent.model);
+        }
       }
       break;
   }
@@ -147,39 +135,33 @@ export function setDirection(d) {
 // These are what initInput registers. Each produces a normalized intent via
 // the device adapter in js/devices.js and routes it through handleIntent.
 
+// Map a layout key to its model name ('wasd' or 'arrows'), or null when the
+// key is not a layout key.
+function keyboardModelForKey(k) {
+  if (k === 'w' || k === 'a' || k === 's' || k === 'd') return 'wasd';
+  if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') return 'arrows';
+  return null;
+}
+
 export function onKey(e) {
-  // In SELECT_CONTROL with two-player mode, WASD/arrows select a layout for
-  // the player who has not yet confirmed; Space/Enter confirm (lock) the selection.
+  // In SELECT_CONTROL with two-player mode: any layout key immediately locks
+  // the current player's choice. Once both have locked, Enter/Space starts
+  // the game. There is no separate confirm step.
   if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
     const k = e.key;
-    const isWasd = k === 'w' || k === 'a' || k === 's' || k === 'd';
-    const isArrow = k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight';
-    if (isWasd || isArrow) {
-      // Layout key: select for whoever hasn't confirmed yet.
-      if (!game.p1Model) {
-        handleIntent({ action: 'selectP1Model', model: isWasd ? 'wasd' : 'arrows' });
-        e.preventDefault();
-        return;
-      } else if (!game.p2Model) {
-        handleIntent({ action: 'selectP2Model', model: isWasd ? 'wasd' : 'arrows' });
-        e.preventDefault();
-        return;
-      }
-      // Both confirmed: fall through to navigation.
-    } else if (k === ' ' || k === 'Enter') {
-      // Space/Enter: confirm the selection for whoever hasn't confirmed yet.
-      if (!game.p1Model) {
-        handleIntent({ action: 'confirmP1Model' });
-        e.preventDefault();
-        return;
-      } else if (!game.p2Model) {
-        handleIntent({ action: 'confirmP2Model' });
-        e.preventDefault();
-        return;
-      }
-      // Both confirmed: fall through to navigation.
+    const model = keyboardModelForKey(k);
+    if (model) {
+      // Layout key: lock the current player's choice in one press.
+      lockControlModel(currentControlPlayer(), model);
+      e.preventDefault();
+      return;
     }
-    // Both confirmed (or non-layout key): fall through to navigation.
+    if ((k === ' ' || k === 'Enter') && game.p1Model && game.p2Model) {
+      // Start key: only once both players have locked a model.
+      handleIntent({ action: 'confirm' });
+      e.preventDefault();
+      return;
+    }
   }
   const i = keyToIntent(e.key);
   if (i) {
@@ -293,8 +275,14 @@ export function onInterfacePointerUp(e) {
   if (game.state === SELECT_CONTROL) {
     const item = firstHit(controlItemsEls, x, y);
     if (item >= 0) {
-      game.controlSelect = item;
-      handleIntent({ action: 'confirm' });
+      // The Start item starts the game once both players have locked a model.
+      if (item === CONTROL_SCREEN_ITEMS.length - 1) {
+        if (game.p1Model && game.p2Model) {
+          startGame();
+        }
+        return;
+      }
+      // P1/P2 items lock their model via a layout key, not a click.
       return;
     }
     // Separate Back button: hit-test the element directly.

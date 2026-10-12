@@ -263,6 +263,10 @@ check(game.state === MENU, 'B from HELP returns to MENU');
 console.log('=== A from game over ===');
 
 resetController();
+// A single-player game over returns to GAME_OVER (two-player mode returns to
+// the shared control screen instead). Clear the flag leaked by the earlier
+// "A on Two Players" demo so this stays a single-player test.
+game.twoPlayerMode = false;
 startGame();
 check(game.state === PLAYING, 'in PLAYING before game over');
 gameOver();
@@ -298,6 +302,10 @@ check(game.state === MENU, 'holding B in RECORDS: returns to menu (idempotent, n
 console.log('=== Disconnect stops input & clears stale state ===');
 
 resetController();
+// Single-player game over returns to GAME_OVER (two-player mode returns to the
+// shared control screen instead). Clear the flag leaked by the earlier "A on
+// Two Players" demo so this stays a single-player test.
+game.twoPlayerMode = false;
 startGame();
 gameOver();
 // Frame 1: A pressed (edge) -> toMenu() -> MENU.

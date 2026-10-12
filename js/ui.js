@@ -6,6 +6,8 @@ import {
   MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER, PLAYING,
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
   ROLE_MARKERS,
+  GAME_CONTROL_P1, GAME_CONTROL_P2, GAME_CONTROL_START,
+  GAME_CONTROL_PLAYER_MARKERS,
 } from './constants.js';
 import { game } from './state.js';
 import { entryRole } from './highscores.js';
@@ -169,62 +171,55 @@ export function syncViews(recordsBoard) {
   if (state === SELECT_CONTROL) {
     highlightItem(menuItemsEls, -1);
     highlightItem(roleItemsEls, -1);
-    // Step-by-step: show only the current step's item.
-    const p1Sel = game.p1Selection;
-    const p1Mod = game.p1Model;
-    const p2Sel = game.p2Selection;
-    const p2Mod = game.p2Model;
-    const confirmed = game.controlConfirmed;
-    let step;
-    if (!p1Mod && !p1Sel) { step = 0; } // P1 select
-    else if (p1Sel && !p1Mod) { step = 1; } // P1 confirm
-    else if (p1Mod && !p2Sel && !p2Mod) { step = 2; } // P2 select
-    else if (p2Sel && !p2Mod) { step = 3; } // P2 confirm
-    else if (confirmed) { step = 4; } // Start
+    // Step-by-step: show exactly one item, driven by gameControlStep.
+    // Step 1 (P1) shows the P1 item, step 2 (P2) shows the P2 item,
+    // step 3 (START) shows the Start item.
+    let index;
+    if (game.gameControlStep === GAME_CONTROL_P1) index = 0;
+    else if (game.gameControlStep === GAME_CONTROL_P2) index = 1;
+    else index = 2; // GAME_CONTROL_START
     for (let i = 0; i < controlItemsEls.length; i++) {
-      show(controlItemsEls[i], i === step);
+      show(controlItemsEls[i], i === index);
     }
     // Key hints per step.
     if (controlKeyHintsEl) {
-      const hints = [
-        'W / A / S / D  ·  ↑ ↓ ← →  ·  🎯',
-        'Enter / Space',
-        'W / A / S / D  ·  ↑ ↓ ← →  ·  🎯',
-        'Enter / Space',
-        'Enter / Space'
-      ];
-      controlKeyHintsEl.textContent = hints[step] || '';
+      const hints = {
+        [GAME_CONTROL_P1]: 'W / A / S / D  ·  ↑ ↓ ← →  ·  🎯',
+        [GAME_CONTROL_P2]: 'W / A / S / D  ·  ↑ ↓ ← →  ·  🎯',
+        [GAME_CONTROL_START]: 'Enter / Space'
+      };
+      controlKeyHintsEl.textContent = hints[game.gameControlStep] || '';
       show(controlKeyHintsEl, true);
     }
     // Show error message when P2 tries same layout as P1.
     show(controlErrorEl, state === SELECT_CONTROL && !!game.controlError);
     if (controlErrorEl) controlErrorEl.textContent = game.controlError || '';
-    // Show Start button only when both players confirm without conflict.
-    show(controlItemStartEl, state === SELECT_CONTROL && game.controlConfirmed);
     // Per-player status feedback (assigned layout).
     if (controlP1StatusEl) {
       controlP1StatusEl.textContent = game.p1Model
-        ? 'P1: ' + game.p1Model.toUpperCase() + '\u2714'
-        : (game.p1Selection ? 'P1 selecting...' : '');
+        ? 'P1: ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' ' + game.p1Model.toUpperCase() + ' ✔'
+        : '';
       show(controlP1StatusEl, !!controlP1StatusEl.textContent);
     }
     if (controlP2StatusEl) {
       controlP2StatusEl.textContent = game.p2Model
-        ? 'P2: ' + game.p2Model.toUpperCase() + '\u2714'
-        : (game.p2Selection ? 'P2 selecting...' : '');
+        ? 'P2: ' + GAME_CONTROL_PLAYER_MARKERS[2] + ' ' + game.p2Model.toUpperCase() + ' ✔'
+        : '';
       show(controlP2StatusEl, !!controlP2StatusEl.textContent);
     }
+    // Reassign buttons: visible only after a player locks a model.
+    if (reassignP1El) show(reassignP1El, !!game.p1Model);
+    if (reassignP2El) show(reassignP2El, !!game.p2Model);
     // Back button: always visible during SELECT_CONTROL.
     if (controlBackEl) show(controlBackEl, true);
-    // Reassign buttons: visible only during confirm steps (step 1 or 3).
-    if (reassignP1El) show(reassignP1El, step === 1 || step === 4);
-    if (reassignP2El) show(reassignP2El, step === 3 || step === 4);
-    // Summary screen when both confirmed.
-    if (controlSummaryEl) {
-      show(controlSummaryEl, state === SELECT_CONTROL && game.controlConfirmed);
+    // Summary screen on the SHARED (START) step: show both assigned layouts.
+    if (controlSummaryEl && game.gameControlStep === GAME_CONTROL_START) {
+      show(controlSummaryEl, true);
       if (summaryLine1El && summaryLine2El) {
-        summaryLine1El.textContent = 'P1: ' + (game.p1Role || game.role) + '  /  ' + (game.p1Model || '');
-        summaryLine2El.textContent = 'P2: ' + (game.p2Role || '') + '  /  ' + (game.p2Model || '');
+        summaryLine1El.textContent = 'P1: ' + (game.p1Role || game.role) +
+          '  /  ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' ' + (game.p1Model || '');
+        summaryLine2El.textContent = 'P2: ' + (game.p2Role || '') +
+          '  /  ' + GAME_CONTROL_PLAYER_MARKERS[2] + ' ' + (game.p2Model || '');
       }
     }
   } else if (state !== SELECT_CONTROL && controlErrorEl) {

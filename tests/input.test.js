@@ -164,3 +164,30 @@ test('Back from SELECT_CONTROL returns to SELECT_ROLE', () => {
   state.backToRoleSelect();
   assert.equal(state.game.state, 'SELECT_ROLE');
 });
+
+test('single key press locks the current player model in SELECT_CONTROL', () => {
+  fresh();
+  state.game.state = 'SELECT_CONTROL';
+  state.game.twoPlayerMode = true;
+  // A layout key locks P1 immediately; no confirm step.
+  input.onKey({ key: 'w', preventDefault() {} });
+  assert.equal(state.game.p1Model, 'wasd');
+  assert.equal(state.game.p1Selection, 'wasd');
+  // The next key press locks P2.
+  input.onKey({ key: 'ArrowUp', preventDefault() {} });
+  assert.equal(state.game.p2Model, 'arrows');
+  assert.equal(state.game.p2Selection, 'arrows');
+});
+
+test('P2 key press that reuses P1 keyboard layout is rejected', () => {
+  fresh();
+  state.game.state = 'SELECT_CONTROL';
+  state.game.twoPlayerMode = true;
+  input.onKey({ key: 'w', preventDefault() {} }); // P1 locks WASD.
+  input.onKey({ key: 'w', preventDefault() {} }); // P2 tries WASD -> conflict.
+  assert.equal(state.game.p2Model, null);
+  assert.equal(state.game.controlError, 'P2: cannot use the same layout as P1');
+  // P2 can still use a different keyboard layout.
+  input.onKey({ key: 'ArrowUp', preventDefault() {} });
+  assert.equal(state.game.p2Model, 'arrows');
+});

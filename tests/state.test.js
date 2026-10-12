@@ -179,48 +179,50 @@ test('two-player game over keeps top-10', () => {
   assert.equal(board.length, 10); // still top-10 after two entries
 });
 
-// ---------- Select/Confirm flow ----------
-test('select sets the correct field', () => {
+// ---------- Single-key-press control lock ----------
+test('a layout key locks both selection and model in one call', () => {
   fresh();
-  state.selectControlModel(1, 'wasd');
+  const ok = state.lockControlModel(1, 'wasd');
+  assert.equal(ok, true);
+  // The same key press sets the selection AND the locked model at once.
   assert.equal(state.game.p1Selection, 'wasd');
-  state.selectControlModel(2, 'arrows');
-  assert.equal(state.game.p2Selection, 'arrows');
-});
-
-test('different layout replaces previous selection', () => {
-  fresh();
-  state.selectControlModel(1, 'wasd');
-  assert.equal(state.game.p1Selection, 'wasd');
-  state.selectControlModel(1, 'arrows');
-  assert.equal(state.game.p1Selection, 'arrows');
-});
-
-test('confirm locks the selection into model', () => {
-  fresh();
-  state.selectControlModel(1, 'wasd');
-  state.confirmControlModel(1);
   assert.equal(state.game.p1Model, 'wasd');
-  state.selectControlModel(2, 'arrows');
-  state.confirmControlModel(2);
-  assert.equal(state.game.p2Model, 'arrows');
+});
+
+test('re-assigning then locking replaces the previous model', () => {
+  fresh();
+  state.lockControlModel(1, 'wasd');
+  assert.equal(state.game.p1Model, 'wasd');
+  // Reassign clears the locked model, so a fresh key press can replace it.
+  state.reassignP1();
+  assert.equal(state.game.p1Model, null);
+  state.lockControlModel(1, 'arrows');
+  assert.equal(state.game.p1Model, 'arrows');
+});
+
+test('locking both players advances currentControlPlayer to null', () => {
+  fresh();
+  assert.equal(state.currentControlPlayer(), 1);
+  state.lockControlModel(1, 'wasd');
+  assert.equal(state.currentControlPlayer(), 2);
+  state.lockControlModel(2, 'arrows');
+  assert.equal(state.currentControlPlayer(), null);
 });
 
 test('conflict error when P2 picks same keyboard layout as P1', () => {
   fresh();
-  state.selectControlModel(1, 'wasd');
-  state.confirmControlModel(1);
-  const result = state.selectControlModel(2, 'wasd');
+  state.lockControlModel(1, 'wasd');
+  const result = state.lockControlModel(2, 'wasd');
   assert.equal(result, false);
   assert.equal(state.game.controlError, 'P2: cannot use the same layout as P1');
 });
 
-test('Start hidden until both confirmed', () => {
+test('gamepad is shareable when P1 already uses a keyboard layout', () => {
   fresh();
-  state.selectControlModel(1, 'wasd');
-  state.confirmControlModel(1);
-  assert.equal(state.game.controlConfirmed, false);
-  state.selectControlModel(2, 'arrows');
-  state.confirmControlModel(2);
-  assert.equal(state.game.controlConfirmed, true);
+  state.lockControlModel(1, 'wasd');
+  // P2 may reuse the gamepad model even though P1 locked a keyboard layout.
+  const result = state.lockControlModel(2, 'gamepad');
+  assert.equal(result, true);
+  assert.equal(state.game.controlError, '');
+  assert.equal(state.game.p2Model, 'gamepad');
 });

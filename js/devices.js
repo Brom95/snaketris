@@ -3,7 +3,7 @@
 // state-machine logic of its own — the flow in js/input.js routes every
 // intent through one navigation path.
 
-import { game } from './state.js';
+import { game, currentControlPlayer, lockControlModel } from './state.js';
 import { BOARD_W, BOARD_H } from './constants.js';
 
 let canvas = null;
@@ -343,6 +343,13 @@ export function pollController() {
 function chooseIntent(state, role, s) {
   if (state === 'PLAYING') return playingIntent(role, s);
   if (state === 'MENU' || state === 'SELECT_ROLE') return menuIntent(state, s);
+  // Two-player control screen: A locks the next player's gamepad model, or
+  // starts the game once both players have locked. Edge-only, one press.
+  if (state === 'SELECT_CONTROL' && game.twoPlayerMode) {
+    const player = currentControlPlayer();
+    if (player) return { action: 'lockModel', model: 'gamepad' };
+    return { action: 'confirm' };
+  }
   // B returns to the menu from the records and help views; A does the same
   // after a game ends. Both are edge-only, matching keyboard and touch.
   if (state === 'RECORDS' || state === 'HELP') return s.bEdge ? { action: 'toMenu' } : null;

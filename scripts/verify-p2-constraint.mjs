@@ -1,7 +1,8 @@
 // Headless browser check for P2 keyboard constraint (task 3.2).
 // Drives the real page in Chromium: enters SELECT_ROLE with two-player mode,
-// selects a role to reach SELECT_CONTROL, P1 selects WASD then confirms,
-// then asserts P2 cannot reuse WASD but can use arrows.
+// selects a role to reach SELECT_CONTROL, then P1 locks WASD with one key press,
+// asserts P2 cannot reuse WASD (one key press) but can use arrows (one key press).
+// Each layout key locks the model immediately; there is no Enter-confirm step.
 
 import { chromium } from '@playwright/test';
 import path from 'node:path';
@@ -20,28 +21,20 @@ check(await stateIs(page, 'SELECT_ROLE'), 'clicking Two Players opens the role s
 await page.click('#role-item-snake');
 check(await stateIs(page, 'SELECT_CONTROL'), 'selecting a role reaches SELECT_CONTROL');
 
-// P1 selects WASD then confirms.
+// P1 locks WASD with one key press; no Enter-confirm.
 await page.keyboard.press('w');
-check(await waitFor(page, () => window.__game.p1Selection === 'wasd', undefined, 3000),
-  'P1 selects WASD');
-
-await page.keyboard.press('Enter');
 check(await waitFor(page, () => window.__game.p1Model === 'wasd', undefined, 3000),
-  'P1 confirms WASD');
+  'P1 locks WASD in one key press');
 
-// P2 cannot reuse WASD (pressing W again does not set P2's selection).
+// P2 cannot reuse WASD (pressing W again is rejected in one step).
 await page.keyboard.press('w');
-check(await waitFor(page, () => window.__game.p2Selection === null || window.__game.p2Selection !== 'wasd', undefined, 3000),
+check(await waitFor(page, () => window.__game.p2Model === null || window.__game.p2Model !== 'wasd', undefined, 3000),
   'P2 cannot reuse P1\'s WASD model');
 
-// P2 can use arrows.
+// P2 locks arrows with one key press; no Enter-confirm.
 await page.keyboard.press('ArrowUp');
-check(await waitFor(page, () => window.__game.p2Selection === 'arrows', undefined, 3000),
-  'P2 selects Arrows');
-
-await page.keyboard.press('Enter');
 check(await waitFor(page, () => window.__game.p2Model === 'arrows', undefined, 3000),
-  'P2 confirms Arrows');
+  'P2 locks Arrows in one key press');
 
 console.log('');
 report('verify-p2-constraint', 0);

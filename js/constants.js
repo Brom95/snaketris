@@ -39,6 +39,31 @@ export const ROLE_SCREEN_ITEMS = ['Snake', 'Tetris', 'Back'];
 // visible button outside this list.
 export const CONTROL_SCREEN_ITEMS = ['P1 Select', 'P2 Select', 'Start'];
 
+// The one-item-at-a-time control flow steps. The game enters GAME_CONTROL_P1
+// when two-player mode starts, moves to GAME_CONTROL_P2 once P1 locks a model,
+// and to GAME_CONTROL_START once P2 locks a model.
+export const GAME_CONTROL_INIT = 'GAME_CONTROL_INIT';
+export const GAME_CONTROL_P1 = 'GAME_CONTROL_P1';
+export const GAME_CONTROL_P2 = 'GAME_CONTROL_P2';
+export const GAME_CONTROL_START = 'GAME_CONTROL_START';
+
+// The four layout keys for each keyboard model, keyed by model name. A model is
+// "keyboard" when it has an entry here; gamepad and any other model are not.
+export const GAME_CONTROL_KEYBOARD_MODELS = {
+  wasd: ['w', 'a', 's', 'd'],
+  arrows: ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'],
+};
+
+// The keyboard model names, in display order. Kept separate so the UI can list
+// them without depending on the key arrays.
+export const GAME_CONTROL_KEYBOARD_MODEL_NAMES = ['wasd', 'arrows'];
+
+// The emoji marker shown with each player's name on the control screen.
+export const GAME_CONTROL_PLAYER_MARKERS = { 1: '\u{1F3AE}', 2: '\u{1F579}\u{FE0F}' }; // 🎮 🕹
+
+// Emoji marker shown with each keyboard model name in the key-hint line.
+export const GAME_CONTROL_MODEL_EMOJI = { wasd: '\u{2328}\u{FE0F}', arrows: '\u{2B06}\u{FE0F}\u{2B07}\u{FE0F}\u{2B05}\u{FE0F}\u{2B06}\u{FE0F}' }; // ⌨️ ⬆⬇⬅⬆
+
 // URL for the GitHub repository.
 export const GITHUB_URL = 'https://github.com/Brom95/snaketris';
 
