@@ -39,9 +39,9 @@
 
 ## 7. Integration checks
 
-- [ ] 7.1 Run `npm test` and `npm run verify` and record the counts against the documented baseline, keeping the pre-existing `tests/app.test.js` engine-order failure accounted for.
-- [ ] 7.2 Run the ripwire quality checks on the working tree: `--quality-delta` and the CLI `--test-gate`, and confirm with `--quality-delta=HEAD..HEAD` that any gated row is not an index artifact.
-- [ ] 7.3 Update `QWEN.md` unit-check and harness counts and the module list so the project docs stay true.
+- [x] 7.1 Run `npm test` and `npm run verify` and record the counts against the documented baseline, keeping the pre-existing `tests/app.test.js` engine-order failure accounted for.
+- [x] 7.2 Run the ripwire quality checks on the working tree: `--quality-delta` and the CLI `--test-gate`, and confirm with `--quality-delta=HEAD..HEAD` that any gated row is not an index artifact.
+- [x] 7.3 Update `QWEN.md` unit-check and harness counts and the module list so the project docs stay true.
 
 ## Workflow follow-up
 
