@@ -4,11 +4,12 @@
 // setDirection (byte-for-byte stable) + canvas fitting + listener registration.
 
 import {
-  BOARD_W, BOARD_H, FIELD_V_GAP, FIELD_V_GAP_MOBILE, UI_STACK_MAX_WIDTH,
+  BOARD_W, BOARD_H,
   PLAYING, MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER,
 } from './constants.js';
 import { game } from './state.js';
 import { pushIntent } from './screens.js';
+import { hitTargets, layoutRule } from './ui.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
 import {
   keyToIntent,
@@ -22,9 +23,6 @@ import {
 } from './devices.js';
 
 let canvas = null;
-let menuItemsEls = [];
-let roleItemsEls = [];
-let controlItemsEls = [];
 
 // ---------- FLOW: device events -> intents -> the screen system ----------
 // Navigation is not decided here. Every navigation intent is pushed onto the
@@ -107,10 +105,10 @@ export function fitCanvas(reserved = 0) {
   // Contain fit: scale so the whole board fits the viewport, preserving
   // aspect ratio. No upper cap — the field may enlarge on large screens so
   // it fills the smaller viewport side (e.g. full height on a desktop).
-  // Reserve FIELD_V_GAP above and below: the field is inset from the top and
-  // bottom viewport edges by at least one board cell of breathing room.
+  // Reserve the same gap the interface rule reports: the field is inset from the
+  // top and bottom viewport edges by at least one board cell of breathing room.
   // On narrow viewports the reservation is halved so the board starts higher.
-  const gap = window.innerWidth <= UI_STACK_MAX_WIDTH ? FIELD_V_GAP_MOBILE : FIELD_V_GAP;
+  const gap = layoutRule().gap;
   const availableH = Math.max(
     window.innerHeight - 2 * gap - reserved,
     gap
@@ -143,9 +141,7 @@ export function initInput(canvasEl) {
   // Interface elements live outside the canvas, so their pointer events never
   // reach the canvas listeners; one document-level listener covers them and
   // bails out for anything happening on the board (see onInterfacePointerUp).
-  menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
-  roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
-  controlItemsEls = Array.from(document.querySelectorAll('#control-items > li'));
+  // js/ui.js owns every interface element; this module hit-tests the same map.
   document.addEventListener('pointerup', onInterfacePointerUp);
 }
 
@@ -172,32 +168,15 @@ export function onInterfacePointerUp(e) {
   if (canvas && e.target === canvas) return; // board gestures belong to onPointerUp
   const x = e.clientX;
   const y = e.clientY;
-  if (game.screen.state === MENU) {
-    const el = firstHit(menuItemsEls, x, y);
+  const state = game.screen.state;
+  // The selection screens hit-test the element map js/ui.js owns, in table order.
+  if (state === MENU || state === SELECT_ROLE || state === SELECT_CONTROL) {
+    const el = firstHit(hitTargets(state), x, y);
     if (el) pushIntent({ action: 'select', id: el.id });
     return;
   }
-  if (game.screen.state === SELECT_ROLE) {
-    const el = firstHit(roleItemsEls, x, y);
-    if (el) pushIntent({ action: 'select', id: el.id });
-    return;
-  }
-  if (game.screen.state === SELECT_CONTROL) {
-    const el = firstHit(controlItemsEls, x, y);
-    if (el) {
-      pushIntent({ action: 'select', id: el.id });
-      return;
-    }
-    for (const id of ['control-back', 'control-reassign-p1', 'control-reassign-p2']) {
-      const control = document.getElementById(id);
-      if (control && hit(control, x, y)) {
-        pushIntent({ action: 'select', id });
-        return;
-      }
-    }
-    return;
-  }
-  if (game.screen.state === RECORDS || game.screen.state === HELP || game.screen.state === GAME_OVER) {
+  // Any click inside the remaining views returns to the menu.
+  if (state === RECORDS || state === HELP || state === GAME_OVER) {
     pushIntent({ action: 'toMenu' });
   }
 }

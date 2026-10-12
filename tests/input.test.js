@@ -10,9 +10,12 @@ const state = await import('../js/state.js');
 const screens = await import('../js/screens.js');
 const devices = await import('../js/devices.js');
 const input = await import('../js/input.js');
+const ui = await import('../js/ui.js');
 
 // Wire the canvas into both input.js and devices.js (as initInput does in the real game).
 input.initInput(stub.canvas);
+// js/ui.js owns the interface elements, so the click tests need them indexed.
+ui.initUi();
 
 function fresh() { state.resetGame(); }
 

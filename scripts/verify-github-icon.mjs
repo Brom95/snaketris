@@ -18,6 +18,7 @@
 
 import { check, makeCanvas, report, stubDom } from './harness.mjs';
 import { initInput, onInterfacePointerUp, onPointerUp } from '../js/input.js';
+import { initUi } from '../js/ui.js';
 import { onPointerDown } from '../js/devices.js';
 import { game } from '../js/state.js';
 import { drainIntents } from '../js/screens.js';
@@ -87,6 +88,7 @@ const dom = stubDom({
   canvas: makeCanvas(),
 });
 
+initUi(); // js/ui.js owns the interface elements, so the item map must be indexed
 initInput(dom.canvas); // installs the module-private canvas + the interface listener
 
 function center(box) {

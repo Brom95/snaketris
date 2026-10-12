@@ -8,7 +8,9 @@ const stub = installDomStub();
 const { game, resetGame, startGame, gameOver } = await import('../js/state.js');
 const { toMenu } = await import('../js/screens.js');
 const ui = await import('../js/ui.js');
+const input = await import('../js/input.js');
 const { ROLE_MARKERS, MENU, SELECT_ROLE, PLAYING, GAME_OVER, RECORDS } = await import('../js/constants.js');
+const { FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H } = await import('../js/constants.js');
 
 ui.initUi();
 
@@ -156,4 +158,24 @@ test('the field and score are on screen only while playing or after game over', 
   ui.syncViews([]);
   assert.equal(game.screen.state, MENU);
   assert.ok(!on(recordsViewEl));
+});
+
+test('the interface band and the field fit read one viewport rule', () => {
+  stub.window.innerWidth = 360;
+  stub.window.innerHeight = 740;
+  const rule = ui.layoutRule();
+  assert.equal(rule.stacked, true);
+  assert.equal(rule.gap, FIELD_V_GAP_MOBILE);
+
+  const band = ui.interfaceBandHeight();
+  assert.equal(band, stub.elements.ui.getBoundingClientRect().height + FIELD_V_GAP_MOBILE);
+
+  input.initInput(stub.canvas);
+  input.fitCanvas(band);
+  const scale = Math.min(
+    stub.window.innerWidth / BOARD_W,
+    (stub.window.innerHeight - 2 * rule.gap - band) / BOARD_H
+  );
+  assert.equal(stub.canvas.style.width, (BOARD_W * scale) + 'px');
+  assert.equal(stub.canvas.style.height, (BOARD_H * scale) + 'px');
 });

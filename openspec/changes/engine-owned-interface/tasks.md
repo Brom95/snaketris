@@ -27,9 +27,9 @@
 
 ## 5. Interface painting from the table
 
-- [ ] 5.1 Make `js/ui.js syncViews` paint from the table: view visibility, item highlight, key hints, per-player status, and summary text read the table entry for the current screen instead of hard-coded index mapping. Verify `verify-views`, `verify-menu-geometry`, and `verify-role-duel` pass with the same element ids and the same `.view`/`.view.on` classes.
-- [ ] 5.2 Move the page element lookup to one owner: `ui.js` exposes the item lists and the named controls, `input.js` hit-tests against that same map. Verify `input.js` contains no `querySelectorAll` and no `getElementById` for interface elements.
-- [ ] 5.3 Unify the viewport math: one helper answers the stacked-layout rule and the gap, and both the interface band and the field fit read it. Verify `verify-page-layout` and `verify-field-only` pass, and verify a unit test asserts the band and the fit agree for one viewport.
+- [x] 5.1 Make `js/ui.js syncViews` paint from the table: view visibility, item highlight, key hints, per-player status, and summary text read the table entry for the current screen instead of hard-coded index mapping. Verify `verify-views`, `verify-menu-geometry`, and `verify-role-duel` pass with the same element ids and the same `.view`/`.view.on` classes.
+- [x] 5.2 Move the page element lookup to one owner: `ui.js` exposes the item lists and the named controls, `input.js` hit-tests against that same map. Verify `input.js` contains no `querySelectorAll` and no `getElementById` for interface elements.
+- [x] 5.3 Unify the viewport math: one helper answers the stacked-layout rule and the gap, and both the interface band and the field fit read it. Verify `verify-page-layout` and `verify-field-only` pass, and verify a unit test asserts the band and the fit agree for one viewport.
 
 ## 6. Records out of the core
 

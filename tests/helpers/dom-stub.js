@@ -96,6 +96,10 @@ export function installDomStub() {
   const menuItems = [makeEl('menu-item-play'), makeEl('menu-item-records'), makeEl('menu-item-help')];
   // Back is the third selectable item of the role list, not a separate control.
   const roleItems = [makeEl('role-item-snake'), makeEl('role-item-tetris'), roleBackEl];
+  // js/ui.js owns the elements and looks each one up by id, so every item must be
+  // reachable through getElementById as well as through the two lists.
+  for (const el of menuItems) elements[el.id] = el;
+  for (const el of roleItems) elements[el.id] = el;
 
   const document = {
     getElementById: (id) => elements[id] ?? null,

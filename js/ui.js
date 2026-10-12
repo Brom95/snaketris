@@ -11,64 +11,77 @@ import {
 } from './constants.js';
 import { game } from './state.js';
 import { entryRole } from './highscores.js';
+import { SCREENS, SCREEN_BY_ID, itemForStep, controlModelAssigned } from './screens.js';
 
+// Elements this module owns that the screen table does not name.
 let uiEl = null;
 let scoreEl = null;
 let statusEl = null;
-let menuViewEl = null;
-let roleViewEl = null;
-let controlViewEl = null;
-let recordsViewEl = null;
-let helpViewEl = null;
 let recordsListEl = null;
 let recordsEmptyEl = null;
-let menuItemsEls = [];
-let roleItemsEls = [];
-let controlItemsEls = [];
-let controlErrorEl = null;
-let controlItemStartEl = null;
 let fieldEl = null;
-let twoPlayerItemEl = null;
 let roleLineEl = null;
+let controlErrorEl = null;
 let controlKeyHintsEl = null;
-let controlP1StatusEl = null;
-let controlP2StatusEl = null;
 let controlSummaryEl = null;
-let summaryLine1El = null;
-let summaryLine2El = null;
-let controlBackEl = null;
-let reassignP1El = null;
-let reassignP2El = null;
+
+// One element owner: every id the screen table names is looked up here, once,
+// and handed out to whoever paints or hit-tests it. js/input.js hit-tests the
+// same lists, so the page and the table cannot drift apart silently.
+const elById = new Map();
+const itemsByScreen = new Map();
+const controlsByScreen = new Map();
+
+// Per-player feedback blocks, keyed by the player number the table carries.
+const statusElsByPlayer = new Map();
+const summaryElsByPlayer = new Map();
 
 // Called by app.js once the page is parsed; stores the interface elements.
 export function initUi() {
   uiEl = document.getElementById('ui');
   scoreEl = document.getElementById('score');
   statusEl = document.getElementById('status');
-  menuViewEl = document.getElementById('menu-view');
-  roleViewEl = document.getElementById('role-view');
-  controlViewEl = document.getElementById('control-view');
-  recordsViewEl = document.getElementById('records-view');
-  helpViewEl = document.getElementById('help-view');
   recordsListEl = document.getElementById('records-list');
   recordsEmptyEl = document.getElementById('records-empty');
-  menuItemsEls = Array.from(document.querySelectorAll('#menu-items > li'));
-  roleItemsEls = Array.from(document.querySelectorAll('#role-items > li'));
-  controlItemsEls = Array.from(document.querySelectorAll('#control-items > li'));
-  controlErrorEl = document.getElementById('control-error');
-  controlItemStartEl = document.getElementById('control-item-start');
   fieldEl = document.getElementById('game');
-  twoPlayerItemEl = document.getElementById('menu-item-two-player');
   roleLineEl = document.getElementById('role-line');
+  controlErrorEl = document.getElementById('control-error');
   controlKeyHintsEl = document.getElementById('control-key-hints');
-  controlP1StatusEl = document.getElementById('control-p1-status');
-  controlP2StatusEl = document.getElementById('control-p2-status');
   controlSummaryEl = document.getElementById('control-summary');
-  summaryLine1El = document.getElementById('summary-line-1');
-  summaryLine2El = document.getElementById('summary-line-2');
-  controlBackEl = document.getElementById('control-back');
-  reassignP1El = document.getElementById('control-reassign-p1');
-  reassignP2El = document.getElementById('control-reassign-p2');
+  statusElsByPlayer.set(1, document.getElementById('control-p1-status'));
+  statusElsByPlayer.set(2, document.getElementById('control-p2-status'));
+  summaryElsByPlayer.set(1, document.getElementById('summary-line-1'));
+  summaryElsByPlayer.set(2, document.getElementById('summary-line-2'));
+  indexInterface();
+}
+
+// Look up every id the table names, in table order. A page element that is
+// absent keeps its slot, so every table index stays true.
+function indexInterface() {
+  for (const row of SCREENS) {
+    if (row.view) lookup(row.view);
+    const items = [];
+    for (const item of row.items) items.push(lookup(item.id));
+    const controls = [];
+    for (const control of row.controls) controls.push(lookup(control.id));
+    itemsByScreen.set(row.id, items);
+    controlsByScreen.set(row.id, controls);
+  }
+}
+
+function lookup(id) {
+  if (!id) return null;
+  const el = document.getElementById(id);
+  elById.set(id, el);
+  return el;
+}
+
+// The interface elements of one screen: its items, then its controls.
+export function hitTargets(screenId) {
+  const out = [];
+  for (const el of itemsByScreen.get(screenId) ?? []) if (el) out.push(el);
+  for (const el of controlsByScreen.get(screenId) ?? []) if (el) out.push(el);
+  return out;
 }
 
 // Shows or hides one interface element. `.view` hides by default, `.view.on`
@@ -138,116 +151,135 @@ function placeScore() {
 // on screen. Called every frame from the render path.
 export function syncViews(recordsBoard) {
   const state = game.screen.state;
+  const row = SCREEN_BY_ID[state];
   if (scoreEl) scoreEl.textContent = scoreText();
-  const fieldOn = state === PLAYING || state === GAME_OVER;
+  const fieldOn = row !== undefined && row.field;
   show(fieldEl, fieldOn);
   show(scoreEl, fieldOn);
   placeScore();
   show(statusEl, state === GAME_OVER);
   if (state === GAME_OVER && statusEl) statusEl.textContent = statusText();
   // The role screen is a separate view: opening it hides the main menu.
-  show(menuViewEl, state === MENU);
-  show(roleViewEl, state === SELECT_ROLE);
-  show(controlViewEl, state === SELECT_CONTROL);
-  show(recordsViewEl, state === RECORDS);
-  show(helpViewEl, state === HELP);
+  for (const screen of SCREENS) show(elById.get(screen.view), screen.id === state);
   // Two-player menu item: shown when the viewport is wide enough, hidden at or
   // below UI_STACK_MAX_WIDTH.
-  if (twoPlayerItemEl) {
-    twoPlayerItemEl.style.display = window.innerWidth > UI_STACK_MAX_WIDTH ? '' : 'none';
+  const twoPlayerItem = elById.get('menu-item-two-player');
+  if (twoPlayerItem) {
+    twoPlayerItem.style.display = window.innerWidth > UI_STACK_MAX_WIDTH ? '' : 'none';
   }
-  if (state === MENU) highlightItem(menuItemsEls, game.screen.menuSelect);
-  if (state === SELECT_ROLE) {
-    // The menu is off screen here, so its highlight is cleared too.
-    highlightItem(menuItemsEls, -1);
-    highlightItem(roleItemsEls, game.screen.roleSelect);
-    // Role line: "P1: X / P2: Y" above the model selection in two-player mode.
-    if (roleLineEl) {
-      roleLineEl.textContent = game.screen.twoPlayerMode
+  paintHighlights(state);
+  if (roleLineEl) {
+    roleLineEl.textContent =
+      state === SELECT_ROLE && game.screen.twoPlayerMode
         ? 'P1: ' + game.screen.p1Role + '  /  P2: ' + game.screen.p2Role
         : '';
-    }
-  } else if (roleLineEl) {
-    roleLineEl.textContent = '';
   }
-  if (state === SELECT_CONTROL) {
-    highlightItem(menuItemsEls, -1);
-    highlightItem(roleItemsEls, -1);
-    // Step-by-step: show exactly one item, driven by gameControlStep.
-    // Step 1 (P1) shows the P1 item, step 2 (P2) shows the P2 item,
-    // step 3 (START) shows the Start item.
-    let index;
-    if (game.screen.gameControlStep === GAME_CONTROL_P1) index = 0;
-    else if (game.screen.gameControlStep === GAME_CONTROL_P2) index = 1;
-    else index = 2; // GAME_CONTROL_START
-    for (let i = 0; i < controlItemsEls.length; i++) {
-      show(controlItemsEls[i], i === index);
-    }
-    // Key hints per step.
-    if (controlKeyHintsEl) {
-      const hints = {
-        [GAME_CONTROL_P1]: 'W / A / S / D  ·  ↑ ↓ ← →  ·  🎯',
-        [GAME_CONTROL_P2]: 'W / A / S / D  ·  ↑ ↓ ← →  ·  🎯',
-        [GAME_CONTROL_START]: 'Enter / Space'
-      };
-      controlKeyHintsEl.textContent = hints[game.screen.gameControlStep] || '';
-      show(controlKeyHintsEl, true);
-    }
-    // Show error message when P2 tries same layout as P1.
-    show(controlErrorEl, state === SELECT_CONTROL && !!game.screen.controlError);
-    if (controlErrorEl) controlErrorEl.textContent = game.screen.controlError || '';
-    // Per-player status feedback (assigned layout).
-    if (controlP1StatusEl) {
-      controlP1StatusEl.textContent = game.screen.p1Model
-        ? 'P1: ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' ' + game.screen.p1Model.toUpperCase() + ' ✔'
-        : '';
-      show(controlP1StatusEl, !!controlP1StatusEl.textContent);
-    }
-    if (controlP2StatusEl) {
-      controlP2StatusEl.textContent = game.screen.p2Model
-        ? 'P2: ' + GAME_CONTROL_PLAYER_MARKERS[2] + ' ' + game.screen.p2Model.toUpperCase() + ' ✔'
-        : '';
-      show(controlP2StatusEl, !!controlP2StatusEl.textContent);
-    }
-    // Reassign buttons: visible only after a player locks a model.
-    if (reassignP1El) show(reassignP1El, !!game.screen.p1Model);
-    if (reassignP2El) show(reassignP2El, !!game.screen.p2Model);
-    // Back button: always visible during SELECT_CONTROL.
-    if (controlBackEl) show(controlBackEl, true);
-    // Summary screen on the SHARED (START) step: show both assigned layouts.
-    if (controlSummaryEl && game.screen.gameControlStep === GAME_CONTROL_START) {
-      show(controlSummaryEl, true);
-      if (summaryLine1El && summaryLine2El) {
-        summaryLine1El.textContent = 'P1: ' + (game.screen.p1Role || game.play.role) +
-          '  /  ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' ' + (game.screen.p1Model || '');
-        summaryLine2El.textContent = 'P2: ' + (game.screen.p2Role || '') +
-          '  /  ' + GAME_CONTROL_PLAYER_MARKERS[2] + ' ' + (game.screen.p2Model || '');
-      }
-    }
-  } else if (state !== SELECT_CONTROL && controlErrorEl) {
-    controlErrorEl.textContent = '';
-  }
-  if (game.screen.state !== MENU && game.screen.state !== SELECT_ROLE && game.screen.state !== SELECT_CONTROL) {
-    // Clear control items when not in either menu state.
-    highlightItem(controlItemsEls, -1);
-  }
+  if (row !== undefined && row.cursor === 'step') paintControlFeedback(row);
+  else if (controlErrorEl) controlErrorEl.textContent = '';
   if (state === RECORDS) fillRecords(recordsBoard || []);
 }
 
-// The interface column has its own size rule and never follows the field's
-// scale, so on viewports where it cannot sit beside the field it stacks above
-// it and the field must give up that band of height.
-function stackedLayout() {
-  if (window.innerWidth <= UI_STACK_MAX_WIDTH) return true;
-  const scale = Math.min(window.innerWidth / BOARD_W, (window.innerHeight - 2 * FIELD_V_GAP) / BOARD_H);
-  return window.innerWidth - BOARD_W * scale < UI_COLUMN_MIN + FIELD_V_GAP;
+// Paint the selection cursor of every screen from the table. The current screen
+// gets its own cursor; every other screen is cleared, exactly as before.
+function paintHighlights(state) {
+  for (const row of SCREENS) {
+    const items = itemsByScreen.get(row.id) ?? [];
+    if (row.id !== state) {
+      highlightItem(items, -1);
+      continue;
+    }
+    if (row.cursor === 'arrow') {
+      highlightItem(items, game.screen[row.selection] ?? -1);
+      continue;
+    }
+    highlightItem(items, stepItemIndex(row));
+  }
+}
+
+// The item index the current control step selects, or -1 when the step names no
+// item (the shared start step).
+function stepItemIndex(row) {
+  const item = itemForStep(row.id, game.screen.gameControlStep);
+  if (!item) return -1;
+  for (let i = 0; i < row.items.length; i++) {
+    if (row.items[i].id === item.id) return i;
+  }
+  return -1;
+}
+
+// The step-screen feedback blocks read the same table entry: key hints, the
+// per-player status, the controls, and the shared summary.
+function paintControlFeedback(row) {
+  const step = itemForStep(row.id, game.screen.gameControlStep);
+  if (controlKeyHintsEl) {
+    controlKeyHintsEl.textContent = step ? step.hints : '';
+    show(controlKeyHintsEl, true);
+  }
+  show(controlErrorEl, !!game.screen.controlError);
+  if (controlErrorEl) controlErrorEl.textContent = game.screen.controlError || '';
+  const controls = controlsByScreen.get(row.id) ?? [];
+  for (let i = 0; i < row.controls.length; i++) {
+    const spec = row.controls[i];
+    const el = controls[i];
+    if (!el) continue;
+    show(el, spec.player ? controlModelAssigned(spec.player) : true);
+  }
+  for (const item of row.items) {
+    if (!item.player) continue;
+    const el = statusElsByPlayer.get(item.player);
+    if (!el) continue;
+    const model = modelOf(item.player);
+    el.textContent = model
+      ? 'P' + item.player + ': ' + item.marker + ' ' + model.toUpperCase() + ' ✔'
+      : '';
+    show(el, !!el.textContent);
+  }
+  const shared = !!step && !step.player;
+  show(controlSummaryEl, shared);
+  if (!shared) return;
+  for (const player of [1, 2]) {
+    const el = summaryElsByPlayer.get(player);
+    if (!el) continue;
+    el.textContent = 'P' + player + ': ' + roleOf(player) +
+      '  /  ' + markerOf(row, player) + ' ' + (modelOf(player) || '');
+  }
+}
+
+function modelOf(player) {
+  return player === 1 ? game.screen.p1Model : game.screen.p2Model;
+}
+
+// P1 falls back to the single-player role; P2 has no role until the table picks one.
+function roleOf(player) {
+  return player === 1 ? (game.screen.p1Role || game.play.role) : (game.screen.p2Role || '');
+}
+
+function markerOf(row, player) {
+  for (const item of row.items) {
+    if (item.player === player) return item.marker;
+  }
+  return GAME_CONTROL_PLAYER_MARKERS[player];
+}
+
+// The one viewport rule: the same scale and gap answer both whether the interface
+// column stacks above the field and how much height the field may take.
+function fieldScale() {
+  return Math.min(window.innerWidth / BOARD_W, (window.innerHeight - 2 * FIELD_V_GAP) / BOARD_H);
+}
+
+export function layoutRule() {
+  const narrow = window.innerWidth <= UI_STACK_MAX_WIDTH;
+  return {
+    stacked: narrow || window.innerWidth - BOARD_W * fieldScale() < UI_COLUMN_MIN + FIELD_V_GAP,
+    gap: narrow ? FIELD_V_GAP_MOBILE : FIELD_V_GAP,
+  };
 }
 
 // Height the stacked interface occupies, including the gap around the field.
 // Zero when the interface shares a track beside the field. On narrow
 // viewports the gap is halved so the board starts higher on screen.
 export function interfaceBandHeight() {
-  if (!stackedLayout() || !uiEl) return 0;
-  const gap = window.innerWidth <= UI_STACK_MAX_WIDTH ? FIELD_V_GAP_MOBILE : FIELD_V_GAP;
-  return uiEl.getBoundingClientRect().height + gap;
+  const rule = layoutRule();
+  if (!rule.stacked || !uiEl) return 0;
+  return uiEl.getBoundingClientRect().height + rule.gap;
 }
