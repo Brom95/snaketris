@@ -5,7 +5,7 @@ import { COLS, ROWS, SOLID, PLAYING } from './constants.js';
 import { game } from './state.js';
 import { getCell } from './grid.js';
 import { handleIntent } from './input.js';
-import { requestPieceShift, shapeInState, setPieceState, shapeFits } from './pieces.js';
+import { requestPieceShift, shapeInState, setPieceState, shapeFits, currentFallSpeed } from './pieces.js';
 
 // Decision order for the snake: up, right, down, left. Ties are broken by this
 // order, which keeps the choice deterministic.
@@ -46,23 +46,41 @@ function isSafeCell(r, c) {
   return !occupiedByBody(r, c);
 }
 
-// Safe directions out of (r, c), ignoring the way the snake just came from.
-function exitCount(r, c, cameFrom) {
-  let count = 0;
-  for (const d of DIRS) {
-    if (d.r === -cameFrom.r && d.c === -cameFrom.c) continue;
-    if (isSafeCell(wrap(r + d.r, ROWS), wrap(c + d.c, COLS))) count += 1;
+// How far the snake can still get from (r, c): the number of distinct safe
+// cells reachable within `depth` steps over the wrap grid, never reversing
+// onto the cell it just came from. A corner-hug or self-trap reaches few or
+// no cells; open board reaches many. Bounded, so it stays cheap at 60 Hz.
+function exitCount(r, c, cameFrom, depth = 3) {
+  const seen = new Set([`${r},${c}`]);
+  let frontier = [[r, c]];
+  for (let step = 0; step < depth; step++) {
+    const next = [];
+    for (const [rr, cc] of frontier) {
+      for (const d of DIRS) {
+        if (d.r === -cameFrom.r && d.c === -cameFrom.c) continue; // never reverse
+        const nr = wrap(rr + d.r, ROWS);
+        const nc = wrap(cc + d.c, COLS);
+        if (!isSafeCell(nr, nc)) continue;
+        const key = `${nr},${nc}`;
+        if (!seen.has(key)) { seen.add(key); next.push([nr, nc]); }
+      }
+    }
+    frontier = next;
+    if (frontier.length === 0) break;
   }
-  return count;
+  return seen.size - 1;
 }
 
-// Nearest cell of a falling piece that lies inside the playfield. A piece
-// entirely above the board has no target.
-function nearestTargetCell(head) {
+// Nearest cell of a falling piece that lies inside the playfield, predicted
+// one step ahead. The piece moves before the head arrives, so the goal is the
+// cell the piece will occupy after one fall step (`currentFallSpeed`), not the
+// cell it occupies now. A piece entirely above the board has no target.
+export function nearestTargetCell(head) {
+  const speed = currentFallSpeed();
   let best = null;
   for (const p of game.pieces) {
     for (const [dr, dc] of p.shape) {
-      const r = Math.floor(p.row + dr);
+      const r = Math.floor(p.row + dr + speed);
       const c = p.col + dc;
       if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
       const dist = torusDelta(head.r, r, ROWS) + torusDelta(head.c, c, COLS);
@@ -73,8 +91,9 @@ function nearestTargetCell(head) {
 }
 
 // Pure snake decision: the safe direction that gets closest to the piece,
-// preferring a direction that still leaves an exit. Returns the current
-// direction when there is no target or no safe direction.
+// preferring a direction that still leaves an exit, and keeping the current
+// heading unless another direction strictly improves the goal (anti-oscillation).
+// Returns the current direction when there is no target or no safe direction.
 export function chooseBotDir() {
   const head = game.snake[0];
   if (!head) return game.dir;
@@ -98,14 +117,25 @@ export function chooseBotDir() {
     return game.dir;
   }
 
-  // Cells where a falling piece will come to rest, treated as solid.
+  // Cells where a falling piece will come to rest, treated as unsafe (stepping
+  // there risks being hit by the landed block).
   const landingSet = new Set();
   for (const p of game.pieces) {
     const cells = landingCells(p.shape, p.col, Math.floor(p.row));
     for (const [r, c] of cells) landingSet.add(`${r},${c}`);
   }
 
-  // Collect safe directions. A landing cell is unsafe.
+  // Goal of a direction: distance to the target (lower is better) and how far
+  // the snake can still travel from the next cell (survival). A direction that
+  // keeps at least three further steps "has an exit."
+  const goalOf = (nr, nc, cameFrom) => {
+    const dist = torusDelta(nr, target.r, ROWS) + torusDelta(nc, target.c, COLS);
+    const exits = exitCount(nr, nc, cameFrom);
+    return { dist, exits, hasExit: exits >= 3 };
+  };
+
+  // Safe directions (not the reverse of the current heading, not onto a landing
+  // cell).
   const candidates = [];
   for (const d of DIRS) {
     if (d.r === -game.dir.r && d.c === -game.dir.c) continue;
@@ -113,24 +143,37 @@ export function chooseBotDir() {
     const nc = wrap(head.c + d.c, COLS);
     if (!isSafeCell(nr, nc)) continue;
     if (landingSet.has(`${nr},${nc}`)) continue;
-    const dist = torusDelta(nr, target.r, ROWS) + torusDelta(nc, target.c, COLS);
-    const exits = exitCount(nr, nc, d);
-    candidates.push({ d, dist, exits });
+    candidates.push({ d, nr, nc });
   }
-
   if (candidates.length === 0) return game.dir;
 
-  // Primary: prefer directions that keep an exit. Fall back to all safe.
-  const withExits = candidates.filter((cand) => cand.exits > 0);
-  const pool = withExits.length > 0 ? withExits : candidates;
+  // The current direction counts as an option only when it is safe to keep.
+  const curNr = wrap(head.r + game.dir.r, ROWS);
+  const curNc = wrap(head.c + game.dir.c, COLS);
+  const currentInPlay = isSafeCell(curNr, curNc) && !landingSet.has(`${curNr},${curNc}`);
+  const currentGoal = currentInPlay ? goalOf(curNr, curNc, game.dir) : null;
 
+  // Strict improvement: a direction that keeps an exit beats one that does not;
+  // a tie on exit breaks by distance to the target. Equal values are not
+  // strictly better, so the current heading is kept (anti-oscillation).
+  const better = (a, b) =>
+    a.hasExit !== b.hasExit ? a.hasExit
+    : a.dist !== b.dist ? a.dist < b.dist
+    : false;
+
+  // Best non-current candidate.
   let best = null;
-  for (const cand of pool) {
-    if (!best || cand.dist < best.dist || (cand.dist === best.dist && cand.exits > best.exits)) {
-      best = cand;
-    }
+  for (const cand of candidates) {
+    if (cand.d.r === game.dir.r && cand.d.c === game.dir.c) continue;
+    const g = goalOf(cand.nr, cand.nc, cand.d);
+    if (best === null || better(g, best.goal)) best = { d: cand.d, goal: g };
   }
-  return best.d;
+
+  // Steer away from a blocked/landing current direction when a safe option
+  // exists; otherwise keep it.
+  if (!currentInPlay) return best ? best.d : game.dir;
+  // Hysteresis: only deviate when a candidate strictly improves the goal.
+  return best && better(best.goal, currentGoal) ? best.d : game.dir;
 }
 
 // Cells the piece would occupy after falling to rest in `col` with `shape`.
@@ -159,6 +202,16 @@ function occupancy(cells) {
     if (seg.r >= 0 && seg.r < ROWS && seg.c >= 0 && seg.c < COLS) {
       occ[seg.r][seg.c] = true;
     }
+  }
+  // The head's next-step cell is occupied too: the snake moves before a falling
+  // piece lands, so a block is scored against the snake's predicted path, not
+  // its stale position. This keeps a landed block from being buried under a
+  // snake that is about to move away from the cell it currently holds.
+  const head = game.snake[0];
+  if (head) {
+    const nr = wrap(head.r + game.dir.r, ROWS);
+    const nc = wrap(head.c + game.dir.c, COLS);
+    occ[nr][nc] = true;
   }
   for (const [r, c] of cells) occ[r][c] = true;
   return occ;
@@ -234,6 +287,20 @@ function anchorRange(shape) {
 
 // Pure piece decision: best (state, column) pair. Ties prefer the column
 // closest to center, then the lowest state index.
+// How quickly the snake can reach a landing: the smallest wrap-around distance
+// from the head to any of the piece's landing cells. Larger means the snake
+// reaches those cells least (and latest). Null when there is no snake to deny
+// food to, so the caller falls back to the centre tie-break.
+function snakeFarthestDistance(cells) {
+  const head = game.snake[0];
+  if (!head) return null;
+  let best = Infinity;
+  for (const [r, c] of cells) {
+    const d = torusDelta(head.r, r, ROWS) + torusDelta(head.c, c, COLS);
+    if (d < best) best = d;
+  }
+  return best;
+}
 export function choosePieceMove(p) {
   let best = null;
   for (let state = 0; state < 4; state++) {

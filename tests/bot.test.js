@@ -7,9 +7,9 @@ import { startIn } from './helpers/game.js';
 
 installDomStub();
 const { game } = await import('../js/state.js');
-const { chooseBotDir, choosePieceMove, botSystem, bodyCells } = await import('../js/bot.js');
+const { chooseBotDir, choosePieceMove, botSystem, bodyCells, nearestTargetCell } = await import('../js/bot.js');
 const { setCell, getCell } = await import('../js/grid.js');
-const { SOLID, COLS, ROWS, MAX_FALL, TETROMINOES } = await import('../js/constants.js');
+const { EMPTY, SOLID, COLS, ROWS, MAX_FALL, TETROMINOES } = await import('../js/constants.js');
 const { snakeTicksPerCell } = await import('../js/snake.js');
 const { piecesSystem, requestPieceShift, currentFallSpeed } = await import('../js/pieces.js');
 
@@ -43,8 +43,55 @@ test('bot never reverses: the reverse of the current direction is never chosen',
 test('bot steers toward the nearest piece cell', () => {
   freshStart('tetris');
   game.dir = { r: 0, c: 1 };
-  placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 6, 9); // directly above the head
+  placePiece([[0, 0]], 6, 8); // single cell above the head
   assert.deepEqual(chooseBotDir(), { r: -1, c: 0 });
+});
+
+test('bot aims at the predicted cell one step ahead, not the current one', () => {
+  freshStart('tetris');
+  // High fall speed so one step crosses a row boundary.
+  game.completedPieces = 121;
+  assert.ok(currentFallSpeed() > 0.8);
+  // A single cell at fractional row 8.2 currently occupies (8, 6); after one
+  // fall step it occupies (9, 6). The goal is the predicted cell.
+  placePiece([[0, 0]], 6, 8.2);
+  const target = nearestTargetCell({ r: 10, c: 6 });
+  assert.notDeepEqual(target, { r: 8, c: 6 }, 'aimed at the current cell');
+  assert.equal(target.r, 9, 'aimed at the predicted one-step-ahead cell');
+  assert.equal(target.c, 6, 'aimed at the predicted one-step-ahead cell');
+});
+
+test('bot avoids a dead-end pocket and keeps an exit (depth-3 survival)', () => {
+  freshStart('tetris');
+  game.dir = { r: 0, c: 1 }; // heading east
+  // The east cell (10,7) is a one-cell pocket: every neighbor but the way back
+  // is walled in, so it reaches fewer than three steps (no exit), while every
+  // other direction opens onto the board. A target below the head makes the
+  // open "down" direction the closest exit-bearing choice.
+  setCell(9, 7, SOLID);
+  setCell(10, 8, SOLID);
+  setCell(11, 7, SOLID);
+  placePiece([[0, 0]], 6, 15);
+  const dir = chooseBotDir();
+  assert.deepEqual(dir, { r: 1, c: 0 }, 'bot should keep an exit rather than enter the dead-end pocket');
+});
+
+test('bot keeps the current direction when another ties on goal value', () => {
+  freshStart('tetris');
+  game.snake = [{ r: 10, c: 6 }]; // no body to bias the choice
+  game.dir = { r: -1, c: 0 }; // heading up
+  placePiece([[0, 0]], 5, 7); // target at (7, 5): up and left tie on distance
+  const dir = chooseBotDir();
+  assert.deepEqual(dir, { r: -1, c: 0 }, 'bot kept the current heading on a tie');
+});
+
+test('bot takes a strictly better direction over a tie (anti-oscillation)', () => {
+  freshStart('tetris');
+  game.snake = [{ r: 10, c: 6 }];
+  game.dir = { r: -1, c: 0 }; // heading up
+  placePiece([[0, 0]], 7, 12); // target to the lower right: right improves on up
+  const dir = chooseBotDir();
+  assert.deepEqual(dir, { r: 0, c: 1 }, 'bot took the strictly better direction');
 });
 
 test('bot skips a direction blocked by a solid block', () => {
@@ -116,14 +163,14 @@ test('bot steers the snake only in Tetris role, through the shared steering path
   freshStart('tetris');
   game.dir = { r: 0, c: 1 };
   game.nextDir = { r: 0, c: 1 };
-  placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 6, 9);
+  placePiece([[0, 0]], 6, 8); // cell above the head
   botSystem.update({});
   assert.deepEqual(game.nextDir, { r: -1, c: 0 });
 
   freshStart('snake');
   game.dir = { r: 0, c: 1 };
   game.nextDir = { r: 0, c: 1 };
-  placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 6, 9);
+  placePiece([[0, 0]], 6, 8);
   botSystem.update({});
   assert.deepEqual(game.nextDir, { r: 0, c: 1 }); // untouched
 });
@@ -183,6 +230,24 @@ test('bot does not drop a block on the snake body', () => {
   placePiece(TETROMINOES.O[0], 5, 10, 'O', 0);
   const target = choosePieceMove(game.pieces[0]);
   assert.notEqual(target.col, 3, 'bot dropped a block on the snake head');
+});
+
+test('bot accounts for the snake head\'s next cell (does not bury a block under the moving snake)', () => {
+  freshStart('snake');
+  game.dir = { r: 0, c: 1 }; // the snake moves east next step
+  game.snake = [{ r: 17, c: 5 }, { r: 17, c: 4 }, { r: 17, c: 3 }]; // next cell (17, 6)
+  // Row 17 left half solid; shelf at row 18 cols 6-8; floor at row 19. An O in
+  // col 6 fills (17,6)/(17,7) and lands a block on the snake's next cell
+  // (17,6); an O in col 7 fills (17,7)/(17,8) and lands nowhere the snake
+  // occupies. Both score the same row progress, so the only difference is the
+  // next-cell penalty.
+  for (let c = 0; c < 6; c++) setCell(17, c, SOLID);
+  for (let c = 6; c < 9; c++) setCell(18, c, SOLID);
+  for (let c = 0; c < COLS; c++) setCell(19, c, SOLID);
+  const p = placePiece(TETROMINOES.O[0], 0, 10, 'O', 0);
+  const target = choosePieceMove(p);
+  // Col 6 buries a block on the snake's next cell, so the bot must avoid it.
+  assert.notEqual(target.col, 6, 'bot buried a block on the snake head\'s next cell');
 });
 
 test('bot rotates a piece that needs both a shift and a rotation', () => {
