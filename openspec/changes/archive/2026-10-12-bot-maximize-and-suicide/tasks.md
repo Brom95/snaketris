@@ -35,8 +35,19 @@
 
 - [x] 4.1 Run `npm test` and confirm only the intended checks changed; leave the pre-existing
   engine-order test untouched
-- [ ] 4.2 Run `npm run verify` (all harness scripts) and confirm every exit code is 0
-- [ ] 4.3 Run ripwire `quality_delta` against the pinned baseline before declaring done
+- [x] 4.2 Run `npm run verify` (all harness scripts) and confirm every exit code is 0
+- [x] 4.3 Run ripwire `quality_delta` against the pinned baseline before declaring done
+
+## 5. Placement model: the snake is not a solid block (bot.js)
+
+- [x] 5.1 Change `occupancy(cells)` in `js/bot.js` to read solid blocks plus the simulated piece
+  cells only; drop the snake body cells and the head's next-step cell from the grid, so `countFullRows`,
+  `stackStats` and the near-complete-row bonus measure the real board
+- [x] 5.2 Add `snakeCellAt(r, c)` in `js/bot.js` (the snake body, or the cell the head steps into next)
+  and use it for the `simulateScore` snake penalty instead of the occupancy grid
+- [x] 5.3 Add a decisive `tests/bot.test.js` test: a bottom row missing one cell whose gap holds a snake
+  body cell; assert the placement into that gap earns the row-completion score (fails while the snake
+  counts as solid); verify `node --test tests/bot.test.js` passes
 
 ## Workflow follow-up
 

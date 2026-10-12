@@ -24,6 +24,21 @@ The game must know WHY it ended. Today `gameOver()` takes no cause. Plan:
 Existing callers that invoke `gameOver()` with no argument (tests, harness) keep working because the
 new `reason` parameter is optional; `gameOverReason` stays null and the score comparison applies.
 
+## Bot: the snake is not part of the stack
+
+The placement model read the snake as solid blocks: `occupancy()` marked SOLID cells, `bodyCells()`
+cells and the head's next-step cell. That made three board features wrong at once. `countFullRows`
+called a row full when its only gap held a snake cell, so the bot never credited a row it could not
+actually clear. `stackStats` counted holes and stack height against a phantom stack, so the snake
+scored as roughly 100 points of penalty on an empty board. `rowProgress` counted snake cells as
+filled. The result was placements on top of filled cells and towers on an empty board.
+
+Plan: `occupancy(cells)` reads SOLID cells plus the simulated piece cells only. A new `snakeCellAt(r,
+c)` answers whether the snake blocks a cell (its body, or the cell the head steps into next).
+`simulateScore` uses it for the small `snakePenalty` instead of reading the occupancy grid. Row
+completion, holes and stack height therefore match the real board, and the snake keeps only its
+bounded, additive influence.
+
 ## Bot: avoid being eaten (bounded, additive)
 
 `js/bot.js` `simulateScore(cells)` becomes `simulateScore(cells, row)`; `choosePieceMove` passes the

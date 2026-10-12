@@ -190,7 +190,10 @@ function landingCells(shape, col, startRow) {
   return cells;
 }
 
-// Occupancy grid: every solid cell on the board plus the simulated cells.
+// Occupancy grid: solid blocks plus the simulated cells. The snake is NOT in
+// this grid. A snake cell is not a solid block: it does not fill a row, so a
+// row the snake is sitting in never reads as complete, and it does not bury a
+// hole or raise the stack. The snake is scored separately, as a small penalty.
 function occupancy(cells) {
   const occ = [];
   for (let r = 0; r < ROWS; r++) {
@@ -198,24 +201,18 @@ function occupancy(cells) {
     for (let c = 0; c < COLS; c++) row.push(getCell(r, c) === SOLID);
     occ.push(row);
   }
-  // Snake body cells are occupied: a landed block on a snake cell is penalized.
-  for (const seg of bodyCells()) {
-    if (seg.r >= 0 && seg.r < ROWS && seg.c >= 0 && seg.c < COLS) {
-      occ[seg.r][seg.c] = true;
-    }
-  }
-  // The head's next-step cell is occupied too: the snake moves before a falling
-  // piece lands, so a block is scored against the snake's predicted path, not
-  // its stale position. This keeps a landed block from being buried under a
-  // snake that is about to move away from the cell it currently holds.
-  const head = game.snake[0];
-  if (head) {
-    const nr = wrap(head.r + game.dir.r, ROWS);
-    const nc = wrap(head.c + game.dir.c, COLS);
-    occ[nr][nc] = true;
-  }
   for (const [r, c] of cells) occ[r][c] = true;
   return occ;
+}
+
+// A cell the snake blocks now: its body, or the cell the head steps into next.
+// The snake moves before a falling piece lands, so the predicted cell counts.
+function snakeCellAt(r, c) {
+  const head = game.snake[0];
+  if (head && wrap(head.r + game.dir.r, ROWS) === r && wrap(head.c + game.dir.c, COLS) === c) {
+    return true;
+  }
+  return bodyCells().some((seg) => seg.r === r && seg.c === c);
 }
 
 function countFullRows(occ) {
@@ -275,7 +272,7 @@ function simulateScore(cells, row) {
   const { holes, height } = stackStats(occ);
   let snakePenalty = 0;
   for (const [r, c] of cells) {
-    if (baseOcc[r][c]) snakePenalty += 1;
+    if (snakeCellAt(r, c)) snakePenalty += 1;
   }
   // Row progress: for each row that is not yet full but has most of its
   // cells filled, reward placing the piece there.

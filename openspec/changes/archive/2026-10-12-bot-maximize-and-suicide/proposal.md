@@ -27,6 +27,12 @@ win rule.
   bounded, additive penalty for landing cells the snake can reach before the piece lands, so the bot
   prefers placements the snake cannot intercept. It never overrides the primary board score
   (row completion, holes, height).
+- **FIXED: the placement model no longer treats the snake as solid blocks.** The snake body and the
+  head's next-step cell were part of the occupancy grid, so a row whose only gap held a snake cell
+  read as already full (never clearable), holes and stack height were measured against a phantom
+  stack, and the bot stacked pieces on top of filled cells instead of filling real gaps. The
+  occupancy grid now holds solid blocks and the simulated piece only; the snake keeps a small
+  additive penalty.
 - **NEW: suicide gives the opponent an automatic win, symmetrically.** If the snake dies (touches a
   solid block or its own body), the Tetris side wins regardless of scores. If the stack tops out
   (a piece lands with no cell inside the playfield), the Snake side wins regardless of scores. The

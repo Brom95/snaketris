@@ -367,6 +367,19 @@ test('bot avoids a placement the snake can eat before the piece lands', () => {
   assert.equal(target.col, 5, 'bot picked the nearest column the snake cannot reach');
 });
 
+test('bot fills a real row gap: a snake body cell does not count as a filled cell', () => {
+  freshStart('snake');
+  for (let c = 0; c < COLS; c++) if (c !== 8) setCell(19, c, SOLID); // bottom row gap at col 8
+  game.snake = [{ r: 18, c: 8 }, { r: 19, c: 8 }, { r: 19, c: 7 }]; // the body sits in the gap
+  game.dir = { r: 0, c: 1 };
+  const p = placePiece([[0, 0]], 2, 10, 'O'); // the lone cell left of an eaten piece
+  const target = choosePieceMove(p);
+  // The gap holds a snake cell, so a model that reads snake cells as solid would
+  // see row 19 as already full and give the fill no credit. Only a model that
+  // counts solid cells can see the +10 the fill earns.
+  assert.ok(target.score >= 10, 'the bot did not credit the row the gap completes');
+});
+
 // Lateral speed parity: the bot and the player share the pieceMoveAcc gate.
 function countShifts(drive, ticks) {
   let count = 0;
