@@ -63,3 +63,7 @@ Ripwire quality tools compare against **git HEAD** → the repo must be a git re
 - Keep changes minimal and scoped per task; mark tasks only when the specified behavior is fully implemented, not partially done.
 - Do not silently absorb scope beyond the spec; if a task needs more than the spec describes, surface it and route it through the pipeline (opsx-update / add tasks) — per user instructions, stepping back or adding work is allowed.
 - Use the OpenSpec workflow for all spec-related work: propose → explore → apply → sync → archive.
+
+## Reference
+
+- https://accessiblegamedesign.com/guidelines/menus.html → cached at reference/menus.md (2026-10-12)
