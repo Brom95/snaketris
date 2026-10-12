@@ -215,3 +215,26 @@ test('P2 key press that reuses P1 keyboard layout is rejected', () => {
   screens.drainIntents();
   assert.equal(state.game.screen.p2Model, 'arrows');
 });
+
+test('a pieceShift intent moves the piece while the player took the Snake role', () => {
+  fresh();
+  state.game.play.role = 'snake'; // P1 drives the snake; P2 drives the piece.
+  state.startGame();
+  state.game.screen.twoPlayerMode = true;
+  state.game.screen.p1Role = 'snake';
+  state.game.screen.p2Role = 'tetris';
+  state.game.screen.p1Model = 'wasd';
+  state.game.screen.p2Model = 'arrows';
+
+  // One falling piece, and the shift interval already spent.
+  state.game.play.pieces.length = 0;
+  state.game.play.pieces.push({ type: 'O', state: 0, shape: [[0, 0]], col: 4, row: 5 });
+  state.game.play.pieceMoveAcc = 99;
+
+  const before = state.game.play.pieces[0].col;
+  const dir = { r: state.game.play.nextDir.r, c: state.game.play.nextDir.c };
+  input.handleIntent({ action: 'pieceShift', dc: -1 });
+  assert.equal(state.game.play.pieces[0].col, before - 1);
+  // The snake never receives this intent, so its steering stays untouched.
+  assert.deepEqual(state.game.play.nextDir, dir);
+});

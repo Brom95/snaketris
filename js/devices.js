@@ -74,16 +74,51 @@ function menuKeyIntent(k, state) {
   return null;
 }
 
-// Keys while a game runs: the Tetris role steers the falling piece, the Snake
-// role steers the snake.
+// The keyboard layout a key belongs to. js/input.js hit-tests the same helper
+// when it locks a model, so one definition answers both call sites. It accepts
+// the raw e.key form ("ArrowUp") and the lowercased form keyToIntent passes.
+export function keyboardModelForKey(k) {
+  const key = k.toLowerCase();
+  if (key === 'w' || key === 'a' || key === 's' || key === 'd') return 'wasd';
+  if (key === 'arrowup' || key === 'arrowdown' || key === 'arrowleft' || key === 'arrowright') return 'arrows';
+  return null;
+}
+
+// Which character a key drives. In a two-player game each player locked one
+// layout, so the layout that key belongs to names the player, and that
+// player's role decides whether the key steers the snake or the piece. A layout
+// no player locked drives nothing. In a single-player game the one role answers.
+function roleForKeyboardKey(k) {
+  if (!game.screen.twoPlayerMode) return game.play.role;
+  const model = keyboardModelForKey(k);
+  if (model && game.screen.p1Model === model) return game.screen.p1Role || game.play.role;
+  if (model && game.screen.p2Model === model) return game.screen.p2Role;
+  return null;
+}
+
+// The role the gamepad drives: the player who locked the gamepad model. Both
+// players locked it, or nobody did, leaves the first pad on P1 — js/devices.js
+// polls only one pad, so a second pad is out of scope.
+function roleForGamepad() {
+  if (!game.screen.twoPlayerMode) return game.play.role;
+  if (game.screen.p1Model === 'gamepad') return game.screen.p1Role || game.play.role;
+  if (game.screen.p2Model === 'gamepad') return game.screen.p2Role;
+  return game.play.role;
+}
+
+// Keys while a game runs: the Tetris side steers the falling piece, the Snake
+// side steers the snake. Which side a key belongs to is the player's, not one
+// shared role, so two layouts drive two different characters.
 function playingKeyIntent(k) {
-  if (game.play.role === 'tetris') {
+  const role = roleForKeyboardKey(k);
+  if (role === 'tetris') {
     if (k === 'arrowleft' || k === 'a') return { action: 'pieceShift', dc: -1 };
     if (k === 'arrowright' || k === 'd') return { action: 'pieceShift', dc: 1 };
     if (k === 'arrowup' || k === 'w') return { action: 'pieceRotate', cw: false };
     if (k === 'arrowdown' || k === 's') return { action: 'pieceRotate', cw: true };
     return null;
   }
+  if (!role) return null;
   const d = keyToDir(k);
   return d ? { dir: d } : null;
 }
@@ -319,7 +354,7 @@ export function pollController() {
   const stickUpEdge = stickUp && !(padState.prevStickDir && padState.prevStickDir.r === -1);
   const stickDownEdge = stickDown && !(padState.prevStickDir && padState.prevStickDir.r === 1);
 
-  const intent = chooseIntent(game.screen.state, game.play.role, {
+  const intent = chooseIntent(game.screen.state, roleForGamepad(), {
     aEdge, bEdge, upEdge, downEdge,
     stickUpEdge, stickDownEdge,
     leftNow, rightNow, upNow, downNow, stick,

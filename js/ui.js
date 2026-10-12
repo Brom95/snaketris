@@ -24,6 +24,8 @@ let roleLineEl = null;
 let controlErrorEl = null;
 let controlKeyHintsEl = null;
 let controlSummaryEl = null;
+let roleTitleEl = null;
+let controlTitleEl = null;
 
 // One element owner: every id the screen table names is looked up here, once,
 // and handed out to whoever paints or hit-tests it. js/input.js hit-tests the
@@ -48,6 +50,8 @@ export function initUi() {
   controlErrorEl = document.getElementById('control-error');
   controlKeyHintsEl = document.getElementById('control-key-hints');
   controlSummaryEl = document.getElementById('control-summary');
+  roleTitleEl = document.getElementById('role-title');
+  controlTitleEl = document.getElementById('control-title');
   statusElsByPlayer.set(1, document.getElementById('control-p1-status'));
   statusElsByPlayer.set(2, document.getElementById('control-p2-status'));
   summaryElsByPlayer.set(1, document.getElementById('summary-line-1'));
@@ -168,15 +172,46 @@ export function syncViews(recordsBoard) {
     twoPlayerItem.style.display = window.innerWidth > UI_STACK_MAX_WIDTH ? '' : 'none';
   }
   paintHighlights(state);
-  if (roleLineEl) {
-    roleLineEl.textContent =
-      state === SELECT_ROLE && game.screen.twoPlayerMode
-        ? 'P1: ' + game.screen.p1Role + '  /  P2: ' + game.screen.p2Role
-        : '';
-  }
+  paintStageTitle(state, row);
+  paintRoleLine(state);
   if (row !== undefined && row.cursor === 'step') paintControlFeedback(row);
   else if (controlErrorEl) controlErrorEl.textContent = '';
   if (state === RECORDS) fillRecords(recordsBoard || []);
+}
+
+// Every preparation stage says its own name and the action it expects, so the
+// player always knows which stage is active and who acts.
+function paintStageTitle(state, row) {
+  if (roleTitleEl) {
+    roleTitleEl.textContent =
+      state === SELECT_ROLE && game.screen.twoPlayerMode
+        ? 'Choose your side — P1 picks, P2 gets the other'
+        : 'Choose your side';
+  }
+  if (!controlTitleEl) return;
+  const step = row !== undefined && state === SELECT_CONTROL
+    ? itemForStep(row.id, game.screen.gameControlStep) : null;
+  if (!step) {
+    controlTitleEl.textContent = 'Confirm controls';
+    return;
+  }
+  const index = stepItemIndex(row);
+  const position = 'step ' + (index >= 0 ? index + 1 : row.items.length) +
+    ' of ' + row.items.length;
+  controlTitleEl.textContent = 'Confirm controls — ' + position +
+    ': ' + (step.player ? 'P' + step.player : 'both players');
+}
+
+// The role line names both roles through the whole preparation flow. It stays
+// empty until a role is chosen, so it never prints the text "null".
+function paintRoleLine(state) {
+  if (!roleLineEl) return;
+  const named = game.screen.twoPlayerMode && game.screen.p1Role && game.screen.p2Role;
+  const on = named && (state === SELECT_ROLE || state === SELECT_CONTROL);
+  roleLineEl.textContent = on
+    ? 'P1: ' + game.screen.p1Role + '  /  P2: ' + game.screen.p2Role
+    : '';
+  show(roleLineEl, !!roleLineEl.textContent);
 }
 
 // Paint the selection cursor of every screen from the table. The current screen
@@ -208,7 +243,7 @@ function stepItemIndex(row) {
 }
 
 // The step-screen feedback blocks read the same table entry: key hints, the
-// per-player status, the controls, and the shared summary.
+// per-player status, the controls, and the per-player summary on every step.
 function paintControlFeedback(row) {
   const step = itemForStep(row.id, game.screen.gameControlStep);
   if (controlKeyHintsEl) {
@@ -234,14 +269,17 @@ function paintControlFeedback(row) {
       : '';
     show(el, !!el.textContent);
   }
-  const shared = !!step && !step.player;
-  show(controlSummaryEl, shared);
-  if (!shared) return;
+  show(controlSummaryEl, true);
   for (const player of [1, 2]) {
     const el = summaryElsByPlayer.get(player);
     if (!el) continue;
-    el.textContent = 'P' + player + ': ' + roleOf(player) +
-      '  /  ' + markerOf(row, player) + ' ' + (modelOf(player) || '');
+    const role = roleOf(player);
+    const model = modelOf(player);
+    el.textContent = role
+      ? 'P' + player + ': ' + role + '  /  ' + markerOf(row, player) +
+        ' ' + (model || 'not chosen')
+      : '';
+    show(el, !!el.textContent);
   }
 }
 

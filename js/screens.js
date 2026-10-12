@@ -268,9 +268,15 @@ export function resetScreen() {
 }
 
 // The screen the interface shows once a game ends: the shared Start step in
-// two-player mode, the game-over overlay otherwise.
+// two-player mode, the game-over overlay otherwise. game.screen.state must hold
+// a screen id the screen table resolves; a bare step constant hides every view.
 export function applyGameOverScreen() {
-  game.screen.state = game.screen.twoPlayerMode ? GAME_CONTROL_START : GAME_OVER;
+  if (!game.screen.twoPlayerMode) {
+    game.screen.state = GAME_OVER;
+    return;
+  }
+  game.screen.state = SELECT_CONTROL;
+  game.screen.gameControlStep = GAME_CONTROL_START;
 }
 
 // True when a player has locked a model. A locked model is final until the

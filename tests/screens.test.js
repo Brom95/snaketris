@@ -184,3 +184,29 @@ test('an intent the current screen has no item for leaves navigation unchanged',
   assert.equal(state.game.screen.p1Model, null);
   assert.equal(state.game.screen.controlSelect, 0);
 });
+
+test('a finished game lands on a screen the table resolves', async () => {
+  state.resetGame();
+  state.startGame();
+  state.gameOver('body');
+  assert.equal(state.game.screen.state, C.GAME_OVER);
+  assert.equal(screens.SCREEN_BY_ID[state.game.screen.state].id, C.GAME_OVER);
+
+  state.resetGame();
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  state.game.screen.p1Model = 'wasd';
+  state.game.screen.p2Model = 'arrows';
+  state.game.screen.gameControlStep = C.GAME_CONTROL_START;
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.PLAYING);
+
+  state.gameOver('body');
+  assert.equal(state.game.screen.state, C.SELECT_CONTROL);
+  assert.equal(screens.SCREEN_BY_ID[state.game.screen.state].id, C.SELECT_CONTROL);
+  assert.equal(state.game.screen.gameControlStep, C.GAME_CONTROL_START);
+});

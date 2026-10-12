@@ -92,6 +92,19 @@ export function installDomStub() {
     'records-empty': makeEl('records-empty'),
     'menu-items': makeEl('menu-items'),
     'role-items': makeEl('role-items'),
+    // Feedback blocks js/ui.js paints during the preparation stages. They are
+    // not selectable items, so they stay out of the two item lists and out of
+    // hit-testing.
+    'role-line': makeEl('role-line'),
+    'role-title': makeEl('role-title'),
+    'control-title': makeEl('control-title'),
+    'control-summary': makeEl('control-summary'),
+    'summary-line-1': makeEl('summary-line-1'),
+    'summary-line-2': makeEl('summary-line-2'),
+    'control-p1-status': makeEl('control-p1-status'),
+    'control-p2-status': makeEl('control-p2-status'),
+    'control-error': makeEl('control-error'),
+    'control-key-hints': makeEl('control-key-hints'),
   };
   const menuItems = [makeEl('menu-item-play'), makeEl('menu-item-records'), makeEl('menu-item-help')];
   // Back is the third selectable item of the role list, not a separate control.

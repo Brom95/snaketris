@@ -9,7 +9,10 @@ const { game, resetGame, startGame, gameOver } = await import('../js/state.js');
 const { toMenu } = await import('../js/screens.js');
 const ui = await import('../js/ui.js');
 const input = await import('../js/input.js');
-const { ROLE_MARKERS, MENU, SELECT_ROLE, PLAYING, GAME_OVER, RECORDS } = await import('../js/constants.js');
+const {
+  ROLE_MARKERS, MENU, SELECT_ROLE, SELECT_CONTROL, PLAYING, GAME_OVER, RECORDS,
+  GAME_CONTROL_P1, GAME_CONTROL_P2, GAME_CONTROL_START, GAME_CONTROL_PLAYER_MARKERS,
+} = await import('../js/constants.js');
 const { FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H } = await import('../js/constants.js');
 
 ui.initUi();
@@ -20,6 +23,11 @@ const menuViewEl = stub.elements['menu-view'];
 const roleViewEl = stub.elements['role-view'];
 const recordsViewEl = stub.elements['records-view'];
 const recordsListEl = stub.elements['records-list'];
+const roleLineEl = stub.elements['role-line'];
+const roleTitleEl = stub.elements['role-title'];
+const controlTitleEl = stub.elements['control-title'];
+const summaryLine1El = stub.elements['summary-line-1'];
+const summaryLine2El = stub.elements['summary-line-2'];
 
 function on(el) {
   return el.classList.has('on');
@@ -178,4 +186,85 @@ test('the interface band and the field fit read one viewport rule', () => {
   );
   assert.equal(stub.canvas.style.width, (BOARD_W * scale) + 'px');
   assert.equal(stub.canvas.style.height, (BOARD_H * scale) + 'px');
+});
+
+test('the role line names both roles and never prints the text null', () => {
+  resetGame();
+  game.screen.state = SELECT_ROLE;
+  ui.syncViews([]);
+  assert.ok(roleLineEl);
+  assert.equal(roleLineEl.textContent, '');
+  assert.ok(!on(roleLineEl));
+
+  game.screen.twoPlayerMode = true;
+  game.screen.p1Role = 'snake';
+  game.screen.p2Role = 'tetris';
+  ui.syncViews([]);
+  assert.ok(on(roleLineEl));
+  assert.equal(roleLineEl.textContent, 'P1: snake  /  P2: tetris');
+
+  game.screen.state = SELECT_CONTROL;
+  game.screen.gameControlStep = GAME_CONTROL_P1;
+  ui.syncViews([]);
+  assert.ok(on(roleLineEl));
+  assert.equal(roleLineEl.textContent, 'P1: snake  /  P2: tetris');
+
+  game.screen.state = PLAYING;
+  ui.syncViews([]);
+  assert.ok(!on(roleLineEl));
+  assert.equal(roleLineEl.textContent, '');
+});
+
+test('the per-player summary paints on the P1 control step, not only the shared step', () => {
+  resetGame();
+  game.screen.twoPlayerMode = true;
+  game.screen.p1Role = 'snake';
+  game.screen.p2Role = 'tetris';
+  game.screen.state = SELECT_CONTROL;
+  game.screen.gameControlStep = GAME_CONTROL_P1;
+  ui.syncViews([]);
+  assert.ok(on(summaryLine1El));
+  assert.equal(
+    summaryLine1El.textContent,
+    'P1: snake  /  ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' not chosen',
+  );
+  assert.ok(on(summaryLine2El));
+  assert.equal(
+    summaryLine2El.textContent,
+    'P2: tetris  /  ' + GAME_CONTROL_PLAYER_MARKERS[2] + ' not chosen',
+  );
+
+  game.screen.p1Model = 'wasd';
+  ui.syncViews([]);
+  assert.equal(
+    summaryLine1El.textContent,
+    'P1: snake  /  ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' wasd',
+  );
+});
+
+test('initUi resolves both stage titles and each stage names itself, its position, and its actor', () => {
+  resetGame();
+  assert.ok(roleTitleEl);
+  assert.ok(controlTitleEl);
+
+  game.screen.state = SELECT_ROLE;
+  ui.syncViews([]);
+  assert.equal(roleTitleEl.textContent, 'Choose your side');
+
+  game.screen.twoPlayerMode = true;
+  ui.syncViews([]);
+  assert.equal(roleTitleEl.textContent, 'Choose your side — P1 picks, P2 gets the other');
+
+  game.screen.state = SELECT_CONTROL;
+  game.screen.gameControlStep = GAME_CONTROL_P1;
+  ui.syncViews([]);
+  assert.equal(controlTitleEl.textContent, 'Confirm controls — step 1 of 3: P1');
+
+  game.screen.gameControlStep = GAME_CONTROL_P2;
+  ui.syncViews([]);
+  assert.equal(controlTitleEl.textContent, 'Confirm controls — step 2 of 3: P2');
+
+  game.screen.gameControlStep = GAME_CONTROL_START;
+  ui.syncViews([]);
+  assert.equal(controlTitleEl.textContent, 'Confirm controls — step 3 of 3: both players');
 });

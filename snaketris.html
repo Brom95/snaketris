@@ -138,13 +138,15 @@
     </div>
     <div id="role-view" class="view">
       <h2 id="role-title">Choose your side</h2>
-      <p id="role-line" class="view"></p>
       <ul id="role-items">
         <li id="role-item-snake" tabindex="-1">🐍 Snake</li>
         <li id="role-item-tetris" tabindex="-1">🏗️ Tetris</li>
         <li id="role-back" tabindex="-1">Back</li>
       </ul>
     </div>
+    <!-- The role line sits outside #role-view so js/ui.js can paint it during the
+         control steps too, not only on the role screen. -->
+    <p id="role-line" class="view"></p>
     <div id="control-view" class="view">
       <h2 id="control-title">Confirm controls</h2>
       <ul id="control-items">

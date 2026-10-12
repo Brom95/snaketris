@@ -190,3 +190,46 @@ test('clearControllerPrev clears every connected pad on disconnect', () => {
   stub.gamepads.push(padC);
   assert.equal(devices.pollController(), null);
 });
+
+// ---------- Which player a control scheme drives (two-player mode) ----------
+test('two keyboard layouts drive two different characters', () => {
+  startIn('PLAYING', 'snake');
+  game.screen.twoPlayerMode = true;
+  game.screen.p1Role = 'snake';
+  game.screen.p2Role = 'tetris';
+  game.screen.p1Model = 'wasd';
+  game.screen.p2Model = 'arrows';
+
+  // P2 locked the arrow layout and took the Tetris role: arrows drive the piece.
+  assert.deepEqual(devices.keyToIntent('ArrowLeft'), { action: 'pieceShift', dc: -1 });
+  // P1 locked WASD and took the Snake role: WASD steers the snake.
+  assert.deepEqual(devices.keyToIntent('a'), { dir: { r: 0, c: -1 } });
+});
+
+test('a keyboard layout no player locked drives nothing', () => {
+  startIn('PLAYING', 'snake');
+  game.screen.twoPlayerMode = true;
+  game.screen.p1Role = 'snake';
+  game.screen.p2Role = 'tetris';
+  game.screen.p1Model = 'wasd';
+  game.screen.p2Model = null;
+
+  assert.equal(devices.keyToIntent('ArrowLeft'), null);
+  assert.deepEqual(devices.keyToIntent('a'), { dir: { r: 0, c: -1 } });
+});
+
+test('the pad drives the player who locked the gamepad model', () => {
+  startIn('PLAYING', 'snake');
+  game.screen.twoPlayerMode = true;
+  game.screen.p1Role = 'tetris';
+  game.screen.p2Role = 'snake';
+  game.screen.p1Model = 'gamepad';
+  game.screen.p2Model = 'wasd';
+
+  stub.gamepads.length = 0;
+  stub.gamepads.push(makePad([14])); // D-pad left
+  assert.deepEqual(devices.pollController(), { action: 'pieceShift', dc: -1 });
+
+  // P2 kept the WASD layout, so those keys still steer the snake.
+  assert.deepEqual(devices.keyToIntent('a'), { dir: { r: 0, c: -1 } });
+});

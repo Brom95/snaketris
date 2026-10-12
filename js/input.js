@@ -13,6 +13,7 @@ import { hitTargets, layoutRule } from './ui.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
 import {
   keyToIntent,
+  keyboardModelForKey,
   setCanvas as deviceSetCanvas,
   onPointerDown as devicePointerDown,
   onPointerMove as devicePointerMove,
@@ -38,11 +39,15 @@ export function handleIntent(intent) {
   }
   switch (intent.action) {
     case 'pieceShift':
-      if (game.play.role === 'tetris') requestPieceShift(intent.dc);
+      // The piece is human-driven when the player took the Tetris role, and in
+      // a two-player duel one side always drives it. Which side a key belongs
+      // to is resolved in js/devices.js, so this gate only asks whether the
+      // piece has a human driver at all.
+      if (game.screen.twoPlayerMode || game.play.role === 'tetris') requestPieceShift(intent.dc);
       return;
     case 'pieceRotate':
-      if (game.play.role === 'tetris' && game.play.pieces.length > 0) {
-        rotatePiece(game.play.pieces[0], intent.cw);
+      if (game.screen.twoPlayerMode || game.play.role === 'tetris') {
+        if (game.play.pieces.length > 0) rotatePiece(game.play.pieces[0], intent.cw);
       }
       return;
     default:
@@ -62,14 +67,6 @@ export function setDirection(d) {
 // ---------- Thin wrappers: raw event -> intent -> handleIntent ----------
 // These are what initInput registers. Each produces a normalized intent via
 // the device adapter in js/devices.js and routes it through handleIntent.
-
-// Map a layout key to its model name ('wasd' or 'arrows'), or null when the
-// key is not a layout key.
-function keyboardModelForKey(k) {
-  if (k === 'w' || k === 'a' || k === 's' || k === 'd') return 'wasd';
-  if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') return 'arrows';
-  return null;
-}
 
 export function onKey(e) {
   // In SELECT_CONTROL with two-player mode: any layout key locks the current
