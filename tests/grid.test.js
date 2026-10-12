@@ -12,50 +12,50 @@ function freshStart() { resetGame(); startGame(); }
 
 test('wrap-around: right edge wraps to col 0', () => {
   freshStart();
-  const s = game.snake;
+  const s = game.play.snake;
   s[0] = { r: Math.floor(ROWS / 2), c: COLS - 1 };
   s[1] = { r: Math.floor(ROWS / 2), c: COLS - 2 };
   s[2] = { r: Math.floor(ROWS / 2), c: COLS - 3 };
   s[3] = { r: Math.floor(ROWS / 2), c: COLS - 4 };
   moveSnake();
-  assert.equal(game.snake[0].r, Math.floor(ROWS / 2));
-  assert.equal(game.snake[0].c, 0);
+  assert.equal(game.play.snake[0].r, Math.floor(ROWS / 2));
+  assert.equal(game.play.snake[0].c, 0);
 });
 
 test('wrap-around: top edge wraps to row ROWS-1', () => {
   freshStart();
-  const s = game.snake;
+  const s = game.play.snake;
   s[0] = { r: 0, c: 5 }; s[1] = { r: 1, c: 5 };
   s[2] = { r: 2, c: 5 }; s[3] = { r: 3, c: 5 };
-  game.nextDir = { r: -1, c: 0 };
+  game.play.nextDir = { r: -1, c: 0 };
   moveSnake();
-  assert.equal(game.snake[0].r, ROWS - 1);
-  assert.equal(game.snake[0].c, 5);
+  assert.equal(game.play.snake[0].r, ROWS - 1);
+  assert.equal(game.play.snake[0].c, 5);
 });
 
 test('death: solid contact -> GAME_OVER', () => {
   freshStart();
   setCell(Math.floor(ROWS / 2), 7, SOLID); // SOLID ahead of head (mid,6)
   moveSnake();
-  assert.equal(game.state, 'GAME_OVER');
+  assert.equal(game.screen.state, 'GAME_OVER');
 });
 
 test('death: self-collision -> GAME_OVER', () => {
   freshStart();
-  const s = game.snake;
+  const s = game.play.snake;
   s[0] = { r: 5, c: 5 }; s[1] = { r: 6, c: 5 };
   s[2] = { r: 6, c: 6 }; s[3] = { r: 6, c: 7 };
-  game.nextDir = { r: 1, c: 0 }; // into non-tail body cell
+  game.play.nextDir = { r: 1, c: 0 }; // into non-tail body cell
   moveSnake();
-  assert.equal(game.state, 'GAME_OVER');
+  assert.equal(game.screen.state, 'GAME_OVER');
 });
 
 test('death: vacated tail is safe', () => {
   freshStart();
-  const s = game.snake;
+  const s = game.play.snake;
   s[0] = { r: 5, c: 5 }; s[1] = { r: 6, c: 6 };
   s[2] = { r: 6, c: 5 }; s[3] = { r: 5, c: 6 };
-  game.nextDir = { r: 0, c: 1 }; // into vacated tail cell
+  game.play.nextDir = { r: 0, c: 1 }; // into vacated tail cell
   moveSnake();
-  assert.equal(game.state, 'PLAYING');
+  assert.equal(game.screen.state, 'PLAYING');
 });

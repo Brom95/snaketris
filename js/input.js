@@ -8,7 +8,10 @@ import {
   PLAYING, MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER,
   MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS, CONTROL_SCREEN_ITEMS,
 } from './constants.js';
-import { game, toMenu, startGame, lockControlModel, currentControlPlayer, backToRoleSelect, reassignP1, reassignP2 } from './state.js';
+import { game, startGame } from './state.js';
+import {
+  toMenu, lockControlModel, currentControlPlayer, backToRoleSelect, reassignP1, reassignP2,
+} from './screens.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
 import {
   keyToIntent,
@@ -30,12 +33,12 @@ let controlItemsEls = [];
 // Move the highlight one step in the active list: the role list in the
 // sub-menu, the main menu list otherwise. Wrapping keeps the ends reachable.
 function moveSelection(step) {
-  if (game.state === SELECT_ROLE) {
-    game.roleSelect = (game.roleSelect + step + ROLE_SCREEN_ITEMS.length) % ROLE_SCREEN_ITEMS.length;
-  } else if (game.state === SELECT_CONTROL) {
-    game.controlSelect = (game.controlSelect + step + CONTROL_SCREEN_ITEMS.length) % CONTROL_SCREEN_ITEMS.length;
+  if (game.screen.state === SELECT_ROLE) {
+    game.screen.roleSelect = (game.screen.roleSelect + step + ROLE_SCREEN_ITEMS.length) % ROLE_SCREEN_ITEMS.length;
+  } else if (game.screen.state === SELECT_CONTROL) {
+    game.screen.controlSelect = (game.screen.controlSelect + step + CONTROL_SCREEN_ITEMS.length) % CONTROL_SCREEN_ITEMS.length;
   } else {
-    game.menuSelect = (game.menuSelect + step + MENU_ITEMS.length) % MENU_ITEMS.length;
+    game.screen.menuSelect = (game.screen.menuSelect + step + MENU_ITEMS.length) % MENU_ITEMS.length;
   }
 }
 
@@ -43,28 +46,28 @@ function moveSelection(step) {
 // SELECT_ROLE it locks the role and starts the game (or goes to control screen);
 // in SELECT_CONTROL it starts the game when both players have confirmed.
 function confirmSelection() {
-  if (game.state === MENU) {
-    if (game.menuSelect === 0) game.state = SELECT_ROLE;
-    else if (game.menuSelect === 1) {
-      game.twoPlayerMode = true;
-      game.state = SELECT_ROLE;
+  if (game.screen.state === MENU) {
+    if (game.screen.menuSelect === 0) game.screen.state = SELECT_ROLE;
+    else if (game.screen.menuSelect === 1) {
+      game.screen.twoPlayerMode = true;
+      game.screen.state = SELECT_ROLE;
     }
-    else if (game.menuSelect === 2) game.state = RECORDS;
-    else if (game.menuSelect === 3) game.state = HELP;
-  } else if (game.state === SELECT_ROLE) {
-    if (game.roleSelect === ROLE_SCREEN_ITEMS.length - 1) {
+    else if (game.screen.menuSelect === 2) game.screen.state = RECORDS;
+    else if (game.screen.menuSelect === 3) game.screen.state = HELP;
+  } else if (game.screen.state === SELECT_ROLE) {
+    if (game.screen.roleSelect === ROLE_SCREEN_ITEMS.length - 1) {
       toMenu();
       return;
     }
-    game.role = ROLE_ITEMS[game.roleSelect].toLowerCase();
-    if (game.twoPlayerMode) {
-      game.state = SELECT_CONTROL;
+    game.play.role = ROLE_ITEMS[game.screen.roleSelect].toLowerCase();
+    if (game.screen.twoPlayerMode) {
+      game.screen.state = SELECT_CONTROL;
     } else {
       startGame();
     }
-  } else if (game.state === SELECT_CONTROL) {
+  } else if (game.screen.state === SELECT_CONTROL) {
     // Start item: start the game once both players have locked a model.
-    if (game.p1Model && game.p2Model) {
+    if (game.screen.p1Model && game.screen.p2Model) {
       startGame();
       return;
     }
@@ -96,15 +99,15 @@ export function handleIntent(intent) {
       break;
     case 'startGame':
       // R in the main menu opens the role sub-menu; anywhere else it starts.
-      if (game.state === MENU) game.state = SELECT_ROLE;
+      if (game.screen.state === MENU) game.screen.state = SELECT_ROLE;
       else startGame();
       break;
     case 'pieceShift':
-      if (game.role === 'tetris') requestPieceShift(intent.dc);
+      if (game.play.role === 'tetris') requestPieceShift(intent.dc);
       break;
     case 'pieceRotate':
-      if (game.role === 'tetris' && game.pieces.length > 0) {
-        rotatePiece(game.pieces[0], intent.cw);
+      if (game.play.role === 'tetris' && game.play.pieces.length > 0) {
+        rotatePiece(game.play.pieces[0], intent.cw);
       }
       break;
     case 'toMenu':
@@ -112,7 +115,7 @@ export function handleIntent(intent) {
       break;
     case 'lockModel':
       // Any layout key immediately locks the current player's choice.
-      if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
+      if (game.screen.state === SELECT_CONTROL && game.screen.twoPlayerMode) {
         const player = currentControlPlayer();
         if (player) {
           lockControlModel(player, intent.model);
@@ -125,10 +128,10 @@ export function handleIntent(intent) {
 // Shared direction path: PLAYING gate + no-reverse rule. Both keyboard and
 // touch feed here so they obey identical rules.
 export function setDirection(d) {
-  if (game.state !== PLAYING) return;
+  if (game.screen.state !== PLAYING) return;
   // No-reverse rule: block the exact opposite of the current direction.
-  if (d.r === -game.dir.r && d.c === -game.dir.c) return;
-  game.nextDir = d;
+  if (d.r === -game.play.dir.r && d.c === -game.play.dir.c) return;
+  game.play.nextDir = d;
 }
 
 // ---------- Thin wrappers: raw event -> intent -> handleIntent ----------
@@ -147,7 +150,7 @@ export function onKey(e) {
   // In SELECT_CONTROL with two-player mode: any layout key immediately locks
   // the current player's choice. Once both have locked, Enter/Space starts
   // the game. There is no separate confirm step.
-  if (game.state === SELECT_CONTROL && game.twoPlayerMode) {
+  if (game.screen.state === SELECT_CONTROL && game.screen.twoPlayerMode) {
     const k = e.key;
     const model = keyboardModelForKey(k);
     if (model) {
@@ -156,7 +159,7 @@ export function onKey(e) {
       e.preventDefault();
       return;
     }
-    if ((k === ' ' || k === 'Enter') && game.p1Model && game.p2Model) {
+    if ((k === ' ' || k === 'Enter') && game.screen.p1Model && game.screen.p2Model) {
       // Start key: only once both players have locked a model.
       handleIntent({ action: 'confirm' });
       e.preventDefault();
@@ -241,43 +244,43 @@ function firstHit(items, x, y) {
 
 // A click on a main-menu item selects it and opens its view.
 function openMenuItem(i) {
-  game.menuSelect = i;
-  if (i === 0) game.state = SELECT_ROLE;
+  game.screen.menuSelect = i;
+  if (i === 0) game.screen.state = SELECT_ROLE;
   else if (i === 1) {
-    game.twoPlayerMode = true;
-    game.state = SELECT_ROLE;
+    game.screen.twoPlayerMode = true;
+    game.screen.state = SELECT_ROLE;
   }
-  else if (i === 2) game.state = RECORDS;
-  else if (i === 3) game.state = HELP;
+  else if (i === 2) game.screen.state = RECORDS;
+  else if (i === 3) game.screen.state = HELP;
 }
 
 export function onInterfacePointerUp(e) {
   if (canvas && e.target === canvas) return; // board gestures belong to onPointerUp
   const x = e.clientX;
   const y = e.clientY;
-  if (game.state === MENU) {
+  if (game.screen.state === MENU) {
     // The GitHub link is a real anchor: the browser navigates it itself, so a
     // click outside the items selects nothing.
     const item = firstHit(menuItemsEls, x, y);
     if (item >= 0) openMenuItem(item);
     return;
   }
-  if (game.state === SELECT_ROLE) {
+  if (game.screen.state === SELECT_ROLE) {
     // Back is a normal item in the list, so confirming index 2 returns to the
     // menu through the same path as a role choice.
     const item = firstHit(roleItemsEls, x, y);
     if (item >= 0) {
-      game.roleSelect = item;
+      game.screen.roleSelect = item;
       handleIntent({ action: 'confirm' });
     }
     return;
   }
-  if (game.state === SELECT_CONTROL) {
+  if (game.screen.state === SELECT_CONTROL) {
     const item = firstHit(controlItemsEls, x, y);
     if (item >= 0) {
       // The Start item starts the game once both players have locked a model.
       if (item === CONTROL_SCREEN_ITEMS.length - 1) {
-        if (game.p1Model && game.p2Model) {
+        if (game.screen.p1Model && game.screen.p2Model) {
           startGame();
         }
         return;
@@ -304,7 +307,7 @@ export function onInterfacePointerUp(e) {
     }
     return;
   }
-  if (game.state === RECORDS || game.state === HELP || game.state === GAME_OVER) {
+  if (game.screen.state === RECORDS || game.screen.state === HELP || game.screen.state === GAME_OVER) {
     handleIntent({ action: 'toMenu' });
   }
 }

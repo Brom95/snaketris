@@ -19,8 +19,8 @@ check(await stateIs(page, 'SELECT_ROLE'), 'clicking Two Players opens the role s
 
 // Set P1/P2 roles directly on the game object.
 await page.evaluate(() => {
-  window.__game.p1Role = 'snake';
-  window.__game.p2Role = 'tetris';
+  window.__game.screen.p1Role = 'snake';
+  window.__game.screen.p2Role = 'tetris';
 });
 await page.waitForTimeout(200);
 const line = await page.evaluate(

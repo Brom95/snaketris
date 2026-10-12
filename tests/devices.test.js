@@ -68,7 +68,7 @@ test('Tetris role: a centre tap rotates the piece, a side tap still shifts it', 
 // ---------- Gamepad ----------
 test('gamepad SELECT_ROLE: D-pad moves the role, A starts, B returns to menu', () => {
   startIn('SELECT_ROLE');
-  game.roleSelect = 0;
+  game.screen.roleSelect = 0;
 
   stub.gamepads.length = 0;
   stub.gamepads.push(makePad([12])); // D-pad up, first press
@@ -79,16 +79,16 @@ test('gamepad SELECT_ROLE: D-pad moves the role, A starts, B returns to menu', (
 
   stub.gamepads[0] = makePad([0]); // A
   assert.deepEqual(pollAndApply(), { action: 'confirm' });
-  assert.equal(game.state, 'PLAYING');
-  assert.equal(game.role, 'snake'); // wrapped back to index 0 after up then down
+  assert.equal(game.screen.state, 'PLAYING');
+  assert.equal(game.play.role, 'snake'); // wrapped back to index 0 after up then down
 
   startIn('SELECT_ROLE');
-  game.roleSelect = 1;
+  game.screen.roleSelect = 1;
   stub.gamepads[0] = makePad([]);
   pollAndApply();
   stub.gamepads[0] = makePad([1]); // B
   assert.deepEqual(pollAndApply(), { action: 'toMenu' });
-  assert.equal(game.state, 'MENU');
+  assert.equal(game.screen.state, 'MENU');
 });
 
 test('gamepad Tetris role: D-pad left/right shift the piece, up/down rotate', () => {

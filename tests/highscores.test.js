@@ -15,10 +15,10 @@ function clearBoard() {
 test('recordScore stores the role of the side that was played', () => {
   clearBoard();
   resetGame();
-  game.role = 'tetris';
+  game.play.role = 'tetris';
   startGame();
-  game.tetrisScore = 25;
-  game.snakeScore = 3;
+  game.play.tetrisScore = 25;
+  game.play.snakeScore = 3;
   gameOver();
   const board = loadBoard();
   assert.equal(board.length, 1);
@@ -29,10 +29,10 @@ test('recordScore stores the role of the side that was played', () => {
 test('a Snake-role game stores role snake and the snake score', () => {
   clearBoard();
   resetGame();
-  game.role = 'snake';
+  game.play.role = 'snake';
   startGame();
-  game.snakeScore = 9;
-  game.tetrisScore = 2;
+  game.play.snakeScore = 9;
+  game.play.tetrisScore = 2;
   gameOver();
   const board = loadBoard();
   assert.equal(board[0].role, 'snake');

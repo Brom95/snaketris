@@ -19,8 +19,8 @@ const TIERS = [COLORS.tierBlue, COLORS.tierPurple, COLORS.tierGold];
 // order (Math.min(2, ...) keeps the body gold past the last tier).
 export function bodyColor(index) {
   if (index === 0) return COLORS.snakeHead;
-  if (game.overflow < index) return COLORS.snakeBody;
-  const tier = Math.min(2, Math.floor((game.overflow - index) / TIER_WIDTH));
+  if (game.play.overflow < index) return COLORS.snakeBody;
+  const tier = Math.min(2, Math.floor((game.play.overflow - index) / TIER_WIDTH));
   return TIERS[tier];
 }
 
@@ -66,15 +66,15 @@ export function render() {
   }
 
   // Snake
-  for (let i = 0; i < game.snake.length; i++) {
+  for (let i = 0; i < game.play.snake.length; i++) {
     ctx.fillStyle = bodyColor(i);
-    drawCell(game.snake[i].r, game.snake[i].c);
+    drawCell(game.play.snake[i].r, game.play.snake[i].c);
   }
 
   // Falling pieces (edible while falling), drawn after the snake so they
   // appear on top of it.
   ctx.fillStyle = COLORS.edible;
-  for (const p of game.pieces) {
+  for (const p of game.play.pieces) {
     for (const cell of pieceCells(p)) drawCell(cell.r, cell.c);
   }
 }

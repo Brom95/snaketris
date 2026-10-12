@@ -23,17 +23,17 @@ check(await stateIs(page, 'SELECT_CONTROL'), 'selecting a role reaches SELECT_CO
 
 // P1 locks WASD with one key press; no Enter-confirm.
 await page.keyboard.press('w');
-check(await waitFor(page, () => window.__game.p1Model === 'wasd', undefined, 3000),
+check(await waitFor(page, () => window.__game.screen.p1Model === 'wasd', undefined, 3000),
   'P1 locks WASD in one key press');
 
 // P2 cannot reuse WASD (pressing W again is rejected in one step).
 await page.keyboard.press('w');
-check(await waitFor(page, () => window.__game.p2Model === null || window.__game.p2Model !== 'wasd', undefined, 3000),
+check(await waitFor(page, () => window.__game.screen.p2Model === null || window.__game.screen.p2Model !== 'wasd', undefined, 3000),
   'P2 cannot reuse P1\'s WASD model');
 
 // P2 locks arrows with one key press; no Enter-confirm.
 await page.keyboard.press('ArrowUp');
-check(await waitFor(page, () => window.__game.p2Model === 'arrows', undefined, 3000),
+check(await waitFor(page, () => window.__game.screen.p2Model === 'arrows', undefined, 3000),
   'P2 locks Arrows in one key press');
 
 console.log('');

@@ -23,7 +23,7 @@ check(await stateIs(page, 'SELECT_CONTROL'), 'selecting a role reaches SELECT_CO
 
 // A layout key locks P1's model in one step; no Enter-confirm.
 await page.keyboard.press('w');
-check(await waitFor(page, () => window.__game.p1Model === 'wasd', undefined, 3000),
+check(await waitFor(page, () => window.__game.screen.p1Model === 'wasd', undefined, 3000),
   'pressing W locks P1\'s model as WASD in one step');
 
 // The P1 status element becomes visible when a selection is made.
@@ -34,7 +34,7 @@ check(await waitFor(page, () => {
 
 // A layout key locks P2's model in one step; no Enter-confirm.
 await page.keyboard.press('ArrowUp');
-check(await waitFor(page, () => window.__game.p2Model === 'arrows', undefined, 3000),
+check(await waitFor(page, () => window.__game.screen.p2Model === 'arrows', undefined, 3000),
   'pressing an arrow key locks P2\'s model as Arrows in one step');
 
 // The P2 status element becomes visible when a selection is made.
@@ -53,7 +53,7 @@ check(await waitFor(page, () => {
 // Gamepad button locks Gamepad (simulated via a direct state check).
 await page.evaluate(() => {
   // Simulate a gamepad button press by locking the model.
-  window.__game.p1Model = 'gamepad';
+  window.__game.screen.p1Model = 'gamepad';
 });
 check(true, 'a gamepad button can lock Gamepad for P1');
 

@@ -46,37 +46,37 @@ test('full-loop invariants (1000 ticks)', async () => {
   // are overflow blocks. The whole-piece bonus pays score only, so
   // score - ((min(length, MAX_SNAKE_LEN) - 3) + overflow) is a multiple of
   // PIECE_BONUS.
-  assert.ok(state.game.snake.length >= 3);
-  const eaten = Math.min(state.game.snake.length, MAX_SNAKE_LEN) - 3 + state.game.overflow;
-  assert.ok(state.game.snakeScore >= eaten);
-  assert.equal((state.game.snakeScore - eaten) % 4, 0);
+  assert.ok(state.game.play.snake.length >= 3);
+  const eaten = Math.min(state.game.play.snake.length, MAX_SNAKE_LEN) - 3 + state.game.play.overflow;
+  assert.ok(state.game.play.snakeScore >= eaten);
+  assert.equal((state.game.play.snakeScore - eaten) % 4, 0);
   // Sequential spawn: at most one falling piece.
-  assert.ok(state.game.pieces.length <= 1);
+  assert.ok(state.game.play.pieces.length <= 1);
   // State is valid (either still PLAYING or hit GAME_OVER).
-  assert.ok(['PLAYING', 'GAME_OVER'].includes(state.game.state));
+  assert.ok(['PLAYING', 'GAME_OVER'].includes(state.game.screen.state));
 });
 
 test('engine order: the bot decides before the snake steps', async () => {
   state.resetGame();
-  state.game.role = 'tetris';
+  state.game.play.role = 'tetris';
   state.startGame();
-  state.game.pieces.length = 0;
+  state.game.play.pieces.length = 0;
   // A piece resting directly above the head: the bot must turn up.
-  state.game.pieces.push({ shape: [[0, 0], [0, 1], [1, 0], [1, 1]], col: 6, row: 9 });
-  state.game.snakeAcc = snakeTicksPerCell() - 1; // the snake steps this tick
+  state.game.play.pieces.push({ shape: [[0, 0], [0, 1], [1, 0], [1, 1]], col: 6, row: 9 });
+  state.game.play.snakeAcc = snakeTicksPerCell() - 1; // the snake steps this tick
   app.update();
-  assert.deepEqual(state.game.dir, { r: -1, c: 0 });
-  assert.equal(state.game.snakeAcc, 0); // the snake stepped after the bot chose
+  assert.deepEqual(state.game.play.dir, { r: -1, c: 0 });
+  assert.equal(state.game.play.snakeAcc, 0); // the snake stepped after the bot chose
 });
 
 test('engine order: the bot does not steer the snake in Snake role', async () => {
   state.resetGame();
-  state.game.role = 'snake';
+  state.game.play.role = 'snake';
   state.startGame();
   const before = { r: 0, c: 1 };
-  state.game.dir = before;
-  state.game.nextDir = before;
+  state.game.play.dir = before;
+  state.game.play.nextDir = before;
   for (let t = 0; t < 60; t++) app.update();
-  assert.deepEqual(state.game.dir, before);
-  assert.deepEqual(state.game.nextDir, before);
+  assert.deepEqual(state.game.play.dir, before);
+  assert.deepEqual(state.game.play.nextDir, before);
 });

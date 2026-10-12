@@ -3,7 +3,8 @@
 // state-machine logic of its own — the flow in js/input.js routes every
 // intent through one navigation path.
 
-import { game, currentControlPlayer, lockControlModel } from './state.js';
+import { game } from './state.js';
+import { currentControlPlayer, lockControlModel } from './screens.js';
 import { BOARD_W, BOARD_H } from './constants.js';
 
 let canvas = null;
@@ -76,7 +77,7 @@ function menuKeyIntent(k, state) {
 // Keys while a game runs: the Tetris role steers the falling piece, the Snake
 // role steers the snake.
 function playingKeyIntent(k) {
-  if (game.role === 'tetris') {
+  if (game.play.role === 'tetris') {
     if (k === 'arrowleft' || k === 'a') return { action: 'pieceShift', dc: -1 };
     if (k === 'arrowright' || k === 'd') return { action: 'pieceShift', dc: 1 };
     if (k === 'arrowup' || k === 'w') return { action: 'pieceRotate', cw: false };
@@ -94,12 +95,12 @@ const TAP_THRESHOLD = 24; // displacement below one cell classifies as a tap
 // every action; pointer and gamepad cover a subset.
 export function keyToIntent(key) {
   const k = key.toLowerCase();
-  if (game.state === 'MENU' || game.state === 'SELECT_ROLE') return menuKeyIntent(k, game.state);
-  if (game.state === 'PLAYING') return playingKeyIntent(k);
-  if (game.state === 'RECORDS' || game.state === 'HELP') {
+  if (game.screen.state === 'MENU' || game.screen.state === 'SELECT_ROLE') return menuKeyIntent(k, game.screen.state);
+  if (game.screen.state === 'PLAYING') return playingKeyIntent(k);
+  if (game.screen.state === 'RECORDS' || game.screen.state === 'HELP') {
     return (k === 'enter' || k === ' ' || k === 'escape') ? { action: 'toMenu' } : null;
   }
-  if (game.state === 'GAME_OVER') {
+  if (game.screen.state === 'GAME_OVER') {
     return (k === 'r' || k === 'enter' || k === ' ') ? { action: 'toMenu' } : null;
   }
   return null;
@@ -134,13 +135,13 @@ export function onPointerUp(e) {
 
   // MENU lives entirely on the page (see onInterfacePointerUp), so a gesture
   // that ends on the board does nothing here.
-  if (game.state === 'MENU') return null;
+  if (game.screen.state === 'MENU') return null;
   // RECORDS / HELP / GAME_OVER: return to the menu.
-  if (game.state === 'RECORDS' || game.state === 'HELP' || game.state === 'GAME_OVER') {
+  if (game.screen.state === 'RECORDS' || game.screen.state === 'HELP' || game.screen.state === 'GAME_OVER') {
     return { action: 'toMenu' };
   }
-  if (game.state !== 'PLAYING') return null;
-  if (game.role === 'tetris') return pieceGesture(dx, dy, end.x);
+  if (game.screen.state !== 'PLAYING') return null;
+  if (game.play.role === 'tetris') return pieceGesture(dx, dy, end.x);
   return snakeGesture(dx, dy, end.x, end.y);
 }
 
@@ -318,7 +319,7 @@ export function pollController() {
   const stickUpEdge = stickUp && !(padState.prevStickDir && padState.prevStickDir.r === -1);
   const stickDownEdge = stickDown && !(padState.prevStickDir && padState.prevStickDir.r === 1);
 
-  const intent = chooseIntent(game.state, game.role, {
+  const intent = chooseIntent(game.screen.state, game.play.role, {
     aEdge, bEdge, upEdge, downEdge,
     stickUpEdge, stickDownEdge,
     leftNow, rightNow, upNow, downNow, stick,
@@ -345,7 +346,7 @@ function chooseIntent(state, role, s) {
   if (state === 'MENU' || state === 'SELECT_ROLE') return menuIntent(state, s);
   // Two-player control screen: A locks the next player's gamepad model, or
   // starts the game once both players have locked. Edge-only, one press.
-  if (state === 'SELECT_CONTROL' && game.twoPlayerMode) {
+  if (state === 'SELECT_CONTROL' && game.screen.twoPlayerMode) {
     const player = currentControlPlayer();
     if (player) return { action: 'lockModel', model: 'gamepad' };
     return { action: 'confirm' };

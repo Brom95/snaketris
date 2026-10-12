@@ -16,7 +16,7 @@ check(!/window\.open/.test(page), 'no scripted navigation in the page');
 
 // ---------- Sources: ui.js owns both, render.js no longer paints them ------
 check(/scoreEl\.textContent = scoreText\(\)/.test(uiSrc), 'ui.js writes the score text from the side scores');
-check(/'Snake ' \+ game\.snakeScore \+ '  ·  Tetris ' \+ game\.tetrisScore/.test(uiSrc), 'the readout text carries both side scores');
+check(/'Snake ' \+ game\.play\.snakeScore \+ '  ·  Tetris ' \+ game\.play\.tetrisScore/.test(uiSrc), 'the readout text carries both side scores');
 check(/show\(statusEl, state === GAME_OVER\)/.test(uiSrc), 'ui.js shows the status message only in GAME_OVER');
 check(!/position: fixed/.test(uiSrc), 'ui.js never pins the readout over the field');
 check(/FIELD_V_GAP_MOBILE/.test(uiSrc), 'ui.js uses the mobile gap when it measures the interface band');
@@ -45,7 +45,7 @@ const { game } = await import('../js/state.js');
 initUi();
 syncViews(null);
 
-check(game.state === MENU, 'the stubbed game starts in MENU');
+check(game.screen.state === MENU, 'the stubbed game starts in MENU');
 check(dom.el('score').textContent === 'Snake 0  ·  Tetris 0', 'the readout shows both side scores at 0 at game start');
 check(dom.classes('menu-view').has('on'), 'the menu view is on screen in MENU');
 check(!dom.classes('status').has('on'), 'the game-over message is hidden outside GAME_OVER');
@@ -53,8 +53,8 @@ check(!dom.classes('records-view').has('on'), 'the records view is hidden in MEN
 
 // Each side score is reported on its own, so stepping one side moves only
 // that side's number in the readout.
-game.snakeScore = 3;
-game.tetrisScore = 1;
+game.play.snakeScore = 3;
+game.play.tetrisScore = 1;
 syncViews(null);
 check(dom.el('score').textContent === 'Snake 3  ·  Tetris 1', 'the readout follows each side score');
 
@@ -62,18 +62,18 @@ check(dom.el('score').textContent === 'Snake 3  ·  Tetris 1', 'the readout foll
 // The field is on screen only in PLAYING and GAME_OVER; while it is hidden the
 // readout returns to the interface flow (clears its inline styles), and it
 // stays in that flow on stacked layouts instead of overlaying the field.
-game.state = MENU;
+game.screen.state = MENU;
 syncViews(null);
 check(!dom.classes('game').has('on'), 'the field is hidden while MENU is shown');
 check(dom.styles('score').position === '', 'the readout clears its inline styles while the field is hidden');
 
-game.state = PLAYING;
+game.screen.state = PLAYING;
 syncViews(null);
 check(dom.classes('game').has('on'), 'the field is on screen in PLAYING');
 check(dom.styles('score').position === '', 'the readout stays in normal flow (no overlay) on stacked layouts');
 check(dom.styles('score').top === '', 'the readout does not pin to the field top edge');
 
-game.state = GAME_OVER;
+game.screen.state = GAME_OVER;
 syncViews(null);
 check(dom.classes('game').has('on'), 'the final board stays visible in GAME_OVER');
 check(dom.classes('status').has('on'), 'the game-over message appears when a game ends');

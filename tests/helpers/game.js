@@ -4,8 +4,8 @@ import { game, resetGame, startGame } from '../../js/state.js';
 
 export function startIn(state = 'PLAYING', role = 'snake') {
   resetGame();
-  game.role = role;
+  game.play.role = role;
   startGame();
-  if (state !== 'PLAYING') game.state = state;
+  if (state !== 'PLAYING') game.screen.state = state;
   return game;
 }

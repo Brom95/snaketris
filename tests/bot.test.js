@@ -16,14 +16,14 @@ const { piecesSystem, requestPieceShift, currentFallSpeed } = await import('../j
 // A fresh game with no falling piece, so each test controls the piece itself.
 function freshStart(role) {
   startIn('PLAYING', role);
-  game.pieces.length = 0;
+  game.play.pieces.length = 0;
   return game;
 }
 
 function placePiece(shape, col, row, type = 'O', state = 0) {
-  game.pieces.length = 0;
-  game.pieces.push({ type, state, shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
-  return game.pieces[0];
+  game.play.pieces.length = 0;
+  game.play.pieces.push({ type, state, shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
+  return game.play.pieces[0];
 }
 
 // Cell offsets sorted by row then column, so two shapes compare as sets.
@@ -34,7 +34,7 @@ function cells(shape) {
 // ---------- Snake pursuit ----------
 test('bot never reverses: the reverse of the current direction is never chosen', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 }; // heading east
+  game.play.dir = { r: 0, c: 1 }; // heading east
   placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 2, 10); // piece west of the head
   const dir = chooseBotDir();
   assert.notDeepEqual(dir, { r: 0, c: -1 }, 'bot chose the reverse direction');
@@ -42,7 +42,7 @@ test('bot never reverses: the reverse of the current direction is never chosen',
 
 test('bot steers toward the nearest piece cell', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 };
+  game.play.dir = { r: 0, c: 1 };
   placePiece([[0, 0]], 6, 8); // single cell above the head
   assert.deepEqual(chooseBotDir(), { r: -1, c: 0 });
 });
@@ -50,7 +50,7 @@ test('bot steers toward the nearest piece cell', () => {
 test('bot aims at the predicted cell one step ahead, not the current one', () => {
   freshStart('tetris');
   // High fall speed so one step crosses a row boundary.
-  game.completedPieces = 121;
+  game.play.completedPieces = 121;
   assert.ok(currentFallSpeed() > 0.8);
   // A single cell at fractional row 8.2 currently occupies (8, 6); after one
   // fall step it occupies (9, 6). The goal is the predicted cell.
@@ -63,7 +63,7 @@ test('bot aims at the predicted cell one step ahead, not the current one', () =>
 
 test('bot avoids a dead-end pocket and keeps an exit (depth-3 survival)', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 }; // heading east
+  game.play.dir = { r: 0, c: 1 }; // heading east
   // The east cell (10,7) is a one-cell pocket: every neighbor but the way back
   // is walled in, so it reaches fewer than three steps (no exit), while every
   // other direction opens onto the board. A target below the head makes the
@@ -78,8 +78,8 @@ test('bot avoids a dead-end pocket and keeps an exit (depth-3 survival)', () => 
 
 test('bot keeps the current direction when another ties on goal value', () => {
   freshStart('tetris');
-  game.snake = [{ r: 10, c: 6 }]; // no body to bias the choice
-  game.dir = { r: -1, c: 0 }; // heading up
+  game.play.snake = [{ r: 10, c: 6 }]; // no body to bias the choice
+  game.play.dir = { r: -1, c: 0 }; // heading up
   placePiece([[0, 0]], 5, 7); // target at (7, 5): up and left tie on distance
   const dir = chooseBotDir();
   assert.deepEqual(dir, { r: -1, c: 0 }, 'bot kept the current heading on a tie');
@@ -87,8 +87,8 @@ test('bot keeps the current direction when another ties on goal value', () => {
 
 test('bot takes a strictly better direction over a tie (anti-oscillation)', () => {
   freshStart('tetris');
-  game.snake = [{ r: 10, c: 6 }];
-  game.dir = { r: -1, c: 0 }; // heading up
+  game.play.snake = [{ r: 10, c: 6 }];
+  game.play.dir = { r: -1, c: 0 }; // heading up
   placePiece([[0, 0]], 7, 12); // target to the lower right: right improves on up
   const dir = chooseBotDir();
   assert.deepEqual(dir, { r: 0, c: 1 }, 'bot took the strictly better direction');
@@ -96,7 +96,7 @@ test('bot takes a strictly better direction over a tie (anti-oscillation)', () =
 
 test('bot skips a direction blocked by a solid block', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 };
+  game.play.dir = { r: 0, c: 1 };
   setCell(10, 7, SOLID); // the cell east of the head
   placePiece([[0, 0], [0, 1]], 7, 10); // target east of the head
   const dir = chooseBotDir();
@@ -106,30 +106,30 @@ test('bot skips a direction blocked by a solid block', () => {
 
 test('bot skips a direction blocked by its own body', () => {
   freshStart('tetris');
-  game.dir = { r: 1, c: 0 };
-  game.snake = [{ r: 10, c: 6 }, { r: 10, c: 5 }, { r: 10, c: 4 }];
+  game.play.dir = { r: 1, c: 0 };
+  game.play.snake = [{ r: 10, c: 6 }, { r: 10, c: 5 }, { r: 10, c: 4 }];
   placePiece([[0, 0], [0, 1]], 5, 10); // nearest cell is the body cell (10,5)
   const dir = chooseBotDir();
   assert.notDeepEqual(dir, { r: 0, c: -1 }, 'bot stepped onto its own body');
-  assert.ok(!game.snake.slice(1, -1).some((s) => s.r === 10 + dir.r && s.c === 6 + dir.c));
+  assert.ok(!game.play.snake.slice(1, -1).some((s) => s.r === 10 + dir.r && s.c === 6 + dir.c));
 });
 
 test('bot keeps the current direction when there is no piece', () => {
   freshStart('tetris');
-  game.dir = { r: 1, c: 0 };
+  game.play.dir = { r: 1, c: 0 };
   assert.deepEqual(chooseBotDir(), { r: 1, c: 0 });
 });
 
 test('bot keeps the current direction when the piece is entirely above the board', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 };
+  game.play.dir = { r: 0, c: 1 };
   placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 4, -5);
   assert.deepEqual(chooseBotDir(), { r: 0, c: 1 });
 });
 
 test('bot keeps the current direction when every direction is unsafe', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 };
+  game.play.dir = { r: 0, c: 1 };
   setCell(9, 6, SOLID);
   setCell(11, 6, SOLID);
   setCell(10, 5, SOLID);
@@ -140,7 +140,7 @@ test('bot keeps the current direction when every direction is unsafe', () => {
 
 test('bot prefers the tied direction that still leaves an exit', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 };
+  game.play.dir = { r: 0, c: 1 };
   setCell(10, 7, SOLID); // east is blocked, so up and down tie on distance
   // Trap the cell below the head so down has no exit.
   setCell(12, 6, SOLID);
@@ -152,7 +152,7 @@ test('bot prefers the tied direction that still leaves an exit', () => {
 
 test('chooseBotDir is deterministic', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 };
+  game.play.dir = { r: 0, c: 1 };
   placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 3, 12);
   const a = chooseBotDir();
   const b = chooseBotDir();
@@ -161,32 +161,32 @@ test('chooseBotDir is deterministic', () => {
 
 test('bot steers the snake only in Tetris role, through the shared steering path', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 };
-  game.nextDir = { r: 0, c: 1 };
+  game.play.dir = { r: 0, c: 1 };
+  game.play.nextDir = { r: 0, c: 1 };
   placePiece([[0, 0]], 6, 8); // cell above the head
   botSystem.update({});
-  assert.deepEqual(game.nextDir, { r: -1, c: 0 });
+  assert.deepEqual(game.play.nextDir, { r: -1, c: 0 });
 
   freshStart('snake');
-  game.dir = { r: 0, c: 1 };
-  game.nextDir = { r: 0, c: 1 };
+  game.play.dir = { r: 0, c: 1 };
+  game.play.nextDir = { r: 0, c: 1 };
   placePiece([[0, 0]], 6, 8);
   botSystem.update({});
-  assert.deepEqual(game.nextDir, { r: 0, c: 1 }); // untouched
+  assert.deepEqual(game.play.nextDir, { r: 0, c: 1 }); // untouched
 });
 
 test('bot obeys the no-reverse rule like the player', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 };
-  game.nextDir = { r: 0, c: 1 };
+  game.play.dir = { r: 0, c: 1 };
+  game.play.nextDir = { r: 0, c: 1 };
   placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 2, 10); // target west
   botSystem.update({});
-  assert.notDeepEqual(game.nextDir, { r: 0, c: -1 });
+  assert.notDeepEqual(game.play.nextDir, { r: 0, c: -1 });
 });
 
 test('bot avoids a landing cell when a safe direction exists', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 }; // heading east
+  game.play.dir = { r: 0, c: 1 }; // heading east
   setCell(11, 7, SOLID); // blocks the piece below row 10 in col 7
   placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 7, 5, 'O', 0); // horizontal O at col 7, row 5
   // The piece lands at row 9: cells (9,7),(9,8),(10,7),(10,8).
@@ -197,7 +197,7 @@ test('bot avoids a landing cell when a safe direction exists', () => {
 
 test('bot prefers a direction with an exit over one without', () => {
   freshStart('tetris');
-  game.dir = { r: 0, c: 1 }; // heading east
+  game.play.dir = { r: 0, c: 1 }; // heading east
   setCell(9, 7, SOLID); // blocks right from (9,6)
   setCell(9, 5, SOLID); // blocks left from (9,6)
   placePiece([[0, 0]], 3, 3); // single cell at (3,3), nearest via up
@@ -226,16 +226,16 @@ test('bot turns the piece when the turned shape scores better', () => {
 
 test('bot does not drop a block on the snake body', () => {
   freshStart('snake');
-  game.snake = [{ r: 19, c: 3 }, { r: 18, c: 3 }]; // head at (19,3), body in bodyCells
+  game.play.snake = [{ r: 19, c: 3 }, { r: 18, c: 3 }]; // head at (19,3), body in bodyCells
   placePiece(TETROMINOES.O[0], 5, 10, 'O', 0);
-  const target = choosePieceMove(game.pieces[0]);
+  const target = choosePieceMove(game.play.pieces[0]);
   assert.notEqual(target.col, 3, 'bot dropped a block on the snake head');
 });
 
 test('bot accounts for the snake head\'s next cell (does not bury a block under the moving snake)', () => {
   freshStart('snake');
-  game.dir = { r: 0, c: 1 }; // the snake moves east next step
-  game.snake = [{ r: 17, c: 5 }, { r: 17, c: 4 }, { r: 17, c: 3 }]; // next cell (17, 6)
+  game.play.dir = { r: 0, c: 1 }; // the snake moves east next step
+  game.play.snake = [{ r: 17, c: 5 }, { r: 17, c: 4 }, { r: 17, c: 3 }]; // next cell (17, 6)
   // Row 17 left half solid; shelf at row 18 cols 6-8; floor at row 19. An O in
   // col 6 fills (17,6)/(17,7) and lands a block on the snake's next cell
   // (17,6); an O in col 7 fills (17,7)/(17,8) and lands nowhere the snake
@@ -254,7 +254,7 @@ test('bot rotates a piece that needs both a shift and a rotation', () => {
   freshStart('snake');
   for (let c = 0; c < COLS - 1; c++) setCell(19, c, SOLID); // bottom row missing col 9
   const p = placePiece(TETROMINOES.I[0], 6, 10, 'I', 0); // horizontal I at col 6
-  game.pieceMoveAcc = snakeTicksPerCell();
+  game.play.pieceMoveAcc = snakeTicksPerCell();
   botSystem.update({});
   assert.notEqual(p.state, 0, 'the bot did not rotate the piece');
   assert.notEqual(p.col, 6, 'the bot did not shift toward the target column');
@@ -264,7 +264,7 @@ test('bot takes exactly one action per decision: one shift toward the target col
   freshStart('snake');
   for (let c = 2; c < COLS; c++) setCell(19, c, SOLID);
   const p = placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 5, 10);
-  game.pieceMoveAcc = snakeTicksPerCell();
+  game.play.pieceMoveAcc = snakeTicksPerCell();
   botSystem.update({});
   assert.equal(p.col, 4); // one step toward col 0
   botSystem.update({}); // the gate blocks a second step in the same interval
@@ -285,25 +285,25 @@ test('bot issues no piece action in Tetris role', () => {
   freshStart('tetris');
   const p = placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 5, 10);
   const before = JSON.stringify([p.shape, p.col, p.row]);
-  game.pieceMoveAcc = snakeTicksPerCell();
+  game.play.pieceMoveAcc = snakeTicksPerCell();
   botSystem.update({});
   assert.equal(JSON.stringify([p.shape, p.col, p.row]), before);
 });
 
 test('bot does nothing when no piece is falling', () => {
   freshStart('snake');
-  game.pieceMoveAcc = snakeTicksPerCell();
+  game.play.pieceMoveAcc = snakeTicksPerCell();
   botSystem.update({});
-  assert.equal(game.pieces.length, 0);
+  assert.equal(game.play.pieces.length, 0);
 });
 
 test('bot does nothing outside PLAYING', () => {
   freshStart('snake');
-  game.state = 'MENU';
+  game.screen.state = 'MENU';
   placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 5, 10);
-  game.pieceMoveAcc = snakeTicksPerCell();
+  game.play.pieceMoveAcc = snakeTicksPerCell();
   botSystem.update({});
-  assert.equal(game.pieces[0].col, 5);
+  assert.equal(game.play.pieces[0].col, 5);
 });
 
 test('choosePieceMove is deterministic', () => {
@@ -316,7 +316,7 @@ test('choosePieceMove is deterministic', () => {
 
 test('equal rows: the bot prefers the placement with no hole', () => {
   freshStart('snake');
-  game.snake = []; // remove the default snake so body cells do not affect occupancy
+  game.play.snake = []; // remove the default snake so body cells do not affect occupancy
   // Rows 10..19 are solid outside cols 4, 5 and 6. Col 4 is solid only from
   // row 18, cols 5 and 6 from row 16. The O piece can only start in col 4 or
   // col 5, and both land at the same height and complete the same two rows
@@ -342,7 +342,7 @@ test('equal rows: the bot prefers the placement with no hole', () => {
 
 test('equal score ties break toward the centre column', () => {
   freshStart('snake');
-  game.snake = []; // remove the default snake so body cells do not affect occupancy
+  game.play.snake = []; // remove the default snake so body cells do not affect occupancy
   const p = placePiece(TETROMINOES.O[0], 5, 10, 'O', 0);
   const target = choosePieceMove(p);
   assert.equal(target.state, 0);
@@ -351,8 +351,8 @@ test('equal score ties break toward the centre column', () => {
 
 test('bot avoids a placement the snake can eat before the piece lands', () => {
   freshStart('snake');
-  game.snake = [{ r: 16, c: 3 }, { r: 16, c: 2 }, { r: 16, c: 1 }];
-  game.dir = { r: -1, c: 0 }; // the head steps to (15, 3) next
+  game.play.snake = [{ r: 16, c: 3 }, { r: 16, c: 2 }, { r: 16, c: 1 }];
+  game.play.dir = { r: -1, c: 0 }; // the head steps to (15, 3) next
   for (let c = 0; c < 4; c++) {
     for (let r = 17; r < ROWS; r++) setCell(r, c, SOLID); // left wall
   }
@@ -370,8 +370,8 @@ test('bot avoids a placement the snake can eat before the piece lands', () => {
 test('bot fills a real row gap: a snake body cell does not count as a filled cell', () => {
   freshStart('snake');
   for (let c = 0; c < COLS; c++) if (c !== 8) setCell(19, c, SOLID); // bottom row gap at col 8
-  game.snake = [{ r: 18, c: 8 }, { r: 19, c: 8 }, { r: 19, c: 7 }]; // the body sits in the gap
-  game.dir = { r: 0, c: 1 };
+  game.play.snake = [{ r: 18, c: 8 }, { r: 19, c: 8 }, { r: 19, c: 7 }]; // the body sits in the gap
+  game.play.dir = { r: 0, c: 1 };
   const p = placePiece([[0, 0]], 2, 10, 'O'); // the lone cell left of an eaten piece
   const target = choosePieceMove(p);
   // The gap holds a snake cell, so a model that reads snake cells as solid would
@@ -384,20 +384,20 @@ test('bot fills a real row gap: a snake body cell does not count as a filled cel
 function countShifts(drive, ticks) {
   let count = 0;
   for (let t = 0; t < ticks; t++) {
-    const before = game.pieces[0].col;
+    const before = game.play.pieces[0].col;
     drive();
     piecesSystem.update({});
-    if (game.pieces[0].col !== before) count += 1;
+    if (game.play.pieces[0].col !== before) count += 1;
   }
   return count;
 }
 
 function parityRun(role, ticks, completedPieces) {
   freshStart(role);
-  game.completedPieces = completedPieces;
+  game.play.completedPieces = completedPieces;
   for (let c = 2; c < COLS; c++) setCell(19, c, SOLID); // target column is 0
   placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 5, 10);
-  game.pieceMoveAcc = 0;
+  game.play.pieceMoveAcc = 0;
   const drive = role === 'snake'
     ? () => botSystem.update({})
     : () => requestPieceShift(-1);
@@ -423,25 +423,25 @@ test('bot lateral speed equals the player lateral speed at the ramped cap', () =
 
 test('bodyCells excludes the tail: an 8-segment snake gives segments 0..6', () => {
   freshStart('tetris');
-  game.snake = [];
-  for (let i = 0; i < 8; i++) game.snake.push({ r: 10, c: 6 - i });
-  assert.deepEqual(bodyCells(), game.snake.slice(0, 7)); // segments 0..6
+  game.play.snake = [];
+  for (let i = 0; i < 8; i++) game.play.snake.push({ r: 10, c: 6 - i });
+  assert.deepEqual(bodyCells(), game.play.snake.slice(0, 7)); // segments 0..6
 });
 
 // ---------- Two-player mode: bot is a no-op ----------
 test('botSystem is a no-op in two-player mode (snake side untouched)', () => {
   freshStart('tetris');
-  game.twoPlayerMode = true;
-  game.dir = { r: 0, c: 1 };
-  game.nextDir = { r: 0, c: 1 };
+  game.screen.twoPlayerMode = true;
+  game.play.dir = { r: 0, c: 1 };
+  game.play.nextDir = { r: 0, c: 1 };
   placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 6, 9);
   botSystem.update({});
-  assert.deepEqual(game.nextDir, { r: 0, c: 1 }); // snake untouched
+  assert.deepEqual(game.play.nextDir, { r: 0, c: 1 }); // snake untouched
 });
 
 test('botSystem is a no-op in two-player mode (piece side untouched)', () => {
   freshStart('snake');
-  game.twoPlayerMode = true;
+  game.screen.twoPlayerMode = true;
   const p = placePiece([[0, 0], [0, 1], [1, 0], [1, 1]], 5, 10);
   botSystem.update({});
   assert.equal(p.col, 5); // piece not shifted

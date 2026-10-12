@@ -4,7 +4,7 @@
 // The menu used to be painted inside the canvas, so this script modelled
 // drawMenu()'s measureText() geometry. The menu is now page markup, so there is
 // no canvas text measurement left to model: the assertions are DOM assertions
-// (a title, three selectable items, the highlight following game.menuSelect)
+// (a title, three selectable items, the highlight following game.screen.menuSelect)
 // plus the keyboard cycle, which must keep performing exactly one menu action
 // per press.
 //
@@ -12,7 +12,8 @@
 
 import { check, makeCanvas, report, stubDom } from './harness.mjs';
 import { MENU_ITEMS, MENU, SELECT_ROLE, RECORDS, HELP } from '../js/constants.js';
-import { game, toMenu } from '../js/state.js';
+import { game } from '../js/state.js';
+import { toMenu } from '../js/screens.js';
 import { initInput, onKey } from '../js/input.js';
 import { initUi, syncViews } from '../js/ui.js';
 import { readFileSync } from 'node:fs';
@@ -69,14 +70,14 @@ check(tabindexOk, 'every item carries tabindex="-1" so the browser never activat
 check(noButtons, 'no <button> element exists: keyboard navigation stays in onKey');
 check(highlightCss, 'the highlight style keys on the .on class (li.on)');
 
-// ---------- Highlight follows game.menuSelect ----------
+// ---------- Highlight follows game.screen.menuSelect ----------
 
-console.log('=== Highlight follows game.menuSelect ===');
+console.log('=== Highlight follows game.screen.menuSelect ===');
 
 toMenu();
 syncViews(null);
 for (let sel = 0; sel < MENU_ITEMS.length; sel++) {
-  game.menuSelect = sel;
+  game.screen.menuSelect = sel;
   syncViews(null);
   const on = items.filter((it) => dom.classes(it.id).has('on')).map((it) => it.id);
   check(on.length === 1 && on[0] === items[sel].id,
@@ -88,47 +89,47 @@ for (let sel = 0; sel < MENU_ITEMS.length; sel++) {
 console.log('=== Keyboard cycle performs one action per press ===');
 
 toMenu();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 press('arrowdown');
-check(game.menuSelect === 1 && game.state === MENU, 'ArrowDown: 0 -> 1');
+check(game.screen.menuSelect === 1 && game.screen.state === MENU, 'ArrowDown: 0 -> 1');
 press('arrowdown');
-check(game.menuSelect === 2 && game.state === MENU, 'ArrowDown: 1 -> 2');
+check(game.screen.menuSelect === 2 && game.screen.state === MENU, 'ArrowDown: 1 -> 2');
 press('arrowdown');
-check(game.menuSelect === 3 && game.state === MENU, 'ArrowDown: 2 -> 3 (Two Players)');
+check(game.screen.menuSelect === 3 && game.screen.state === MENU, 'ArrowDown: 2 -> 3 (Two Players)');
 press('arrowdown');
-check(game.menuSelect === 0 && game.state === MENU, 'ArrowDown: 3 -> 0 (wraps)');
+check(game.screen.menuSelect === 0 && game.screen.state === MENU, 'ArrowDown: 3 -> 0 (wraps)');
 press('arrowup');
-check(game.menuSelect === 3 && game.state === MENU, 'ArrowUp: 0 -> 3 (wraps)');
+check(game.screen.menuSelect === 3 && game.screen.state === MENU, 'ArrowUp: 0 -> 3 (wraps)');
 press('arrowup');
-check(game.menuSelect === 2 && game.state === MENU, 'ArrowUp: 3 -> 2');
+check(game.screen.menuSelect === 2 && game.screen.state === MENU, 'ArrowUp: 3 -> 2');
 
 toMenu();
-game.menuSelect = 1;
+game.screen.menuSelect = 1;
 press('enter');
-check(game.twoPlayerMode && game.state === SELECT_ROLE, 'Enter on "Two Players" opens two-player role select');
+check(game.screen.twoPlayerMode && game.screen.state === SELECT_ROLE, 'Enter on "Two Players" opens two-player role select');
 
 toMenu();
-game.menuSelect = 2;
+game.screen.menuSelect = 2;
 press(' ');
-check(game.state === RECORDS, 'Space on "Records" opens RECORDS');
+check(game.screen.state === RECORDS, 'Space on "Records" opens RECORDS');
 press('escape');
-check(game.state === MENU, 'Escape in RECORDS returns to MENU');
+check(game.screen.state === MENU, 'Escape in RECORDS returns to MENU');
 
 // "Play" no longer starts a game: it opens the role sub-menu.
 toMenu();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 press('enter');
-check(game.state === SELECT_ROLE, 'Enter on "Play" opens the role sub-menu');
+check(game.screen.state === SELECT_ROLE, 'Enter on "Play" opens the role sub-menu');
 
 toMenu();
 press('r');
-check(game.state === SELECT_ROLE, 'R opens the role sub-menu from the menu');
+check(game.screen.state === SELECT_ROLE, 'R opens the role sub-menu from the menu');
 
 // A single press must not advance the selection twice.
 toMenu();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 press('arrowdown');
-check(game.menuSelect === 1, 'one ArrowDown press advances exactly one step');
+check(game.screen.menuSelect === 1, 'one ArrowDown press advances exactly one step');
 
 // ---------- Summary ----------
 

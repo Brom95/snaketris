@@ -105,7 +105,7 @@ resetGame();
 setCell(ROWS - 1, 0, SOLID);
 setCell(ROWS - 1, 1, SOLID);
 setCell(ROWS - 2, 0, SOLID);
-game.pieces = [{ shape: [[0, 0], [0, 1], [1, 0], [1, 1]], col: 3, row: 5 }];
+game.play.pieces = [{ shape: [[0, 0], [0, 1], [1, 0], [1, 1]], col: 3, row: 5 }];
 
 const renderSrc = readFileSync(new URL('../js/render.js', import.meta.url), 'utf8');
 check(!/fillText|measureText|strokeText|drawImage/.test(renderSrc), 'render.js has no text or image drawing left anywhere');
@@ -113,7 +113,7 @@ check(!/drawMenu|drawRecords|drawHelp|drawOverlay|overlayBackground|drawText|dra
 check(!/MENU_ITEMS|MENU_ITEM_Y|MENU_ITEM_HIT_H/.test(renderSrc), 'render.js no longer imports the menu layout constants');
 
 for (const state of [MENU, PLAYING, RECORDS, HELP, GAME_OVER]) {
-  game.state = state;
+  game.screen.state = state;
   calls.length = 0;
   painted.length = 0;
   render();
@@ -124,10 +124,10 @@ for (const state of [MENU, PLAYING, RECORDS, HELP, GAME_OVER]) {
   check(painted.every((p) => FIELD_COLORS.has(p[1])), 'in ' + state + ' only field palette colours are used');
 
   const solids = getGrid().flat().filter((v) => v === SOLID).length;
-  const pieceCells = game.pieces.reduce((n, p) => n + p.shape.length, 0);
+  const pieceCells = game.play.pieces.reduce((n, p) => n + p.shape.length, 0);
   const rects = names.filter((n) => n === 'fillRect').length;
-  check(rects === 1 + solids + pieceCells + game.snake.length,
-    'in ' + state + ' the painted cells are exactly background + ' + solids + ' solid + ' + pieceCells + ' falling + ' + game.snake.length + ' snake');
+  check(rects === 1 + solids + pieceCells + game.play.snake.length,
+    'in ' + state + ' the painted cells are exactly background + ' + solids + ' solid + ' + pieceCells + ' falling + ' + game.play.snake.length + ' snake');
 }
 
 // ---------- 5.2 fitCanvas keeps the contain-fit rule on the canvas alone ----
@@ -170,30 +170,30 @@ function gesture(pointerId, x, y) {
   handleIntent(onPointerUp({ pointerId, clientX: x, clientY: y }));
 }
 
-game.state = PLAYING;
-game.dir = { r: 0, c: 1 };
-game.nextDir = { r: 0, c: 1 };
+game.screen.state = PLAYING;
+game.play.dir = { r: 0, c: 1 };
+game.play.nextDir = { r: 0, c: 1 };
 
 onPointerDown({ pointerId: 1, clientX: 120, clientY: 240 });
 onPointerMove({ pointerId: 1, clientX: 120, clientY: 100 });
 gesture(1, 120, 100);
-check(game.nextDir.r === -1 && game.nextDir.c === 0, 'an upward swipe queues the upward direction');
+check(game.play.nextDir.r === -1 && game.play.nextDir.c === 0, 'an upward swipe queues the upward direction');
 
-game.dir = { r: 0, c: 1 };
-game.nextDir = { r: 0, c: 1 };
+game.play.dir = { r: 0, c: 1 };
+game.play.nextDir = { r: 0, c: 1 };
 onPointerDown({ pointerId: 2, clientX: 200, clientY: 240 });
 gesture(2, 40, 240);
-check(game.nextDir.r === 0 && game.nextDir.c === 1, 'a leftward swipe against a rightward heading is refused by the no-reverse rule');
+check(game.play.nextDir.r === 0 && game.play.nextDir.c === 1, 'a leftward swipe against a rightward heading is refused by the no-reverse rule');
 
-game.dir = { r: 0, c: 1 };
+game.play.dir = { r: 0, c: 1 };
 onPointerDown({ pointerId: 3, clientX: 40, clientY: 100 });
 gesture(3, 42, 102);
-check(game.nextDir.r === -1 && game.nextDir.c === 0, 'a tap above the centre queues the upward direction');
+check(game.play.nextDir.r === -1 && game.play.nextDir.c === 0, 'a tap above the centre queues the upward direction');
 
-game.state = MENU;
+game.screen.state = MENU;
 onPointerDown({ pointerId: 4, clientX: 120, clientY: 240 });
 gesture(4, 120, 100);
-check(game.nextDir.r === -1 && game.nextDir.c === 0, 'outside PLAYING a board gesture queues nothing new');
+check(game.play.nextDir.r === -1 && game.play.nextDir.c === 0, 'outside PLAYING a board gesture queues nothing new');
 
 // ---------- 5.3 Field and interface scale by separate rules -----------------
 dom.setViewport(1920, 1080);

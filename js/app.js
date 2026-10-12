@@ -42,9 +42,9 @@ function fitField(force = false) {
 }
 
 // One fixed-timestep tick: advance the shared tick counter and run every
-// system in declared order. The systems each guard on game.state themselves.
+// system in declared order. The systems each guard on game.screen.state themselves.
 export function update() {
-  game.tick++;
+  game.play.tick++;
   engine.update(ctx);
 }
 
@@ -57,7 +57,7 @@ export function frame(now) {
   for (let i = 0; i < n; i++) update();
   pollController();
   render();
-  syncViews(game.state === 'RECORDS' ? loadBoard() : null);
+  syncViews(game.screen.state === 'RECORDS' ? loadBoard() : null);
   fitField();
 }
 

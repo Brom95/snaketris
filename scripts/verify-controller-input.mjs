@@ -27,7 +27,8 @@
 import { check, makePad, report, stubDom } from './harness.mjs';
 import { pollController, keyToDir, tapToDir, swipeToDir, clearControllerPrev } from '../js/devices.js';
 import { initInput, handleIntent, setDirection } from '../js/input.js';
-import { game, toMenu, startGame, gameOver } from '../js/state.js';
+import { game, startGame, gameOver } from '../js/state.js';
+import { toMenu } from '../js/screens.js';
 import { PLAYING, SELECT_ROLE, MENU, GAME_OVER, RECORDS, HELP, MENU_ITEMS } from '../js/constants.js';
 
 // DPAD_UP=12, DPAD_DOWN=13, DPAD_LEFT=14, DPAD_RIGHT=15, A=0, B=1.
@@ -75,12 +76,12 @@ function resetController() {
 }
 
 // Enter PLAYING with a controllable current direction. The no-reverse rule
-// blocks only the exact opposite of game.dir, so callers pick a
+// blocks only the exact opposite of game.play.dir, so callers pick a
 // non-conflicting dir.
 function startPlaying(dir) {
   startGame();
-  game.dir = dir;
-  game.nextDir = dir;
+  game.play.dir = dir;
+  game.play.nextDir = dir;
 }
 
 function sameDir(a, b) {
@@ -105,67 +106,67 @@ console.log('=== Stick quantization ===');
 
 frame(makePad([], [0.1, 0.1]));
 startPlaying({ r: 0, c: 1 });
-const beforeDead = { ...game.nextDir };
+const beforeDead = { ...game.play.nextDir };
 frames([makePad([], [0.1, 0.1])]);
-check(sameDir(game.nextDir, beforeDead), 'stick in deadzone (0.1, 0.1) is a no-op (nextDir unchanged)');
+check(sameDir(game.play.nextDir, beforeDead), 'stick in deadzone (0.1, 0.1) is a no-op (nextDir unchanged)');
 
 startPlaying({ r: 1, c: 0 }); // down (right not blocked)
 frames([makePad([], [0.8, 0])]);
-check(sameDir(game.nextDir, { r: 0, c: 1 }), 'stick right (0.8, 0)');
+check(sameDir(game.play.nextDir, { r: 0, c: 1 }), 'stick right (0.8, 0)');
 
 startPlaying({ r: 0, c: 1 }); // right (up not blocked)
 frames([makePad([], [0, -0.8])]);
-check(sameDir(game.nextDir, { r: -1, c: 0 }), 'stick up (0, -0.8)');
+check(sameDir(game.play.nextDir, { r: -1, c: 0 }), 'stick up (0, -0.8)');
 
 startPlaying({ r: 0, c: -1 }); // left (down not blocked)
 frames([makePad([], [0, 0.8])]);
-check(sameDir(game.nextDir, { r: 1, c: 0 }), 'stick down (0, 0.8)');
+check(sameDir(game.play.nextDir, { r: 1, c: 0 }), 'stick down (0, 0.8)');
 
 startPlaying({ r: -1, c: 0 }); // up (left not blocked)
 frames([makePad([], [-0.8, 0])]);
-check(sameDir(game.nextDir, { r: 0, c: -1 }), 'stick left (-0.8, 0)');
+check(sameDir(game.play.nextDir, { r: 0, c: -1 }), 'stick left (-0.8, 0)');
 
 startPlaying({ r: 1, c: 0 }); // down
 frames([makePad([], [0.8, 0.4])]);
-check(sameDir(game.nextDir, { r: 0, c: 1 }), 'stick diagonal x-dominant (0.8, 0.4) resolves to right');
+check(sameDir(game.play.nextDir, { r: 0, c: 1 }), 'stick diagonal x-dominant (0.8, 0.4) resolves to right');
 
 startPlaying({ r: 0, c: 1 }); // right
 frames([makePad([], [0.4, -0.8])]);
-check(sameDir(game.nextDir, { r: -1, c: 0 }), 'stick diagonal y-dominant (0.4, -0.8) resolves to up');
+check(sameDir(game.play.nextDir, { r: -1, c: 0 }), 'stick diagonal y-dominant (0.4, -0.8) resolves to up');
 
 startPlaying({ r: 1, c: 0 }); // down
 frames([makePad([], [0.8, 0.1])]);
-check(sameDir(game.nextDir, { r: 0, c: 1 }), 'stick mixed (0.8, 0.1) -> right (y in deadzone)');
+check(sameDir(game.play.nextDir, { r: 0, c: 1 }), 'stick mixed (0.8, 0.1) -> right (y in deadzone)');
 
 // ---------- D-pad steering ----------
 
 console.log('=== D-pad steering ===');
 
-// Each test sets game.dir to a non-opposite direction so the no-reverse rule
+// Each test sets game.play.dir to a non-opposite direction so the no-reverse rule
 // does not interfere; a release frame follows each press (edge-only).
 startPlaying({ r: 0, c: 1 }); // right (up not blocked)
 frames([makePad([UP]), makePad()]);
-check(sameDir(game.nextDir, { r: -1, c: 0 }), 'D-pad up');
+check(sameDir(game.play.nextDir, { r: -1, c: 0 }), 'D-pad up');
 
 startPlaying({ r: 0, c: 1 }); // right (down not blocked)
 frames([makePad([DOWN]), makePad()]);
-check(sameDir(game.nextDir, { r: 1, c: 0 }), 'D-pad down');
+check(sameDir(game.play.nextDir, { r: 1, c: 0 }), 'D-pad down');
 
 startPlaying({ r: 0, c: 1 }); // right (left blocked by no-reverse; checked below)
 frames([makePad([LEFT]), makePad()]);
-check(sameDir(game.nextDir, { r: 0, c: 1 }), 'D-pad left while moving right is blocked (no-reverse rule)');
+check(sameDir(game.play.nextDir, { r: 0, c: 1 }), 'D-pad left while moving right is blocked (no-reverse rule)');
 
 startPlaying({ r: 0, c: -1 }); // left (left not blocked)
 frames([makePad([LEFT]), makePad()]);
-check(sameDir(game.nextDir, { r: 0, c: -1 }), 'D-pad left (moving left)');
+check(sameDir(game.play.nextDir, { r: 0, c: -1 }), 'D-pad left (moving left)');
 
 startPlaying({ r: 1, c: 0 }); // down (right not blocked)
 frames([makePad([RIGHT]), makePad()]);
-check(sameDir(game.nextDir, { r: 0, c: 1 }), 'D-pad right (moving down)');
+check(sameDir(game.play.nextDir, { r: 0, c: 1 }), 'D-pad right (moving down)');
 
 startPlaying({ r: 0, c: 1 }); // right (up not blocked)
 frames([makePad([UP], [-0.8, 0]), makePad()]); // D-pad up + stick left
-check(sameDir(game.nextDir, { r: -1, c: 0 }), 'D-pad up wins over stick left when both pressed');
+check(sameDir(game.play.nextDir, { r: -1, c: 0 }), 'D-pad up wins over stick left when both pressed');
 
 // ---------- No-reverse rejection ----------
 
@@ -173,12 +174,12 @@ console.log('=== No-reverse rejection ===');
 
 startPlaying({ r: 0, c: 1 }); // right
 frames([makePad([UP])]);
-check(sameDir(game.nextDir, { r: -1, c: 0 }), 'right -> up accepted');
+check(sameDir(game.play.nextDir, { r: -1, c: 0 }), 'right -> up accepted');
 frames([makePad([DOWN])]);
-check(sameDir(game.nextDir, { r: 1, c: 0 }), 'up -> down accepted');
+check(sameDir(game.play.nextDir, { r: 1, c: 0 }), 'up -> down accepted');
 startPlaying({ r: 0, c: 1 }); // right again
 frames([makePad([LEFT])]);
-check(sameDir(game.nextDir, { r: 0, c: 1 }), 'right -> left rejected (no-reverse)');
+check(sameDir(game.play.nextDir, { r: 0, c: 1 }), 'right -> left rejected (no-reverse)');
 
 // ---------- Menu navigation with wrapping ----------
 
@@ -187,28 +188,28 @@ check(sameDir(game.nextDir, { r: 0, c: 1 }), 'right -> left rejected (no-reverse
 console.log('=== Menu navigation (wrapping) ===');
 
 toMenu();
-check(game.menuSelect === 0, 'menu starts at 0 (Play)');
+check(game.screen.menuSelect === 0, 'menu starts at 0 (Play)');
 
 frames([makePad([DOWN]), makePad()]);
-check(game.menuSelect === 1, 'D-pad down: 0 -> 1 (Two Players)');
+check(game.screen.menuSelect === 1, 'D-pad down: 0 -> 1 (Two Players)');
 frames([makePad([DOWN]), makePad()]);
-check(game.menuSelect === 2, 'D-pad down: 1 -> 2 (Records)');
+check(game.screen.menuSelect === 2, 'D-pad down: 1 -> 2 (Records)');
 frames([makePad([DOWN]), makePad()]);
-check(game.menuSelect === 3, 'D-pad down: 2 -> 3 (How to Play)');
+check(game.screen.menuSelect === 3, 'D-pad down: 2 -> 3 (How to Play)');
 frames([makePad([DOWN]), makePad()]);
-check(game.menuSelect === 0, 'D-pad down: 3 -> 0 (wraps)');
+check(game.screen.menuSelect === 0, 'D-pad down: 3 -> 0 (wraps)');
 
 toMenu();
 frames([makePad([UP]), makePad()]);
-check(game.menuSelect === 3, 'D-pad up: 0 -> 3 (wraps)');
+check(game.screen.menuSelect === 3, 'D-pad up: 0 -> 3 (wraps)');
 frames([makePad([UP]), makePad()]);
-check(game.menuSelect === 2, 'D-pad up: 3 -> 2');
+check(game.screen.menuSelect === 2, 'D-pad up: 3 -> 2');
 
 toMenu();
 frames([makePad([], [0, 0.8]), makePad()]);
-check(game.menuSelect === 1, 'stick down moves selection 0 -> 1');
+check(game.screen.menuSelect === 1, 'stick down moves selection 0 -> 1');
 frames([makePad([], [0, -0.8]), makePad()]);
-check(game.menuSelect === 0, 'stick up moves selection 1 -> 0 (wraps)');
+check(game.screen.menuSelect === 0, 'stick up moves selection 1 -> 0 (wraps)');
 
 // ---------- A confirm for each of the three menu items ----------
 
@@ -216,27 +217,27 @@ console.log('=== A confirm (each menu item) ===');
 
 resetController();
 toMenu();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 frames([makePad([A])]);
-check(game.state === SELECT_ROLE, 'A on "Play" opens the role screen (SELECT_ROLE)');
+check(game.screen.state === SELECT_ROLE, 'A on "Play" opens the role screen (SELECT_ROLE)');
 
 resetController();
 toMenu();
-game.menuSelect = 1;
+game.screen.menuSelect = 1;
 frames([makePad([A])]);
-check(game.twoPlayerMode && game.state === SELECT_ROLE, 'A on "Two Players" opens two-player role select');
+check(game.screen.twoPlayerMode && game.screen.state === SELECT_ROLE, 'A on "Two Players" opens two-player role select');
 
 resetController();
 toMenu();
-game.menuSelect = 2;
+game.screen.menuSelect = 2;
 frames([makePad([A])]);
-check(game.state === RECORDS, 'A on "Records" opens RECORDS');
+check(game.screen.state === RECORDS, 'A on "Records" opens RECORDS');
 
 resetController();
 toMenu();
-game.menuSelect = 3;
+game.screen.menuSelect = 3;
 frames([makePad([A])]);
-check(game.state === HELP, 'A on "How to Play" opens HELP');
+check(game.screen.state === HELP, 'A on "How to Play" opens HELP');
 
 // ---------- B back from Records and How to Play ----------
 
@@ -244,19 +245,19 @@ console.log('=== B back to menu ===');
 
 resetController();
 toMenu();
-game.menuSelect = 2;
+game.screen.menuSelect = 2;
 frames([makePad([A])]);
-check(game.state === RECORDS, 'entering RECORDS via A');
+check(game.screen.state === RECORDS, 'entering RECORDS via A');
 frames([makePad([B])]);
-check(game.state === MENU, 'B from RECORDS returns to MENU');
+check(game.screen.state === MENU, 'B from RECORDS returns to MENU');
 
 resetController();
 toMenu();
-game.menuSelect = 3;
+game.screen.menuSelect = 3;
 frames([makePad([A])]);
-check(game.state === HELP, 'entering HELP via A');
+check(game.screen.state === HELP, 'entering HELP via A');
 frames([makePad([B])]);
-check(game.state === MENU, 'B from HELP returns to MENU');
+check(game.screen.state === MENU, 'B from HELP returns to MENU');
 
 // ---------- A from game over returns to the menu ----------
 
@@ -266,13 +267,13 @@ resetController();
 // A single-player game over returns to GAME_OVER (two-player mode returns to
 // the shared control screen instead). Clear the flag leaked by the earlier
 // "A on Two Players" demo so this stays a single-player test.
-game.twoPlayerMode = false;
+game.screen.twoPlayerMode = false;
 startGame();
-check(game.state === PLAYING, 'in PLAYING before game over');
+check(game.screen.state === PLAYING, 'in PLAYING before game over');
 gameOver();
-check(game.state === GAME_OVER, 'game over state');
+check(game.screen.state === GAME_OVER, 'game over state');
 frames([makePad([A])]);
-check(game.state === MENU, 'A from GAME_OVER returns to MENU');
+check(game.screen.state === MENU, 'A from GAME_OVER returns to MENU');
 
 // ---------- Edge detection: a held button does not re-fire ----------
 
@@ -280,22 +281,22 @@ console.log('=== Edge detection (hold does not re-fire) ===');
 
 resetController();
 toMenu();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 frames([makePad([A]), makePad([A]), makePad([A])]);
-check(game.state === SELECT_ROLE, 'holding A in menu: fires once -> SELECT_ROLE (no re-fire)');
+check(game.screen.state === SELECT_ROLE, 'holding A in menu: fires once -> SELECT_ROLE (no re-fire)');
 
 resetController();
 toMenu();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 frames([makePad([DOWN]), makePad([DOWN]), makePad([DOWN])]);
-check(game.menuSelect === 1, 'holding D-pad down: selection advances exactly once (0->1)');
+check(game.screen.menuSelect === 1, 'holding D-pad down: selection advances exactly once (0->1)');
 
 resetController();
 toMenu();
-game.menuSelect = 2;
+game.screen.menuSelect = 2;
 frames([makePad([A])]);
 frames([makePad([B]), makePad([B]), makePad([B])]);
-check(game.state === MENU, 'holding B in RECORDS: returns to menu (idempotent, no crash)');
+check(game.screen.state === MENU, 'holding B in RECORDS: returns to menu (idempotent, no crash)');
 
 // ---------- Disconnect stops input and clears stale state ----------
 
@@ -305,29 +306,29 @@ resetController();
 // Single-player game over returns to GAME_OVER (two-player mode returns to the
 // shared control screen instead). Clear the flag leaked by the earlier "A on
 // Two Players" demo so this stays a single-player test.
-game.twoPlayerMode = false;
+game.screen.twoPlayerMode = false;
 startGame();
 gameOver();
 // Frame 1: A pressed (edge) -> toMenu() -> MENU.
 frames([makePad([A])]);
-check(game.state === MENU, 'frame1 A edge in GAME_OVER -> MENU');
+check(game.screen.state === MENU, 'frame1 A edge in GAME_OVER -> MENU');
 // Frame 2: A still held -> no re-fire -> stays MENU.
 frames([makePad([A])]);
-check(game.state === MENU, 'frame2 A held -> no re-fire (stays MENU)');
+check(game.screen.state === MENU, 'frame2 A held -> no re-fire (stays MENU)');
 // Frame 3: disconnect (no gamepad) clears the edge-detection state.
 frames([null]);
 // Frame 4: reconnect with A "still pressed". Because prev was cleared, this is
 // a fresh edge. In MENU with menuSelect 0, A confirms -> SELECT_ROLE.
 frames([makePad([A])]);
-check(game.state === SELECT_ROLE,
-  'reconnect with A: fresh edge fires (prev cleared on disconnect) -> ' + game.state);
+check(game.screen.state === SELECT_ROLE,
+  'reconnect with A: fresh edge fires (prev cleared on disconnect) -> ' + game.screen.state);
 
 // With no gamepad, steering is a no-op.
 startGame();
-game.dir = { r: 0, c: 1 };
-game.nextDir = { r: 0, c: 1 };
+game.play.dir = { r: 0, c: 1 };
+game.play.nextDir = { r: 0, c: 1 };
 frames([null, null, null]);
-check(sameDir(game.nextDir, { r: 0, c: 1 }), 'no gamepad: steering is a no-op (nextDir unchanged)');
+check(sameDir(game.play.nextDir, { r: 0, c: 1 }), 'no gamepad: steering is a no-op (nextDir unchanged)');
 
 // ---------- First connected pad in any slot ----------
 
@@ -338,21 +339,21 @@ resetController();
 startPlaying({ r: 0, c: 1 }); // right (up not blocked)
 dom.setGamepads([null, makePad([UP])]);
 handleIntent(pollController());
-check(sameDir(game.nextDir, { r: -1, c: 0 }), 'pad in slot 1 steers up while slot 0 is empty');
+check(sameDir(game.play.nextDir, { r: -1, c: 0 }), 'pad in slot 1 steers up while slot 0 is empty');
 resetController();
 
 // The first non-null entry wins, so slot 0 takes precedence over a second pad.
 startPlaying({ r: 1, c: 0 }); // down (right not blocked)
 dom.setGamepads([makePad([RIGHT]), makePad([UP])]);
 handleIntent(pollController());
-check(sameDir(game.nextDir, { r: 0, c: 1 }), 'slot 0 pad wins over slot 1 pad (first non-null entry)');
+check(sameDir(game.play.nextDir, { r: 0, c: 1 }), 'slot 0 pad wins over slot 1 pad (first non-null entry)');
 resetController();
 
 // Deeper slots resolve the same way.
 startPlaying({ r: 0, c: -1 }); // left (down not blocked)
 dom.setGamepads([null, null, makePad([DOWN])]);
 handleIntent(pollController());
-check(sameDir(game.nextDir, { r: 1, c: 0 }), 'pad in slot 2 steers down while slots 0-1 are empty');
+check(sameDir(game.play.nextDir, { r: 1, c: 0 }), 'pad in slot 2 steers down while slots 0-1 are empty');
 resetController();
 
 // ---------- A held left stick does not swallow a D-pad edge ----------
@@ -361,24 +362,24 @@ console.log('=== Held left stick does not swallow a D-pad edge ===');
 
 resetController();
 toMenu();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 
 // Frame 1: only the stick is held down -> its own edge moves the selection.
 dom.setGamepads([makePad([], [0, 0.8])]);
 handleIntent(pollController());
-check(game.menuSelect === 1, 'frame1 stick-down edge: 0 -> 1');
+check(game.screen.menuSelect === 1, 'frame1 stick-down edge: 0 -> 1');
 
 // Frame 2: the stick is still held while the D-pad down button (index 13) is
 // freshly pressed. The stick must not mark that button as already pressed, so
 // its unpressed -> pressed edge fires and the selection advances again.
 dom.setGamepads([makePad([DOWN], [0, 0.8])]);
 handleIntent(pollController());
-check(game.menuSelect === 2, 'frame2 D-pad down edge while stick held: 1 -> 2 (edge not swallowed)');
+check(game.screen.menuSelect === 2, 'frame2 D-pad down edge while stick held: 1 -> 2 (edge not swallowed)');
 
 // Frame 3: D-pad released, stick still held -> no new edge on either channel.
 dom.setGamepads([makePad([], [0, 0.8])]);
 handleIntent(pollController());
-check(game.menuSelect === 2, 'frame3 stick held, no new edge: selection stays 2');
+check(game.screen.menuSelect === 2, 'frame3 stick held, no new edge: selection stays 2');
 resetController();
 
 // ---------- initInput registers the gamepad listeners once each ----------

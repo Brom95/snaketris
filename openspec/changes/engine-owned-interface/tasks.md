@@ -8,9 +8,9 @@
 
 ## 2. State split
 
-- [ ] 2.1 Split `js/state.js` into `game.play` (snake, pieces, scores, accumulators, tick, result) and `game.screen` (state, selections, models, control step), keeping `game` as the single root import. Verify `npm test` stays at the documented baseline and a new test asserts a write to one half changes no field of the other half.
-- [ ] 2.2 Move the navigation transitions (`toMenu`, `backToRoleSelect`, `pickP1Role`, `reassignP1`, `reassignP2`, `lockControlModel`, `advanceControlStep`, `currentControlPlayer`, `controlModelAssigned`) out of `state.js` into the screen layer. Verify `state.js` no longer imports `MENU`, `SELECT_CONTROL`, `GAME_CONTROL_P1`, `GAME_CONTROL_P2`, `GAME_CONTROL_START`, and verify `tests/state.test.js` still passes after its imports are repointed.
-- [ ] 2.3 Replace the raw string `'SELECT_ROLE'` in `backToRoleSelect` with the shared screen constant. Verify a test asserts the screen value equals the constant.
+- [x] 2.1 Split `js/state.js` into `game.play` (snake, pieces, scores, accumulators, tick, result) and `game.screen` (state, selections, models, control step), keeping `game` as the single root import. Verify `npm test` stays at the documented baseline and a new test asserts a write to one half changes no field of the other half.
+- [x] 2.2 Move the navigation transitions (`toMenu`, `backToRoleSelect`, `pickP1Role`, `reassignP1`, `reassignP2`, `lockControlModel`, `advanceControlStep`, `currentControlPlayer`, `controlModelAssigned`) out of `state.js` into the screen layer. Verify `state.js` no longer imports `MENU`, `SELECT_CONTROL`, `GAME_CONTROL_P1`, `GAME_CONTROL_P2`, `GAME_CONTROL_START`, and verify `tests/state.test.js` still passes after its imports are repointed.
+- [x] 2.3 Replace the raw string `'SELECT_ROLE'` in `backToRoleSelect` with the shared screen constant. Verify a test asserts the screen value equals the constant.
 
 ## 3. Screen system in the registry
 

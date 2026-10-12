@@ -23,8 +23,8 @@ test('sequential spawn: at most one falling piece at a time', () => {
   let maxPieces = 0;
   for (let t = 0; t < 2000; t++) {
     app.update();
-    maxPieces = Math.max(maxPieces, game.pieces.length);
-    if (game.state === 'GAME_OVER') break;
+    maxPieces = Math.max(maxPieces, game.play.pieces.length);
+    if (game.screen.state === 'GAME_OVER') break;
   }
   assert.ok(maxPieces <= 1, `maxPieces=${maxPieces}`);
 });
@@ -32,16 +32,16 @@ test('sequential spawn: at most one falling piece at a time', () => {
 test('fully consumed piece is followed by a new spawn', () => {
   freshStart();
   const MID = Math.floor(20 / 2);
-  const ps = game.pieces;
+  const ps = game.play.pieces;
   ps.length = 0;
   ps.push({ shape: [[0, 0], [0, 1], [0, 2]], col: 7, row: MID }); // I over head path
   for (let i = 0; i < 3; i++) moveSnake();
-  assert.equal(game.pieces.length, 0);
-  assert.equal(game.snakeScore, 3 + 4); // 3 cells + whole-piece bonus
+  assert.equal(game.play.pieces.length, 0);
+  assert.equal(game.play.snakeScore, 3 + 4); // 3 cells + whole-piece bonus
   let spawned = false;
   for (let t = 0; t < 300; t++) {
     app.update();
-    if (game.pieces.length > 0) { spawned = true; break; }
+    if (game.play.pieces.length > 0) { spawned = true; break; }
   }
   assert.ok(spawned, 'no new piece spawned');
 });
@@ -49,32 +49,32 @@ test('fully consumed piece is followed by a new spawn', () => {
 test('spawn owns an independent shape copy and starts in state 0', () => {
   const before = JSON.stringify(TETROMINOES);
   freshStart();
-  game.pieces.length = 0;
+  game.play.pieces.length = 0;
   spawnPiece();
-  const p = game.pieces[0];
+  const p = game.play.pieces[0];
   assert.ok(PIECE_TYPES.includes(p.type), 'spawned piece has no type');
   assert.equal(p.state, 0);
   assert.equal(p.shape.length, 4);
   assert.notEqual(p.shape, TETROMINOES[p.type][0], 'shape is the shared table array');
   p.shape.length = 0; // simulate the snake eating the piece down to nothing
   assert.equal(JSON.stringify(TETROMINOES), before, 'the table lost cells');
-  game.pieces.length = 0;
+  game.play.pieces.length = 0;
   spawnPiece();
-  assert.equal(game.pieces[0].shape.length, 4);
+  assert.equal(game.play.pieces[0].shape.length, 4);
 });
 
 test('difficulty ramp: one step per three completed pieces, capped at 0.9', () => {
-  game.completedPieces = 0;
+  game.play.completedPieces = 0;
   assert.ok(Math.abs(currentFallSpeed() - 0.04) < 1e-9);
-  game.completedPieces = 2;
+  game.play.completedPieces = 2;
   assert.ok(Math.abs(currentFallSpeed() - 0.04) < 1e-9);
-  game.completedPieces = 3;
+  game.play.completedPieces = 3;
   assert.ok(Math.abs(currentFallSpeed() - 0.04 * 1.08) < 1e-9);
-  game.completedPieces = 5;
+  game.play.completedPieces = 5;
   assert.ok(Math.abs(currentFallSpeed() - 0.04 * 1.08) < 1e-9);
-  game.completedPieces = 6;
+  game.play.completedPieces = 6;
   assert.ok(Math.abs(currentFallSpeed() - 0.04 * 1.08 * 1.08) < 1e-9);
-  game.completedPieces = 123; // floor(123/3) = 41 tiers — past the 0.9 cap
+  game.play.completedPieces = 123; // floor(123/3) = 41 tiers — past the 0.9 cap
   assert.ok(Math.abs(currentFallSpeed() - Math.min(0.9, 0.04 * Math.pow(1.08, 41))) < 1e-9);
 });
 
@@ -82,15 +82,15 @@ test('line clear: full row clears, +10 to the Tetris side, no landed-block rollb
   freshStart();
   for (let c = 0; c < 10; c++) setCell(19, c, SOLID); // fill bottom row
   setCell(18, 3, SOLID); // a solid block above the cleared row
-  game.landedBlocks = 50;
-  const t0 = game.tetrisScore;
-  const s0 = game.snakeScore;
+  game.play.landedBlocks = 50;
+  const t0 = game.play.tetrisScore;
+  const s0 = game.play.snakeScore;
   clearFullRows();
   assert.equal(getCell(19, 0), EMPTY);
   assert.equal(getCell(19, 9), EMPTY);
-  assert.equal(game.tetrisScore, t0 + 10);
-  assert.equal(game.snakeScore, s0); // the snake side is untouched
-  assert.equal(game.landedBlocks, 50); // no rollback on clear
+  assert.equal(game.play.tetrisScore, t0 + 10);
+  assert.equal(game.play.snakeScore, s0); // the snake side is untouched
+  assert.equal(game.play.landedBlocks, 50); // no rollback on clear
   // The solid block above the cleared row dropped by one.
   assert.equal(getCell(18, 3), EMPTY);
   assert.equal(getCell(19, 3), SOLID);
@@ -101,9 +101,9 @@ test('two full rows in one tick: blocks above both drop by two, snake stays put'
   // Fill rows 18 and 17 completely; a solid block sits at row 16 above both.
   for (let c = 0; c < 10; c++) { setCell(18, c, SOLID); setCell(17, c, SOLID); }
   setCell(16, 4, SOLID); // solid above both cleared rows
-  game.snake = [{ r: 16, c: 5 }]; // a snake segment above both cleared rows
-  const t0 = game.tetrisScore;
-  const s0 = game.snakeScore;
+  game.play.snake = [{ r: 16, c: 5 }]; // a snake segment above both cleared rows
+  const t0 = game.play.tetrisScore;
+  const s0 = game.play.snakeScore;
   clearFullRows();
   // Both rows cleared.
   assert.equal(getCell(18, 0), EMPTY);
@@ -112,17 +112,17 @@ test('two full rows in one tick: blocks above both drop by two, snake stays put'
   assert.equal(getCell(16, 4), EMPTY);
   assert.equal(getCell(18, 4), SOLID);
   // Each cleared row awards +10; the snake side is untouched.
-  assert.equal(game.tetrisScore, t0 + 20);
-  assert.equal(game.snakeScore, s0);
+  assert.equal(game.play.tetrisScore, t0 + 20);
+  assert.equal(game.play.snakeScore, s0);
   // Snake segments do not move on a line clear.
-  assert.deepEqual(game.snake, [{ r: 16, c: 5 }]);
+  assert.deepEqual(game.play.snake, [{ r: 16, c: 5 }]);
 });
 
 // ---------- Sideways shift ----------
 function placePiece(shape, col, row, type = 'O', state = 0) {
-  game.pieces.length = 0;
-  game.pieces.push({ type, state, shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
-  return game.pieces[0];
+  game.play.pieces.length = 0;
+  game.play.pieces.push({ type, state, shape: shape.map(([dr, dc]) => [dr, dc]), col, row });
+  return game.play.pieces[0];
 }
 
 test('movePiece: a legal shift moves exactly one cell', () => {
@@ -266,7 +266,7 @@ test('rotation keeps cells the snake already ate gone', () => {
 
 test('a rotation does not interrupt the fall', () => {
   freshStart();
-  game.completedPieces = 0;
+  game.play.completedPieces = 0;
   const p = placePiece(TETROMINOES.T[0], 4, 10, 'T', 0);
   const speed = currentFallSpeed();
   assert.equal(rotatePiece(p, true), true);
@@ -278,42 +278,42 @@ test('a rotation does not interrupt the fall', () => {
 // ---------- Shift cooldown gate ----------
 test('shift gate: two presses inside one interval move the piece one cell', () => {
   freshStart();
-  game.completedPieces = 0;
+  game.play.completedPieces = 0;
   const p = placePiece([[0, 0], [0, 1]], 4, 10);
   const interval = snakeTicksPerCell();
-  game.pieceMoveAcc = interval;
+  game.play.pieceMoveAcc = interval;
   assert.equal(requestPieceShift(1), true);
   assert.equal(p.col, 5);
   assert.equal(requestPieceShift(1), false); // the interval was consumed
   assert.equal(p.col, 5);
-  for (let i = 0; i < interval; i++) game.pieceMoveAcc += 1;
+  for (let i = 0; i < interval; i++) game.play.pieceMoveAcc += 1;
   assert.equal(requestPieceShift(1), true);
   assert.equal(p.col, 6);
 });
 
 test('shift gate: a blocked shift does not consume the interval', () => {
   freshStart();
-  game.completedPieces = 0;
+  game.play.completedPieces = 0;
   const p = placePiece([[0, 0], [0, 1]], 0, 10);
-  game.pieceMoveAcc = snakeTicksPerCell();
+  game.play.pieceMoveAcc = snakeTicksPerCell();
   assert.equal(requestPieceShift(-1), false);
-  assert.equal(game.pieceMoveAcc, snakeTicksPerCell());
+  assert.equal(game.play.pieceMoveAcc, snakeTicksPerCell());
   assert.equal(requestPieceShift(1), true);
   assert.equal(p.col, 1);
 });
 
 test('shift gate: the interval follows the speed ramp', () => {
   freshStart();
-  game.completedPieces = 0;
+  game.play.completedPieces = 0;
   const base = snakeTicksPerCell();
   assert.ok(Math.abs(base - 23) < 1e-9);
-  game.completedPieces = 123; // floor(123/3) = 41 tiers — past the 0.9 cap
+  game.play.completedPieces = 123; // floor(123/3) = 41 tiers — past the 0.9 cap
   const fast = snakeTicksPerCell();
   assert.ok(Math.abs(fast - 1) < 1e-9);
   const p = placePiece([[0, 0], [0, 1]], 4, 10);
-  game.pieceMoveAcc = 0;
+  game.play.pieceMoveAcc = 0;
   assert.equal(requestPieceShift(1), false);
-  game.pieceMoveAcc = 1;
+  game.play.pieceMoveAcc = 1;
   assert.equal(requestPieceShift(1), true);
   assert.equal(p.col, 5);
 });
@@ -321,36 +321,36 @@ test('shift gate: the interval follows the speed ramp', () => {
 // ---------- Landing and top-out ----------
 test('landing pays the Tetris side +3 per solid cell and not the snake side', () => {
   freshStart();
-  game.pieces.length = 0;
+  game.play.pieces.length = 0;
   const p = { shape: [[0, 0], [0, 1], [1, 0], [1, 1]], col: 4, row: 18 };
-  game.pieces.push(p);
-  const t0 = game.tetrisScore;
-  const s0 = game.snakeScore;
+  game.play.pieces.push(p);
+  const t0 = game.play.tetrisScore;
+  const s0 = game.play.snakeScore;
   landPiece(p);
-  assert.equal(game.tetrisScore, t0 + 12);
-  assert.equal(game.snakeScore, s0);
-  assert.equal(game.landedBlocks, 4);
-  assert.equal(game.pieces.length, 0);
-  assert.equal(game.state, 'PLAYING');
+  assert.equal(game.play.tetrisScore, t0 + 12);
+  assert.equal(game.play.snakeScore, s0);
+  assert.equal(game.play.landedBlocks, 4);
+  assert.equal(game.play.pieces.length, 0);
+  assert.equal(game.screen.state, 'PLAYING');
 });
 
 test('top-out: a piece that lands with no cell in the grid ends the game', () => {
   freshStart();
-  game.pieces.length = 0;
+  game.play.pieces.length = 0;
   const p = { shape: [[0, 0], [0, 1], [1, 0], [1, 1]], col: 4, row: -2 }; // fully above row 0
-  game.pieces.push(p);
+  game.play.pieces.push(p);
   landPiece(p);
-  assert.equal(game.state, 'GAME_OVER');
-  assert.equal(game.landedBlocks, 0);
+  assert.equal(game.screen.state, 'GAME_OVER');
+  assert.equal(game.play.landedBlocks, 0);
 });
 
 test('a partial landing does not end the game', () => {
   freshStart();
-  game.pieces.length = 0;
+  game.play.pieces.length = 0;
   const p = { shape: [[0, 0], [0, 1], [1, 0], [1, 1]], col: 4, row: -1 }; // two cells above, two inside
-  game.pieces.push(p);
+  game.play.pieces.push(p);
   landPiece(p);
-  assert.equal(game.state, 'PLAYING');
-  assert.equal(game.landedBlocks, 2);
-  assert.equal(game.tetrisScore, 6);
+  assert.equal(game.screen.state, 'PLAYING');
+  assert.equal(game.play.landedBlocks, 2);
+  assert.equal(game.play.tetrisScore, 6);
 });

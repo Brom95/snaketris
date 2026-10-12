@@ -99,7 +99,7 @@ function clickPage(x, y) {
 }
 
 function menuState() {
-  game.state = MENU;
+  game.screen.state = MENU;
 }
 
 // ---------- Static checks ----------
@@ -128,46 +128,46 @@ check(!MENU_ITEMS.includes('GitHub') && !MENU_ITEMS.includes(GITHUB_URL),
   'the icon is not a selectable menu item');
 
 menuState();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 clickPage(center(ITEMS[3]).x, center(ITEMS[3]).y);
-check(game.state === HELP && game.menuSelect === 3, 'click on "How to Play" selects item 3 and opens HELP');
+check(game.screen.state === HELP && game.screen.menuSelect === 3, 'click on "How to Play" selects item 3 and opens HELP');
 
 menuState();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 clickPage(center(ITEMS[2]).x, center(ITEMS[2]).y);
-check(game.state === RECORDS && game.menuSelect === 2, 'click on "Records" selects item 2 and opens RECORDS');
+check(game.screen.state === RECORDS && game.screen.menuSelect === 2, 'click on "Records" selects item 2 and opens RECORDS');
 
 menuState();
-game.menuSelect = 0;
+game.screen.menuSelect = 0;
 clickPage(center(ITEMS[0]).x, center(ITEMS[0]).y);
-check(game.state === 'SELECT_ROLE', 'click on "Play" opens the role sub-menu');
+check(game.screen.state === 'SELECT_ROLE', 'click on "Play" opens the role sub-menu');
 
 // ---------- The anchor: the browser navigates, the game selects nothing ----------
 
 console.log('=== Clicking the icon selects nothing ===');
 
 menuState();
-game.menuSelect = 1;
+game.screen.menuSelect = 1;
 clickPage(center(ANCHOR).x, center(ANCHOR).y);
-check(game.menuSelect === 1 && game.state === MENU,
+check(game.screen.menuSelect === 1 && game.screen.state === MENU,
   'click inside the anchor box changes no selection and no state (the browser opens the tab)');
 
 menuState();
-game.menuSelect = 1;
+game.screen.menuSelect = 1;
 clickPage(center(ITEMS[0]).x + 200, center(ITEMS[0]).y); // same row, outside every box
-check(game.menuSelect === 1 && game.state === MENU,
+check(game.screen.menuSelect === 1 && game.screen.state === MENU,
   'click outside every item box is a no-op (no row-based hit test survives)');
 
 menuState();
-game.menuSelect = 1;
+game.screen.menuSelect = 1;
 clickPage(center(ITEMS[2]).x, ITEMS[2].top - 4); // 4px above item 2, inside the row gap
-check(game.menuSelect === 1 && game.state === MENU, 'click just above an item box does not select it');
+check(game.screen.menuSelect === 1 && game.screen.state === MENU, 'click just above an item box does not select it');
 
 // A board gesture must never be handled by the interface listener.
 menuState();
-game.menuSelect = 1;
+game.screen.menuSelect = 1;
 onInterfacePointerUp({ target: dom.canvas, clientX: center(ITEMS[2]).x, clientY: center(ITEMS[2]).y });
-check(game.menuSelect === 1 && game.state === MENU,
+check(game.screen.menuSelect === 1 && game.screen.state === MENU,
   'a pointer release whose target is the canvas is ignored by the interface listener');
 
 // ---------- Board gestures in MENU do nothing ----------
@@ -175,13 +175,13 @@ check(game.menuSelect === 1 && game.state === MENU,
 console.log('=== MENU board gesture is inert ===');
 
 menuState();
-game.menuSelect = 1;
-const dirBefore = { ...game.nextDir };
+game.screen.menuSelect = 1;
+const dirBefore = { ...game.play.nextDir };
 onPointerDown({ pointerId: 7, clientX: 120, clientY: 240 });
 onPointerUp({ pointerId: 7, clientX: 120, clientY: 20 }); // swipe up ending on the board
-check(game.state === MENU && game.menuSelect === 1,
+check(game.screen.state === MENU && game.screen.menuSelect === 1,
   'a swipe ending on the board in MENU changes neither state nor selection');
-check(game.nextDir.r === dirBefore.r && game.nextDir.c === dirBefore.c,
+check(game.play.nextDir.r === dirBefore.r && game.play.nextDir.c === dirBefore.c,
   'and it steers nothing (nextDir unchanged)');
 
 // ---------- Non-menu states still return to the menu from the page ----------
@@ -189,13 +189,13 @@ check(game.nextDir.r === dirBefore.r && game.nextDir.c === dirBefore.c,
 console.log('=== Interface click returns to the menu from RECORDS/HELP/GAME_OVER ===');
 
 for (const [label, enter] of [
-  ['RECORDS', () => { game.state = RECORDS; }],
-  ['HELP', () => { game.state = HELP; }],
-  ['GAME_OVER', () => { game.state = GAME_OVER; }],
+  ['RECORDS', () => { game.screen.state = RECORDS; }],
+  ['HELP', () => { game.screen.state = HELP; }],
+  ['GAME_OVER', () => { game.screen.state = GAME_OVER; }],
 ]) {
   enter();
   clickPage(center(ANCHOR).x, center(ANCHOR).y);
-  check(game.state === MENU, label + ': interface click returns to MENU');
+  check(game.screen.state === MENU, label + ': interface click returns to MENU');
 }
 
 // ---------- Summary ----------

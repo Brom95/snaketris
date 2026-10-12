@@ -79,7 +79,7 @@ check(roleSets.every((set) => set.filter((b) => b.marker === '1').length === 1),
   'the arrow reaches every role item, including Back');
 await menu.keyboard.press('ArrowDown');
 await menu.keyboard.press('ArrowDown');
-check(await waitFor(menu, () => window.__game.roleSelect === 2, undefined, 3000),
+check(await waitFor(menu, () => window.__game.screen.roleSelect === 2, undefined, 3000),
   'the arrow lands on the Back item');
 await menu.waitForTimeout(120);
 check(await menu.evaluate(() => getComputedStyle(document.getElementById('role-back'), '::before').opacity === '1'),
@@ -92,7 +92,7 @@ const tetris = await playRole(context, 'tetris', ROOT);
 let tetrisPage = tetris.page;
 dump('tetris start', await snapshot(tetrisPage));
 check(tetris.ok, 'choosing Tetris starts a Tetris-role game');
-check(await waitFor(tetrisPage, () => window.__game.pieces.length > 0, undefined, 5000),
+check(await waitFor(tetrisPage, () => window.__game.play.pieces.length > 0, undefined, 5000),
   'a piece is falling in Tetris role');
 
 const before = await snapshot(tetrisPage);
@@ -103,7 +103,7 @@ check(before.length === 3, 'the bot snake starts with three segments');
 // inside one interval, in the direction that keeps the piece on the board.
 const gateOpen = await waitFor(tetris.page, (ticks) => {
   const g = window.__game;
-  return g.state === 'PLAYING' && g.pieces.length > 0 && g.pieceMoveAcc >= ticks;
+  return g.screen.state === 'PLAYING' && g.play.pieces.length > 0 && g.play.pieceMoveAcc >= ticks;
 }, SNAKE_BASE_TICKS, 20000);
 check(gateOpen, 'the shared shift gate opens after one snake step');
 if (gateOpen) {
@@ -136,12 +136,12 @@ if (gateOpen) {
   // A rotation must not stop the fall: the next tick still moves the piece.
   const fall = await tetris.page.evaluate(async () => {
     const pieces = await import('/js/pieces.js');
-    const p = window.__game.pieces[0];
+    const p = window.__game.play.pieces[0];
     if (!p) return null;
     const row = p.row;
     const turned = pieces.rotatePiece(p, true);
     pieces.stepPiece(p);
-    const landed = window.__game.pieces.indexOf(p) === -1;
+    const landed = window.__game.play.pieces.indexOf(p) === -1;
     return { turned, advanced: p.row > row || landed, speed: pieces.currentFallSpeed() };
   });
   check(fall !== null && fall.advanced,
@@ -153,7 +153,7 @@ check(await centreTapRotates(tetrisPage),
   'a tap in the centre of the field rotates the falling piece');
 const bothScored = (page) => waitFor(page, () => {
   const g = window.__game;
-  return (g.snakeScore > 0 && g.tetrisScore > 0) || g.state === 'GAME_OVER';
+  return (g.play.snakeScore > 0 && g.play.tetrisScore > 0) || g.screen.state === 'GAME_OVER';
 }, undefined, 60000);
 await bothScored(tetrisPage);
 played = await snapshot(tetrisPage);
@@ -183,11 +183,11 @@ if (tetrisPage !== tetris.page) await tetrisPage.close();
 console.log('=== Snake role: the bot drives the pieces ===');
 const snake = await playRole(context, 'snake', ROOT);
 check(snake.ok, 'choosing Snake starts a Snake-role game');
-check(await waitFor(snake.page, () => window.__game.pieces.length > 0, undefined, 5000),
+check(await waitFor(snake.page, () => window.__game.play.pieces.length > 0, undefined, 5000),
   'a piece is falling in Snake role');
 const botPieceStart = await snapshot(snake.page);
 check(botPieceStart.piece !== null, 'the bot leaves a piece in the air for the player to see');
-check(await waitFor(snake.page, () => window.__game.landedBlocks > 0, undefined, 60000),
+check(await waitFor(snake.page, () => window.__game.play.landedBlocks > 0, undefined, 60000),
   'the bot landed at least one piece');
 const botPieceEnd = await snapshot(snake.page);
 dump('snake role', botPieceEnd);

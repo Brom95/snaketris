@@ -255,7 +255,7 @@ export async function waitFor(page, predicate, arg, timeout = 10000) {
 }
 
 export function stateIs(page, state, timeout = 5000) {
-  return waitFor(page, (wanted) => window.__game.state === wanted, state, timeout);
+  return waitFor(page, (wanted) => window.__game.screen.state === wanted, state, timeout);
 }
 
 // A view class is applied on the next rendered frame, so visibility is checked
@@ -272,18 +272,18 @@ export async function shown(page, selector, want, timeout = 3000) {
 export async function snapshot(page) {
   return page.evaluate(() => {
     const g = window.__game;
-    const piece = g.pieces[0];
+    const piece = g.play.pieces[0];
     return {
-      tick: g.tick,
-      state: g.state,
-      role: g.role,
-      snakeScore: g.snakeScore,
-      tetrisScore: g.tetrisScore,
-      overflow: g.overflow,
-      head: g.snake[0],
-      length: g.snake.length,
-      landed: g.landedBlocks,
-      moveAcc: g.pieceMoveAcc,
+      tick: g.play.tick,
+      state: g.screen.state,
+      role: g.play.role,
+      snakeScore: g.play.snakeScore,
+      tetrisScore: g.play.tetrisScore,
+      overflow: g.play.overflow,
+      head: g.play.snake[0],
+      length: g.play.snake.length,
+      landed: g.play.landedBlocks,
+      moveAcc: g.play.pieceMoveAcc,
       piece: piece ? { col: piece.col, row: piece.row, shape: piece.shape.map((s) => s.join(',')) } : null,
     };
   });
@@ -307,7 +307,7 @@ export async function nearestSolid(page) {
     const g = window.__game;
     const { getCell } = await import('/js/grid.js');
     const { COLS, ROWS, SOLID } = await import('/js/constants.js');
-    const head = g.snake[0];
+    const head = g.play.snake[0];
     let best = null;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -372,7 +372,7 @@ export async function playRole(context, role, rootDir) {
   await page.click('#role-item-' + role);
   const ok = await waitFor(page, (wanted) => {
     const g = window.__game;
-    return g.state === 'PLAYING' && g.role === wanted;
+    return g.screen.state === 'PLAYING' && g.play.role === wanted;
   }, role, 5000);
   if (!ok) console.log('  (state after the role click: ' + JSON.stringify(await snapshot(page)) + ')');
   return { page, ok };
@@ -397,7 +397,7 @@ export async function itemBoxes(page, selector) {
 export async function boxesAtEverySelection(page, selector, count, stepKey) {
   const sets = [];
   for (let i = 0; i < count; i++) {
-    await waitFor(page, (wanted) => window.__game.menuSelect === wanted || window.__game.roleSelect === wanted, i, 3000);
+    await waitFor(page, (wanted) => window.__game.screen.menuSelect === wanted || window.__game.screen.roleSelect === wanted, i, 3000);
     // The highlight class is applied on the next rendered frame.
     await page.waitForTimeout(120);
     sets.push(await itemBoxes(page, selector));

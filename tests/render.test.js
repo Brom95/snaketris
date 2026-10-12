@@ -13,7 +13,7 @@ const C = await import('../js/constants.js');
 test('bodyColor over overflow 0..22', () => {
   const TIERS = [C.COLORS.tierBlue, C.COLORS.tierPurple, C.COLORS.tierGold];
   for (let o = 0; o <= 22; o += 1) {
-    state.game.overflow = o;
+    state.game.play.overflow = o;
     assert.equal(render.bodyColor(0), C.COLORS.snakeHead);
     for (let i = 1; i < 8; i += 1) {
       if (o < i) {

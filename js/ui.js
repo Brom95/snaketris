@@ -1,6 +1,6 @@
 // The page interface: everything the game shows outside the play field.
 // Owns the elements declared in snaketris.html and keeps their visibility in
-// step with `game.state`, the single view authority. Imports only constants.js
+// step with `game.screen.state`, the single view authority. Imports only constants.js
 // and state.js, so the module graph stays one-way (app -> ui).
 import {
   MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER, PLAYING,
@@ -108,17 +108,17 @@ function highlightItem(items, index) {
 
 // Both side scores, each labelled with its side. The chosen role is not named.
 function scoreText() {
-  return 'Snake ' + game.snakeScore + '  ·  Tetris ' + game.tetrisScore;
+  return 'Snake ' + game.play.snakeScore + '  ·  Tetris ' + game.play.tetrisScore;
 }
 
 // The game-over line names the winner and shows both final scores.
 function statusText() {
   let winner = 'Draw';
-  if (game.gameOverReason === 'snake-death') winner = 'Tetris wins';
-  else if (game.gameOverReason === 'top-out') winner = 'Snake wins';
-  else if (game.snakeScore > game.tetrisScore) winner = 'Snake wins';
-  else if (game.tetrisScore > game.snakeScore) winner = 'Tetris wins';
-  return 'Game Over — Snake ' + game.snakeScore + ', Tetris ' + game.tetrisScore + ' — ' + winner +
+  if (game.play.gameOverReason === 'snake-death') winner = 'Tetris wins';
+  else if (game.play.gameOverReason === 'top-out') winner = 'Snake wins';
+  else if (game.play.snakeScore > game.play.tetrisScore) winner = 'Snake wins';
+  else if (game.play.tetrisScore > game.play.snakeScore) winner = 'Tetris wins';
+  return 'Game Over — Snake ' + game.play.snakeScore + ', Tetris ' + game.play.tetrisScore + ' — ' + winner +
     ' — press R or click for menu';
 }
 
@@ -134,10 +134,10 @@ function placeScore() {
   scoreEl.style.width = '';
 }
 
-// The one view authority: `game.state` decides which interface elements are
+// The one view authority: `game.screen.state` decides which interface elements are
 // on screen. Called every frame from the render path.
 export function syncViews(recordsBoard) {
-  const state = game.state;
+  const state = game.screen.state;
   if (scoreEl) scoreEl.textContent = scoreText();
   const fieldOn = state === PLAYING || state === GAME_OVER;
   show(fieldEl, fieldOn);
@@ -156,15 +156,15 @@ export function syncViews(recordsBoard) {
   if (twoPlayerItemEl) {
     twoPlayerItemEl.style.display = window.innerWidth > UI_STACK_MAX_WIDTH ? '' : 'none';
   }
-  if (state === MENU) highlightItem(menuItemsEls, game.menuSelect);
+  if (state === MENU) highlightItem(menuItemsEls, game.screen.menuSelect);
   if (state === SELECT_ROLE) {
     // The menu is off screen here, so its highlight is cleared too.
     highlightItem(menuItemsEls, -1);
-    highlightItem(roleItemsEls, game.roleSelect);
+    highlightItem(roleItemsEls, game.screen.roleSelect);
     // Role line: "P1: X / P2: Y" above the model selection in two-player mode.
     if (roleLineEl) {
-      roleLineEl.textContent = game.twoPlayerMode
-        ? 'P1: ' + game.p1Role + '  /  P2: ' + game.p2Role
+      roleLineEl.textContent = game.screen.twoPlayerMode
+        ? 'P1: ' + game.screen.p1Role + '  /  P2: ' + game.screen.p2Role
         : '';
     }
   } else if (roleLineEl) {
@@ -177,8 +177,8 @@ export function syncViews(recordsBoard) {
     // Step 1 (P1) shows the P1 item, step 2 (P2) shows the P2 item,
     // step 3 (START) shows the Start item.
     let index;
-    if (game.gameControlStep === GAME_CONTROL_P1) index = 0;
-    else if (game.gameControlStep === GAME_CONTROL_P2) index = 1;
+    if (game.screen.gameControlStep === GAME_CONTROL_P1) index = 0;
+    else if (game.screen.gameControlStep === GAME_CONTROL_P2) index = 1;
     else index = 2; // GAME_CONTROL_START
     for (let i = 0; i < controlItemsEls.length; i++) {
       show(controlItemsEls[i], i === index);
@@ -190,44 +190,44 @@ export function syncViews(recordsBoard) {
         [GAME_CONTROL_P2]: 'W / A / S / D  ·  ↑ ↓ ← →  ·  🎯',
         [GAME_CONTROL_START]: 'Enter / Space'
       };
-      controlKeyHintsEl.textContent = hints[game.gameControlStep] || '';
+      controlKeyHintsEl.textContent = hints[game.screen.gameControlStep] || '';
       show(controlKeyHintsEl, true);
     }
     // Show error message when P2 tries same layout as P1.
-    show(controlErrorEl, state === SELECT_CONTROL && !!game.controlError);
-    if (controlErrorEl) controlErrorEl.textContent = game.controlError || '';
+    show(controlErrorEl, state === SELECT_CONTROL && !!game.screen.controlError);
+    if (controlErrorEl) controlErrorEl.textContent = game.screen.controlError || '';
     // Per-player status feedback (assigned layout).
     if (controlP1StatusEl) {
-      controlP1StatusEl.textContent = game.p1Model
-        ? 'P1: ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' ' + game.p1Model.toUpperCase() + ' ✔'
+      controlP1StatusEl.textContent = game.screen.p1Model
+        ? 'P1: ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' ' + game.screen.p1Model.toUpperCase() + ' ✔'
         : '';
       show(controlP1StatusEl, !!controlP1StatusEl.textContent);
     }
     if (controlP2StatusEl) {
-      controlP2StatusEl.textContent = game.p2Model
-        ? 'P2: ' + GAME_CONTROL_PLAYER_MARKERS[2] + ' ' + game.p2Model.toUpperCase() + ' ✔'
+      controlP2StatusEl.textContent = game.screen.p2Model
+        ? 'P2: ' + GAME_CONTROL_PLAYER_MARKERS[2] + ' ' + game.screen.p2Model.toUpperCase() + ' ✔'
         : '';
       show(controlP2StatusEl, !!controlP2StatusEl.textContent);
     }
     // Reassign buttons: visible only after a player locks a model.
-    if (reassignP1El) show(reassignP1El, !!game.p1Model);
-    if (reassignP2El) show(reassignP2El, !!game.p2Model);
+    if (reassignP1El) show(reassignP1El, !!game.screen.p1Model);
+    if (reassignP2El) show(reassignP2El, !!game.screen.p2Model);
     // Back button: always visible during SELECT_CONTROL.
     if (controlBackEl) show(controlBackEl, true);
     // Summary screen on the SHARED (START) step: show both assigned layouts.
-    if (controlSummaryEl && game.gameControlStep === GAME_CONTROL_START) {
+    if (controlSummaryEl && game.screen.gameControlStep === GAME_CONTROL_START) {
       show(controlSummaryEl, true);
       if (summaryLine1El && summaryLine2El) {
-        summaryLine1El.textContent = 'P1: ' + (game.p1Role || game.role) +
-          '  /  ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' ' + (game.p1Model || '');
-        summaryLine2El.textContent = 'P2: ' + (game.p2Role || '') +
-          '  /  ' + GAME_CONTROL_PLAYER_MARKERS[2] + ' ' + (game.p2Model || '');
+        summaryLine1El.textContent = 'P1: ' + (game.screen.p1Role || game.play.role) +
+          '  /  ' + GAME_CONTROL_PLAYER_MARKERS[1] + ' ' + (game.screen.p1Model || '');
+        summaryLine2El.textContent = 'P2: ' + (game.screen.p2Role || '') +
+          '  /  ' + GAME_CONTROL_PLAYER_MARKERS[2] + ' ' + (game.screen.p2Model || '');
       }
     }
   } else if (state !== SELECT_CONTROL && controlErrorEl) {
     controlErrorEl.textContent = '';
   }
-  if (game.state !== MENU && game.state !== SELECT_ROLE && game.state !== SELECT_CONTROL) {
+  if (game.screen.state !== MENU && game.screen.state !== SELECT_ROLE && game.screen.state !== SELECT_CONTROL) {
     // Clear control items when not in either menu state.
     highlightItem(controlItemsEls, -1);
   }

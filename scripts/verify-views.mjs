@@ -112,7 +112,7 @@ check(board.every((e, i) => i === 0 || board[i - 1].score >= e.score),
   'entries stay in descending score order: ' + board.map((e) => e.score).join(', '));
 check(board[0].score === Math.max(...recorded), 'the stored top entry is the highest score recorded: ' + board[0].score);
 
-game.state = RECORDS;
+game.screen.state = RECORDS;
 syncViews(board);
 check(rows().length === board.length, 'records-list holds one row per entry: ' + rows().length);
 const markerRe = new RegExp('^(' + Object.values(ROLE_MARKERS).join('|') + ')  \\d+  ·  \\d{4}-\\d{2}-\\d{2}$');
@@ -140,11 +140,11 @@ check(dom.classes('records-empty').has('on'), 'the empty-state message is shown 
 // ---------- View visibility follows state ----------
 
 console.log('=== Only the active view is shown ===');
-game.state = HELP;
+game.screen.state = HELP;
 syncViews(null);
 check(dom.classes('help-view').has('on') && !dom.classes('records-view').has('on') && !dom.classes('menu-view').has('on'),
   'in HELP only the help view is on');
-game.state = MENU;
+game.screen.state = MENU;
 syncViews(null);
 check(dom.classes('menu-view').has('on') && !dom.classes('help-view').has('on'),
   'in MENU only the menu view is on');

@@ -31,7 +31,7 @@ function torusDelta(a, b, size) {
 // vacates on the next step. At the length cap the snake never grows, so the
 // tail always vacates and its cell is free for the head to step onto.
 export function bodyCells() {
-  return game.snake.slice(0, game.snake.length - 1);
+  return game.play.snake.slice(0, game.play.snake.length - 1);
 }
 
 function occupiedByBody(r, c) {
@@ -79,7 +79,7 @@ function exitCount(r, c, cameFrom, depth = 3) {
 export function nearestTargetCell(head) {
   const speed = currentFallSpeed();
   let best = null;
-  for (const p of game.pieces) {
+  for (const p of game.play.pieces) {
     for (const [dr, dc] of p.shape) {
       const r = Math.floor(p.row + dr + speed);
       const c = p.col + dc;
@@ -96,8 +96,8 @@ export function nearestTargetCell(head) {
 // heading unless another direction strictly improves the goal (anti-oscillation).
 // Returns the current direction when there is no target or no safe direction.
 export function chooseBotDir() {
-  const head = game.snake[0];
-  if (!head) return game.dir;
+  const head = game.play.snake[0];
+  if (!head) return game.play.dir;
   const target = nearestTargetCell(head);
   // When no falling piece remains, the snake must not chase a cell that is
   // already solid (a piece that just landed). If the current direction leads
@@ -107,21 +107,21 @@ export function chooseBotDir() {
     const hc = head.c;
     // If the current direction is safe, keep it. Otherwise steer to a safe
     // direction (the first safe one in DIRS order).
-    const curR = wrap(hr + game.dir.r, ROWS);
-    const curC = wrap(hc + game.dir.c, COLS);
-    if (isSafeCell(curR, curC)) return game.dir;
+    const curR = wrap(hr + game.play.dir.r, ROWS);
+    const curC = wrap(hc + game.play.dir.c, COLS);
+    if (isSafeCell(curR, curC)) return game.play.dir;
     for (const d of DIRS) {
       const nr = wrap(hr + d.r, ROWS);
       const nc = wrap(hc + d.c, COLS);
       if (isSafeCell(nr, nc)) return d;
     }
-    return game.dir;
+    return game.play.dir;
   }
 
   // Cells where a falling piece will come to rest, treated as unsafe (stepping
   // there risks being hit by the landed block).
   const landingSet = new Set();
-  for (const p of game.pieces) {
+  for (const p of game.play.pieces) {
     const cells = landingCells(p.shape, p.col, Math.floor(p.row));
     for (const [r, c] of cells) landingSet.add(`${r},${c}`);
   }
@@ -139,20 +139,20 @@ export function chooseBotDir() {
   // cell).
   const candidates = [];
   for (const d of DIRS) {
-    if (d.r === -game.dir.r && d.c === -game.dir.c) continue;
+    if (d.r === -game.play.dir.r && d.c === -game.play.dir.c) continue;
     const nr = wrap(head.r + d.r, ROWS);
     const nc = wrap(head.c + d.c, COLS);
     if (!isSafeCell(nr, nc)) continue;
     if (landingSet.has(`${nr},${nc}`)) continue;
     candidates.push({ d, nr, nc });
   }
-  if (candidates.length === 0) return game.dir;
+  if (candidates.length === 0) return game.play.dir;
 
   // The current direction counts as an option only when it is safe to keep.
-  const curNr = wrap(head.r + game.dir.r, ROWS);
-  const curNc = wrap(head.c + game.dir.c, COLS);
+  const curNr = wrap(head.r + game.play.dir.r, ROWS);
+  const curNc = wrap(head.c + game.play.dir.c, COLS);
   const currentInPlay = isSafeCell(curNr, curNc) && !landingSet.has(`${curNr},${curNc}`);
-  const currentGoal = currentInPlay ? goalOf(curNr, curNc, game.dir) : null;
+  const currentGoal = currentInPlay ? goalOf(curNr, curNc, game.play.dir) : null;
 
   // Strict improvement: a direction that keeps an exit beats one that does not;
   // a tie on exit breaks by distance to the target. Equal values are not
@@ -165,16 +165,16 @@ export function chooseBotDir() {
   // Best non-current candidate.
   let best = null;
   for (const cand of candidates) {
-    if (cand.d.r === game.dir.r && cand.d.c === game.dir.c) continue;
+    if (cand.d.r === game.play.dir.r && cand.d.c === game.play.dir.c) continue;
     const g = goalOf(cand.nr, cand.nc, cand.d);
     if (best === null || better(g, best.goal)) best = { d: cand.d, goal: g };
   }
 
   // Steer away from a blocked/landing current direction when a safe option
   // exists; otherwise keep it.
-  if (!currentInPlay) return best ? best.d : game.dir;
+  if (!currentInPlay) return best ? best.d : game.play.dir;
   // Hysteresis: only deviate when a candidate strictly improves the goal.
-  return best && better(best.goal, currentGoal) ? best.d : game.dir;
+  return best && better(best.goal, currentGoal) ? best.d : game.play.dir;
 }
 
 // Cells the piece would occupy after falling to rest in `col` with `shape`.
@@ -208,8 +208,8 @@ function occupancy(cells) {
 // A cell the snake blocks now: its body, or the cell the head steps into next.
 // The snake moves before a falling piece lands, so the predicted cell counts.
 function snakeCellAt(r, c) {
-  const head = game.snake[0];
-  if (head && wrap(head.r + game.dir.r, ROWS) === r && wrap(head.c + game.dir.c, COLS) === c) {
+  const head = game.play.snake[0];
+  if (head && wrap(head.r + game.play.dir.r, ROWS) === r && wrap(head.c + game.play.dir.c, COLS) === c) {
     return true;
   }
   return bodyCells().some((seg) => seg.r === r && seg.c === c);
@@ -249,7 +249,7 @@ function stackStats(occ) {
 // in the meantime. The cost is one per reachable cell, so it is capped by the
 // piece's cell count and only breaks ties between equal boards.
 function snakeEatPenalty(cells, row) {
-  const head = game.snake[0];
+  const head = game.play.snake[0];
   if (!head) return 0;
   let landRow = -Infinity;
   for (const [r, c] of cells) {
@@ -340,13 +340,13 @@ function applyBotPieceMove(p) {
 export const botSystem = {
   name: 'bot',
   update(ctx) {
-    if (game.twoPlayerMode) return; // both sides are human; no bot
-    if (game.state !== PLAYING) return;
-    if (game.role === 'tetris') {
+    if (game.screen.twoPlayerMode) return; // both sides are human; no bot
+    if (game.screen.state !== PLAYING) return;
+    if (game.play.role === 'tetris') {
       // The bot steers the snake through the shared steering path.
       handleIntent({ dir: chooseBotDir() });
-    } else if (game.pieces.length > 0) {
-      applyBotPieceMove(game.pieces[0]);
+    } else if (game.play.pieces.length > 0) {
+      applyBotPieceMove(game.play.pieces[0]);
     }
   },
 };

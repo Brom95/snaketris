@@ -23,24 +23,24 @@ export function snakeTicksPerCell() {
 function eatPieceAt(r, c) {
   const hit = findPieceAt(r, c);
   if (!hit) return false;
-  const p = game.pieces[hit.pieceIdx];
+  const p = game.play.pieces[hit.pieceIdx];
   p.shape.splice(hit.shapeIdx, 1);
-  game.snakeScore += 1;
+  game.play.snakeScore += 1;
   if (p.shape.length === 0) {
-    game.snakeScore += PIECE_BONUS;
-    game.completedPieces += 1;
-    const idx = game.pieces.indexOf(p);
-    if (idx >= 0) game.pieces.splice(idx, 1);
+    game.play.snakeScore += PIECE_BONUS;
+    game.play.completedPieces += 1;
+    const idx = game.play.pieces.indexOf(p);
+    if (idx >= 0) game.play.pieces.splice(idx, 1);
   }
   return true;
 }
 
 export function moveSnake() {
-  if (game.state !== PLAYING) return;
-  game.dir = { r: game.nextDir.r, c: game.nextDir.c };
-  const head = game.snake[0];
-  let nr = head.r + game.dir.r;
-  let nc = head.c + game.dir.c;
+  if (game.screen.state !== PLAYING) return;
+  game.play.dir = { r: game.play.nextDir.r, c: game.play.nextDir.c };
+  const head = game.play.snake[0];
+  let nr = head.r + game.play.dir.r;
+  let nc = head.c + game.play.dir.c;
   nr = ((nr % ROWS) + ROWS) % ROWS;
   nc = ((nc % COLS) + COLS) % COLS;
   if (getCell(nr, nc) === SOLID) {
@@ -48,17 +48,17 @@ export function moveSnake() {
     return;
   }
   const ate = eatPieceAt(nr, nc);
-  const grew = ate && game.snake.length < MAX_SNAKE_LEN;
-  if (ate && !grew) game.overflow += 1;
-  const bodyToCheck = grew ? game.snake : game.snake.slice(0, game.snake.length - 1);
+  const grew = ate && game.play.snake.length < MAX_SNAKE_LEN;
+  if (ate && !grew) game.play.overflow += 1;
+  const bodyToCheck = grew ? game.play.snake : game.play.snake.slice(0, game.play.snake.length - 1);
   for (const seg of bodyToCheck) {
     if (seg.r === nr && seg.c === nc) {
       gameOver('snake-death');
       return;
     }
   }
-  game.snake.unshift({ r: nr, c: nc });
-  if (!grew) game.snake.pop();
+  game.play.snake.unshift({ r: nr, c: nc });
+  if (!grew) game.play.snake.pop();
 }
 
 // Eat any falling-piece cell the snake's HEAD now occupies. Runs after the
@@ -66,13 +66,13 @@ export function moveSnake() {
 // Only the head eats — the body never consumes a piece. +1 score; the snake
 // grows one segment until it reaches its length cap.
 export function consumePieceAtHead() {
-  const head = game.snake[0];
+  const head = game.play.snake[0];
   if (!eatPieceAt(head.r, head.c)) return 0;
-  if (game.snake.length < MAX_SNAKE_LEN) {
-    const tail = game.snake[game.snake.length - 1];
-    game.snake.push({ r: tail.r, c: tail.c });
+  if (game.play.snake.length < MAX_SNAKE_LEN) {
+    const tail = game.play.snake[game.play.snake.length - 1];
+    game.play.snake.push({ r: tail.r, c: tail.c });
   } else {
-    game.overflow += 1;
+    game.play.overflow += 1;
   }
   return 1;
 }
@@ -82,10 +82,10 @@ export function consumePieceAtHead() {
 export const snakeSystem = {
   name: 'snake',
   update(ctx) {
-    if (game.state !== PLAYING) return;
-    game.snakeAcc += 1;
-    if (game.snakeAcc >= snakeTicksPerCell()) {
-      game.snakeAcc -= snakeTicksPerCell();
+    if (game.screen.state !== PLAYING) return;
+    game.play.snakeAcc += 1;
+    if (game.play.snakeAcc >= snakeTicksPerCell()) {
+      game.play.snakeAcc -= snakeTicksPerCell();
       moveSnake();
     }
   },

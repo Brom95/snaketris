@@ -7,7 +7,7 @@ import { consumePieceAtHead, snakeTicksPerCell } from './snake.js';
 // Difficulty ramp: fall speed (cells/tick) ticks up one step every three
 // completed pieces, from BASE_FALL, capped at MAX_FALL.
 export function currentFallSpeed() {
-  const tier = Math.floor(game.completedPieces / 3);
+  const tier = Math.floor(game.play.completedPieces / 3);
   return Math.min(MAX_FALL, BASE_FALL * Math.pow(1.08, tier));
 }
 
@@ -44,8 +44,8 @@ export function shapeFits(shape, row, col) {
 
 // Find a falling piece occupying grid cell (r, c); returns indices or null.
 export function findPieceAt(r, c) {
-  for (let i = 0; i < game.pieces.length; i++) {
-    const p = game.pieces[i];
+  for (let i = 0; i < game.play.pieces.length; i++) {
+    const p = game.play.pieces[i];
     for (let j = 0; j < p.shape.length; j++) {
       const [dr, dc] = p.shape[j];
       if (Math.floor(p.row + dr) === r && p.col + dc === c) {
@@ -59,13 +59,13 @@ export function findPieceAt(r, c) {
 // Sequential spawn: a new piece may spawn only when no piece is falling
 // (the previous one has landed and become solid, or been fully consumed).
 export function spawnPiece() {
-  if (game.pieces.length !== 0) return;
+  if (game.play.pieces.length !== 0) return;
   const type = PIECE_TYPES[Math.floor(Math.random() * PIECE_TYPES.length)];
   const col = Math.floor(Math.random() * (COLS - 3)); // fits widest piece
   const row = -5; // above the top of the grid
   // Copy the state offsets: eating splices a falling piece's shape in place,
   // and the shared TETROMINOES table must stay intact for every future spawn.
-  game.pieces.push({
+  game.play.pieces.push({
     type,
     state: 0,
     shape: TETROMINOES[type][0].map(([dr, dc]) => [dr, dc]),
@@ -149,10 +149,10 @@ export function setPieceState(p, state) {
 // snake's step interval. Shared by the player and the bot. A blocked attempt
 // does not consume the interval.
 export function requestPieceShift(dc) {
-  if (game.pieces.length === 0) return false;
-  if (game.pieceMoveAcc < snakeTicksPerCell()) return false;
-  if (!movePiece(game.pieces[0], dc)) return false;
-  game.pieceMoveAcc = 0;
+  if (game.play.pieces.length === 0) return false;
+  if (game.play.pieceMoveAcc < snakeTicksPerCell()) return false;
+  if (!movePiece(game.play.pieces[0], dc)) return false;
+  game.play.pieceMoveAcc = 0;
   return true;
 }
 
@@ -203,7 +203,7 @@ export function clearFullRows() {
       }
     }
   }
-  game.tetrisScore += cleared.length * LINE_CLEAR_POINTS;
+  game.play.tetrisScore += cleared.length * LINE_CLEAR_POINTS;
 }
 
 // Snap the piece to the grid as SOLID blocks and remove it from the list.
@@ -215,14 +215,14 @@ export function landPiece(p) {
     const c = p.col + dc;
     if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
       setCell(r, c, SOLID);
-      game.landedBlocks += 1;
-      game.tetrisScore += 3;
+      game.play.landedBlocks += 1;
+      game.play.tetrisScore += 3;
       landedCells += 1;
     }
   }
-  game.completedPieces += 1;
-  const idx = game.pieces.indexOf(p);
-  if (idx >= 0) game.pieces.splice(idx, 1);
+  game.play.completedPieces += 1;
+  const idx = game.play.pieces.indexOf(p);
+  if (idx >= 0) game.play.pieces.splice(idx, 1);
   clearFullRows();
   if (landedCells === 0) gameOver('top-out');
 }
@@ -232,13 +232,13 @@ export function landPiece(p) {
 export const piecesSystem = {
   name: 'pieces',
   update(ctx) {
-    if (game.state !== PLAYING) return;
-    game.pieceMoveAcc += 1;
-    for (const p of game.pieces.slice()) stepPiece(p);
-    if (game.state === PLAYING) consumePieceAtHead();
-    game.spawnAcc += 1;
-    if (game.spawnAcc >= SPAWN_INTERVAL && game.pieces.length === 0) {
-      game.spawnAcc = 0;
+    if (game.screen.state !== PLAYING) return;
+    game.play.pieceMoveAcc += 1;
+    for (const p of game.play.pieces.slice()) stepPiece(p);
+    if (game.screen.state === PLAYING) consumePieceAtHead();
+    game.play.spawnAcc += 1;
+    if (game.play.spawnAcc >= SPAWN_INTERVAL && game.play.pieces.length === 0) {
+      game.play.spawnAcc = 0;
       spawnPiece();
     }
   },
