@@ -14,7 +14,12 @@ The system SHALL keep the snake's current direction whenever no other safe direc
 - **THEN** the bot takes that direction
 
 ### Requirement: Bot denies the snake free food
-In Snake role, among placements whose board score is equal, the system SHALL prefer the placement whose landing cells the snake reaches least before the piece lands. The system SHALL still penalize a landed block on a snake cell as if it were a solid overlap, and it SHALL NOT steer the snake or the piece so that the game ends while the snake is ahead.
+In Snake role, among placements whose board score is equal, the system SHALL prefer the placement
+whose landing cells the snake reaches least before the piece lands. The system SHALL apply this as a
+small additive penalty, so it SHALL NOT override a row completion or the near-complete-row bonus. A
+cell occupied by the snake SHALL NOT count as a solid block when the system scores the board; the
+system SHALL penalize such a landing cell only with that small penalty, because the snake leaves the
+cell. The system SHALL NOT steer the snake or the piece so that the game ends while the snake is ahead.
 
 #### Scenario: Equal placements prefer the column farthest from the snake
 - **WHEN** two placements have equal board value
@@ -53,7 +58,7 @@ The system SHALL, among the safe directions, prefer a direction from which the s
 - **THEN** the bot still chooses a safe direction by its normal goal
 
 ### Requirement: Bot steers the falling piece by simulation
-In Snake role the system SHALL choose the piece's shift and rotation by simulating the landing of every legal rotation in every reachable column, and SHALL pick the option with the highest score, where score is 10 points per row that would become full, minus 2 per hole created below the piece, minus 1 per cell of resulting stack height. The simulation SHALL account for cells occupied by the snake's predicted path, so a landed block on a snake cell is penalized as if it were a solid overlap.
+In Snake role the system SHALL choose the piece's shift and rotation by simulating the landing of every legal rotation in every reachable column, and SHALL pick the option with the highest score, where score is 10 points per row that would become full, plus a bonus for near-complete rows, minus 2 per hole created below the piece, minus 1 per cell of resulting stack height. The simulation SHALL read only solid blocks and the simulated piece cells when it decides whether a row is full, whether a hole exists and how tall the stack stands; a cell occupied by the snake SHALL NOT count as a solid block there, because the snake leaves that cell and a row with a gap the snake sits in never clears. The simulation SHALL add a small bounded penalty for each landing cell on the snake body, on the head's next-step cell, or on any cell the snake can reach before the piece lands, so the bot avoids feeding the snake. This penalty SHALL be additive and small enough that it never overrides a row completion or the near-complete-row bonus; it only breaks ties among placements of equal board value.
 
 #### Scenario: Bot aims at a row it can complete
 - **WHEN** a shift or rotation would complete a full row on landing

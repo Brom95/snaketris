@@ -20,9 +20,10 @@ snake, no self-suicide), only better play inside the current fairness rules.
   safe direction on the next step".
 - **NEW: anti-oscillation rule.** The bot keeps its current direction unless another direction
   strictly improves its goal value. This stops the ping-pong and corner-hugging behaviour.
-- **Piece-placement simulation models the snake's predicted path**, not only its current body
-  cells, so the bot does not bury a block under a snake that is about to move away, and does not
-  treat a cell the snake will vacate as blocked.
+- **Piece-placement simulation keeps the snake out of the stack model.** A cell the snake occupies
+  is not a solid block: it never fills a row, never buries a hole and never raises the stack. The
+  bot penalizes such a landing cell with a small additive penalty instead, so it still fills a gap
+  the snake is sitting in while it avoids feeding the snake.
 - **NEW: food-denial rule (score race).** Among placements of equal board value, the bot prefers
   the one the snake can reach least before the piece lands, so the snake eats fewer cells.
 - **Fairness is unchanged and stays pinned:** the bot never lands a block on a snake cell and
@@ -44,8 +45,8 @@ None.
     piece to the piece's predicted landing/intercept cell.
   - "Bot prefers directions that keep an exit" — the one-step exit check becomes a depth-3
     reachability check.
-  - "Bot steers the falling piece by simulation" — the simulation's occupancy model uses the
-    snake's predicted path instead of its current body cells.
+  - "Bot steers the falling piece by simulation" — the simulation reads only solid blocks and the
+    simulated piece cells; the snake contributes a small additive penalty, never a solid cell.
   - NEW "Bot does not oscillate" — a direction change must strictly improve the goal value.
   - NEW "Bot denies the snake free food" — equal-value placements prefer the column the snake
     reaches least.
