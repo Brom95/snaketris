@@ -39,34 +39,24 @@ export function moveSnake() {
   if (game.state !== PLAYING) return;
   game.dir = { r: game.nextDir.r, c: game.nextDir.c };
   const head = game.snake[0];
-  // Discrete step with wrap-around via modulo (applied before any check).
   let nr = head.r + game.dir.r;
   let nc = head.c + game.dir.c;
   nr = ((nr % ROWS) + ROWS) % ROWS;
   nc = ((nc % COLS) + COLS) % COLS;
-
-  // Death: head touches a solid (landed) block.
   if (getCell(nr, nc) === SOLID) {
-    gameOver();
+    gameOver('snake-death');
     return;
   }
-
-  // Eating: consume the edible cell of any falling piece here, +1 score.
-  // Growth stops at the cap; an eaten cell past the cap is one overflow block.
   const ate = eatPieceAt(nr, nc);
   const grew = ate && game.snake.length < MAX_SNAKE_LEN;
   if (ate && !grew) game.overflow += 1;
-
-  // Death: self-collision (tail is vacated only when the snake does not grow).
   const bodyToCheck = grew ? game.snake : game.snake.slice(0, game.snake.length - 1);
   for (const seg of bodyToCheck) {
     if (seg.r === nr && seg.c === nc) {
-      gameOver();
+      gameOver('snake-death');
       return;
     }
   }
-
-  // Classic growth: unshift the head; drop the tail unless the snake grew.
   game.snake.unshift({ r: nr, c: nc });
   if (!grew) game.snake.pop();
 }

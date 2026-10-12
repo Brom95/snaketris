@@ -349,6 +349,24 @@ test('equal score ties break toward the centre column', () => {
   assert.equal(target.col, 4, 'ties prefer the column closest to centre');
 });
 
+test('bot avoids a placement the snake can eat before the piece lands', () => {
+  freshStart('snake');
+  game.snake = [{ r: 16, c: 3 }, { r: 16, c: 2 }, { r: 16, c: 1 }];
+  game.dir = { r: -1, c: 0 }; // the head steps to (15, 3) next
+  for (let c = 0; c < 4; c++) {
+    for (let r = 17; r < ROWS; r++) setCell(r, c, SOLID); // left wall
+  }
+  for (let c = 4; c < COLS; c++) setCell(19, c, SOLID); // floor
+  const p = placePiece(TETROMINOES.O[0], 4, 16, 'O', 0);
+  const target = choosePieceMove(p);
+  // Columns 4..8 all give the same board: no hole, no new row, the same stack
+  // height. Only col 4 lands within the two cells the head can cross while the
+  // piece falls, so the snake-reachability penalty must move the choice away
+  // from the centre-preferred col 4.
+  assert.notEqual(target.col, 4, 'bot picked a column the snake can eat');
+  assert.equal(target.col, 5, 'bot picked the nearest column the snake cannot reach');
+});
+
 // Lateral speed parity: the bot and the player share the pieceMoveAcc gate.
 function countShifts(drive, ticks) {
   let count = 0;

@@ -114,7 +114,9 @@ function scoreText() {
 // The game-over line names the winner and shows both final scores.
 function statusText() {
   let winner = 'Draw';
-  if (game.snakeScore > game.tetrisScore) winner = 'Snake wins';
+  if (game.gameOverReason === 'snake-death') winner = 'Tetris wins';
+  else if (game.gameOverReason === 'top-out') winner = 'Snake wins';
+  else if (game.snakeScore > game.tetrisScore) winner = 'Snake wins';
   else if (game.tetrisScore > game.snakeScore) winner = 'Tetris wins';
   return 'Game Over — Snake ' + game.snakeScore + ', Tetris ' + game.tetrisScore + ' — ' + winner +
     ' — press R or click for menu';

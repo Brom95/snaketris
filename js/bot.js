@@ -6,6 +6,7 @@ import { game } from './state.js';
 import { getCell } from './grid.js';
 import { handleIntent } from './input.js';
 import { requestPieceShift, shapeInState, setPieceState, shapeFits, currentFallSpeed } from './pieces.js';
+import { snakeTicksPerCell } from './snake.js';
 
 // Decision order for the snake: up, right, down, left. Ties are broken by this
 // order, which keeps the choice deterministic.
@@ -247,7 +248,27 @@ function stackStats(occ) {
 // rows give no credit), holes and tall stacks are bad, and landing on snake
 // body cells is penalized. Also rewards filling a row that is close to being
 // completed (a "near-complete" bonus).
-function simulateScore(cells) {
+// The snake moves before the piece lands, so it can eat a landing cell it reaches
+// in the meantime. The cost is one per reachable cell, so it is capped by the
+// piece's cell count and only breaks ties between equal boards.
+function snakeEatPenalty(cells, row) {
+  const head = game.snake[0];
+  if (!head) return 0;
+  let landRow = -Infinity;
+  for (const [r, c] of cells) {
+    if (r > landRow) landRow = r;
+  }
+  const fallCells = Math.max(0, landRow - Math.floor(row));
+  const reach = (fallCells / currentFallSpeed()) / snakeTicksPerCell();
+  let penalty = 0;
+  for (const [r, c] of cells) {
+    const d = torusDelta(head.r, r, ROWS) + torusDelta(head.c, c, COLS);
+    if (d <= reach) penalty += 1;
+  }
+  return penalty;
+}
+
+function simulateScore(cells, row) {
   const baseOcc = occupancy([]);
   const occ = occupancy(cells);
   const newFull = countFullRows(occ) - countFullRows(baseOcc);
@@ -268,7 +289,8 @@ function simulateScore(cells) {
     }
     if (filled >= COLS - 2 && !baseRowFull) rowProgress += 1;
   }
-  return 10 * newFull + 3 * rowProgress - 2 * holes - height - snakePenalty;
+  return 10 * newFull + 3 * rowProgress - 2 * holes - height - snakePenalty -
+    snakeEatPenalty(cells, row);
 }
 
 // Anchor columns that keep every cell of a shape inside the playfield. The
@@ -310,7 +332,7 @@ export function choosePieceMove(p) {
       if (!shapeFits(shape, p.row, col)) continue;
       const cells = landingCells(shape, col, p.row);
       if (cells.length === 0) continue;
-      const score = simulateScore(cells);
+      const score = simulateScore(cells, p.row);
       if (best === null || score > best.score ||
           (score === best.score && Math.abs(col - (COLS - 1) / 2) < Math.abs(best.col - (COLS - 1) / 2))) {
         best = { score, state, col, shape };

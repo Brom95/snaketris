@@ -35,7 +35,8 @@ export const game = {
   snakeAcc: 0,
   spawnAcc: 0,
   pieceMoveAcc: 0,
-  tick: 0
+  tick: 0,
+  gameOverReason: null // why the last game ended: 'snake-death' | 'top-out' | null
 };
 
 function resetSnake() {
@@ -75,6 +76,7 @@ export function resetGame() {
   game.controlError = '';
   game.controlConfirmed = false;
   game.gameControlStep = GAME_CONTROL_P1;
+  game.gameOverReason = null;
 }
 
 // True when a player has locked a model. A locked model is final until the
@@ -183,7 +185,8 @@ export function pickP1Role(role) {
   game.gameControlStep = GAME_CONTROL_P1;
 }
 
-export function gameOver() {
+export function gameOver(reason) {
+  game.gameOverReason = reason;
   if (game.twoPlayerMode) {
     recordScore(game.snakeScore, 'snake');
     recordScore(game.tetrisScore, 'tetris');

@@ -216,7 +216,7 @@ export function landPiece(p) {
     if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
       setCell(r, c, SOLID);
       game.landedBlocks += 1;
-      game.tetrisScore += 1;
+      game.tetrisScore += 3;
       landedCells += 1;
     }
   }
@@ -224,7 +224,7 @@ export function landPiece(p) {
   const idx = game.pieces.indexOf(p);
   if (idx >= 0) game.pieces.splice(idx, 1);
   clearFullRows();
-  if (landedCells === 0) gameOver();
+  if (landedCells === 0) gameOver('top-out');
 }
 // Piece fall + eating + sequential-spawn gate as an engine system. The
 // accumulator (spawnAcc) and the interval live here; app.js no longer owns

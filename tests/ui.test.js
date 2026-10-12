@@ -71,6 +71,26 @@ test('game-over status names the winner and shows both final scores', () => {
   assert.ok(statusEl.textContent.includes('Draw'));
 });
 
+test('a side that kills itself hands the win to the opponent whatever the scores', () => {
+  resetGame();
+  game.role = 'snake';
+  startGame();
+  game.snakeScore = 20;
+  game.tetrisScore = 3;
+  gameOver('snake-death');
+  ui.syncViews([]);
+  assert.ok(statusEl.textContent.includes('Tetris wins'));
+
+  resetGame();
+  game.role = 'tetris';
+  startGame();
+  game.snakeScore = 1;
+  game.tetrisScore = 30;
+  gameOver('top-out');
+  ui.syncViews([]);
+  assert.ok(statusEl.textContent.includes('Snake wins'));
+});
+
 test('every records entry carries its role marker, legacy entries included', () => {
   resetGame();
   game.state = RECORDS;

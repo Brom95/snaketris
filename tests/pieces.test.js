@@ -319,7 +319,7 @@ test('shift gate: the interval follows the speed ramp', () => {
 });
 
 // ---------- Landing and top-out ----------
-test('landing pays the Tetris side +1 per solid cell and not the snake side', () => {
+test('landing pays the Tetris side +3 per solid cell and not the snake side', () => {
   freshStart();
   game.pieces.length = 0;
   const p = { shape: [[0, 0], [0, 1], [1, 0], [1, 1]], col: 4, row: 18 };
@@ -327,7 +327,7 @@ test('landing pays the Tetris side +1 per solid cell and not the snake side', ()
   const t0 = game.tetrisScore;
   const s0 = game.snakeScore;
   landPiece(p);
-  assert.equal(game.tetrisScore, t0 + 4);
+  assert.equal(game.tetrisScore, t0 + 12);
   assert.equal(game.snakeScore, s0);
   assert.equal(game.landedBlocks, 4);
   assert.equal(game.pieces.length, 0);
@@ -352,5 +352,5 @@ test('a partial landing does not end the game', () => {
   landPiece(p);
   assert.equal(game.state, 'PLAYING');
   assert.equal(game.landedBlocks, 2);
-  assert.equal(game.tetrisScore, 2);
+  assert.equal(game.tetrisScore, 6);
 });
