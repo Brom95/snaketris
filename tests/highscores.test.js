@@ -6,13 +6,13 @@ import { installDomStub } from './helpers/dom-stub.js';
 
 installDomStub();
 const { game, resetGame, startGame, gameOver } = await import('../js/state.js');
-const { loadBoard, recordScore, entryRole } = await import('../js/highscores.js');
+const { loadBoard, recordScore, entryRole, recordsSystem } = await import('../js/highscores.js');
 
 function clearBoard() {
   localStorage.removeItem('snaketris.highscores');
 }
 
-test('recordScore stores the role of the side that was played', () => {
+test('the records layer stores the role of the side that was played', () => {
   clearBoard();
   resetGame();
   game.play.role = 'tetris';
@@ -20,6 +20,7 @@ test('recordScore stores the role of the side that was played', () => {
   game.play.tetrisScore = 25;
   game.play.snakeScore = 3;
   gameOver();
+  recordsSystem.update({});
   const board = loadBoard();
   assert.equal(board.length, 1);
   assert.equal(board[0].role, 'tetris');
@@ -34,6 +35,7 @@ test('a Snake-role game stores role snake and the snake score', () => {
   game.play.snakeScore = 9;
   game.play.tetrisScore = 2;
   gameOver();
+  recordsSystem.update({});
   const board = loadBoard();
   assert.equal(board[0].role, 'snake');
   assert.equal(board[0].score, 9);

@@ -9,7 +9,6 @@ const screens = await import('../js/screens.js');
 const { SELECT_ROLE } = await import('../js/constants.js');
 const devices = await import('../js/devices.js');
 const input = await import('../js/input.js');
-const { loadBoard } = await import('../js/highscores.js');
 
 // Wire the canvas into both input.js and devices.js (as initInput does in the real game).
 input.initInput(stub.canvas);
@@ -68,29 +67,22 @@ test('overflow counter is zero at start and clears on restart', () => {
   assert.equal(state.game.play.overflow, 0);
 });
 
-test('gameOver records the score of the side the player played', () => {
-  globalThis.localStorage.setItem('snaketris.highscores', '[]');
+test('gameOver reports the score of the side the player played', () => {
   fresh();
   state.game.play.role = 'tetris';
   state.startGame();
   state.game.play.snakeScore = 3;
   state.game.play.tetrisScore = 25;
   state.gameOver();
-  const board = loadBoard();
-  assert.equal(board.length, 1);
-  assert.equal(board[0].score, 25);
-  assert.equal(board[0].role, 'tetris');
+  assert.deepEqual(state.game.play.result, [{ score: 25, role: 'tetris' }]);
 
-  globalThis.localStorage.setItem('snaketris.highscores', '[]');
   fresh();
   state.game.play.role = 'snake';
   state.startGame();
   state.game.play.snakeScore = 9;
   state.game.play.tetrisScore = 2;
   state.gameOver();
-  const board2 = loadBoard();
-  assert.equal(board2[0].score, 9);
-  assert.equal(board2[0].role, 'snake');
+  assert.deepEqual(state.game.play.result, [{ score: 9, role: 'snake' }]);
 });
 
 test('board tap while PLAYING steers (no crash)', async () => {
@@ -147,8 +139,7 @@ test('resetGame clears the two-player fields', () => {
   assert.equal(state.game.screen.twoPlayerMode, false);
 });
 
-test('gameOver in two-player mode records both sides', () => {
-  globalThis.localStorage.setItem('snaketris.highscores', '[]');
+test('gameOver in two-player mode reports both sides', () => {
   fresh();
   screens.pickP1Role('snake');
   state.startGame();
@@ -157,29 +148,14 @@ test('gameOver in two-player mode records both sides', () => {
   state.game.play.snakeScore = 5;
   state.game.play.tetrisScore = 20;
   state.gameOver();
-  const board = loadBoard();
-  assert.equal(board.length, 2);
-  // Sorted by score descending: tetris (20) first, snake (5) second.
-  assert.equal(board[0].score, 20);
-  assert.equal(board[0].role, 'tetris');
-  assert.equal(board[1].score, 5);
-  assert.equal(board[1].role, 'snake');
+  assert.deepEqual(state.game.play.result, [
+    { score: 5, role: 'snake' },
+    { score: 20, role: 'tetris' },
+  ]);
 });
 
-test('two-player game over keeps top-10', () => {
-  globalThis.localStorage.setItem('snaketris.highscores', JSON.stringify(
-    Array.from({ length: 10 }).map((_, i) => ({ score: i + 1, date: new Date().toISOString(), role: 'snake' }))
-  ));
-  fresh();
-  screens.pickP1Role('snake');
-  state.startGame();
-  state.game.screen.twoPlayerMode = true;
-  state.game.play.snakeScore = 50;
-  state.game.play.tetrisScore = 60;
-  state.gameOver();
-  const board = loadBoard();
-  assert.equal(board.length, 10); // still top-10 after two entries
-});
+// The top-10 board write is asserted in tests/records.test.js: the records
+// layer, not the core, performs it.
 
 // ---------- Single-key-press control lock ----------
 test('a layout key locks both selection and model in one call', () => {

@@ -3,7 +3,7 @@
 // so the DOM is parsed by the time it runs.
 import { COLS, ROWS, CELL, TICK } from './constants.js';
 import { game, resetGame } from './state.js';
-import { loadBoard } from './highscores.js';
+import { loadBoard, recordsSystem } from './highscores.js';
 import { createClock, createEngine } from './engine.js';
 import { botSystem } from './bot.js';
 import { snakeSystem } from './snake.js';
@@ -14,11 +14,13 @@ import { initRender, render } from './render.js';
 import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
 // The ordered systems: the bot decides first (its direction is applied before
-// the snake steps), then the snake steps, then the pieces fall and eat, and
-// last the screen system drains the navigation intents the devices produced.
-// The registry holds no painting step: canvas painting and page painting run
-// once per rendered frame in frame(), not once per tick.
-export const systems = [botSystem, snakeSystem, piecesSystem, screenSystem];
+// the snake steps), then the snake steps, then the pieces fall and eat, then
+// the records owner persists a result the core reported this tick, and last
+// the screen system drains the navigation intents the devices produced. The
+// records step runs before navigation so a same-tick restart cannot drop a
+// reported result. The registry holds no painting step: canvas painting and
+// page painting run once per rendered frame in frame(), not once per tick.
+export const systems = [botSystem, snakeSystem, piecesSystem, recordsSystem, screenSystem];
 const engine = createEngine(systems);
 
 // The context handed to each system's update(ctx). The systems read the

@@ -8,7 +8,6 @@
 // entry points.
 import { PLAYING, ROWS, SPAWN_INTERVAL } from './constants.js';
 import { initGrid } from './grid.js';
-import { recordScore } from './highscores.js';
 import { newScreen, resetScreen, applyGameOverScreen } from './screens.js';
 
 export const game = {
@@ -29,6 +28,10 @@ export const game = {
     tick: 0,
     gameOverReason: null, // why the last game ended: 'snake-death' | 'top-out' | null
     role: 'snake', // the side the player drives; the bot drives the other
+    // The finished game reported to the records layer: an array of
+    // { score, role } entries, or null when nothing is waiting. The core
+    // writes this field only; the records layer is the only board writer.
+    result: null,
   },
   screen: newScreen(),
 };
@@ -59,6 +62,7 @@ function resetPlay() {
   game.play.pieceMoveAcc = 0;
   game.play.tick = 0;
   game.play.gameOverReason = null;
+  game.play.result = null;
 }
 
 // The navigation half lives in js/screens.js: `resetScreen` replaces it with a
@@ -97,15 +101,24 @@ export function restart() {
   startGame();
 }
 
+// The core reports the finished game; it never writes the records board. A
+// two-player duel reports both sides, a single-player game reports the side
+// the player drove. The records layer persists this report once.
 export function gameOver(reason) {
   game.play.gameOverReason = reason;
-  if (game.screen.twoPlayerMode) {
-    recordScore(game.play.snakeScore, 'snake');
-    recordScore(game.play.tetrisScore, 'tetris');
-  } else {
-    const playerScore = game.play.role === 'tetris' ? game.play.tetrisScore : game.play.snakeScore;
-    recordScore(playerScore, game.play.role);
-  }
+  game.play.result = finishedResult();
   // The screen layer decides which screen the interface shows after a game.
   applyGameOverScreen();
+}
+
+function finishedResult() {
+  if (game.screen.twoPlayerMode) {
+    return [
+      { score: game.play.snakeScore, role: 'snake' },
+      { score: game.play.tetrisScore, role: 'tetris' },
+    ];
+  }
+  const role = game.play.role;
+  const score = role === 'tetris' ? game.play.tetrisScore : game.play.snakeScore;
+  return [{ score: score, role: role }];
 }

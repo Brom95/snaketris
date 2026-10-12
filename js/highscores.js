@@ -1,6 +1,10 @@
 // High-score board: load/save/insert the top-10 scores in `localStorage`.
 // Each entry is { score: number, date: ISO-8601 string, role: 'snake' | 'tetris' }.
 // Entries saved before roles existed have no `role` field and read as 'snake'.
+// This module is the records layer: the only writer of the board. The gameplay
+// core reports a finished game and never touches storage.
+import { game } from './state.js';
+
 const STORAGE_KEY = 'snaketris.highscores';
 
 // Normalise an entry's role. Anything that is not 'tetris' is the snake side,
@@ -46,3 +50,17 @@ export function recordScore(score, role) {
   });
   saveBoard(board.slice(0, 10));
 }
+
+// The records owner, run as a system in the engine registry. The core reports
+// a finished game once as `game.play.result`; this step persists that report
+// and clears it before writing, so a failing storage write cannot repeat on
+// later ticks. A two-player duel reports two entries, a single-player game one.
+export const recordsSystem = {
+  name: 'records',
+  update(ctx) {
+    const report = game.play.result;
+    if (!report) return;
+    game.play.result = null;
+    for (const entry of report) recordScore(entry.score, entry.role);
+  },
+};

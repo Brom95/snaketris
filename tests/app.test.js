@@ -82,7 +82,7 @@ test('engine order: the bot does not steer the snake in Snake role', async () =>
 });
 
 test('the registry holds the screen system last and no painting step', async () => {
-  assert.deepEqual(app.systems.map((s) => s.name), ['bot', 'snake', 'pieces', 'screen']);
+  assert.deepEqual(app.systems.map((s) => s.name), ['bot', 'snake', 'pieces', 'records', 'screen']);
   for (const s of app.systems) {
     assert.equal(typeof s.name, 'string');
     assert.equal(typeof s.update, 'function');

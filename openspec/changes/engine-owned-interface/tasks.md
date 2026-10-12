@@ -33,9 +33,9 @@
 
 ## 6. Records out of the core
 
-- [ ] 6.1 Make `gameOver()` set `game.play.result` and stop calling `recordScore`. Verify a test asserts the core reports the result and that no gameplay module imports `highscores.js`.
-- [ ] 6.2 Add the records owner that persists a reported result once and clears it. Verify a test asserts one board entry per finished game and that a failed storage write leaves navigation and gameplay unchanged.
-- [ ] 6.3 Verify the gameplay core runs with no page object and no storage object available. Verify a unit test runs the three gameplay systems with `document`, `window`, and `localStorage` absent and finishes the tick.
+- [x] 6.1 Make `gameOver()` set `game.play.result` and stop calling `recordScore`. Verify a test asserts the core reports the result and that no gameplay module imports `highscores.js`.
+- [x] 6.2 Add the records owner that persists a reported result once and clears it. Verify a test asserts one board entry per finished game and that a failed storage write leaves navigation and gameplay unchanged.
+- [x] 6.3 Verify the gameplay core runs with no page object and no storage object available. Verify a unit test runs the three gameplay systems with `document`, `window`, and `localStorage` absent and finishes the tick.
 
 ## 7. Integration checks
 
