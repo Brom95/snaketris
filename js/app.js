@@ -8,15 +8,18 @@ import { createClock, createEngine } from './engine.js';
 import { botSystem } from './bot.js';
 import { snakeSystem } from './snake.js';
 import { piecesSystem } from './pieces.js';
+import { screenSystem } from './screens.js';
 import { initInput, fitCanvas, pollController } from './input.js';
 import { initRender, render } from './render.js';
 import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
 // The ordered systems: the bot decides first (its direction is applied before
-// the snake steps), then the snake steps, then the pieces fall and eat.
-// app.js no longer owns per-tick game logic — each system does its own state
-// check and work in declared order.
-const engine = createEngine([botSystem, snakeSystem, piecesSystem]);
+// the snake steps), then the snake steps, then the pieces fall and eat, and
+// last the screen system drains the navigation intents the devices produced.
+// The registry holds no painting step: canvas painting and page painting run
+// once per rendered frame in frame(), not once per tick.
+export const systems = [botSystem, snakeSystem, piecesSystem, screenSystem];
+const engine = createEngine(systems);
 
 // The context handed to each system's update(ctx). The systems read the
 // shared `game` module directly; ctx is the hook for any future per-frame

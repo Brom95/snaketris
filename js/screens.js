@@ -237,7 +237,7 @@ export function opensScreen(screenId, index) {
 // Every transition below reads and writes the navigation half only. No
 // gameplay field changes here, and no page element, pointer coordinate, key
 // code or device state is read here.
-import { game } from './state.js';
+import { game, startGame } from './state.js';
 
 // A fresh navigation half: the main menu, no selections, nothing locked.
 // A hoisted function declaration, so state.js can call it while building the
@@ -356,4 +356,179 @@ export function toMenu() {
 export function backToRoleSelect() {
   game.screen.state = SELECT_ROLE;
 }
+
+// ---------- The intent queue and the screen system ----------
+// The input layer normalises a device event into an intent and pushes it here.
+// The screen system drains the queue once per tick, at the start of its update,
+// so an intent applies on the tick after it was produced. This module is the
+// only place that interprets an intent: it reads the screen table and the
+// navigation half, and never a page element, a pointer coordinate, a key code
+// or a device.
+const intentQueue = [];
+
+export function pushIntent(intent) {
+  if (intent) intentQueue.push(intent);
+}
+
+// Run one table transition for the item the intent selected. Returns false
+// when the transition is not allowed now, so the caller can undo its writes.
+function applyAction(item, intent) {
+  switch (item.action) {
+    case TRANSITIONS.open:
+    case TRANSITIONS['select-role']:
+      game.screen.state = item.opens;
+      return true;
+    case TRANSITIONS['two-player']:
+      game.screen.twoPlayerMode = true;
+      game.screen.state = item.opens;
+      return true;
+    case TRANSITIONS['pick-role']:
+      pickRole(item.role);
+      return true;
+    case TRANSITIONS['back-menu']:
+      toMenu();
+      return true;
+    case TRANSITIONS['back-role-select']:
+      backToRoleSelect();
+      return true;
+    case TRANSITIONS['lock-model']:
+      if (!intent.model || !item.player) return false;
+      return lockControlModel(item.player, intent.model);
+    case TRANSITIONS.reassign:
+      if (item.player === 1) reassignP1();
+      else reassignP2();
+      return true;
+    case TRANSITIONS['start-game']:
+      if (!game.screen.p1Model || !game.screen.p2Model) return false;
+      startGame();
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Lock the role the player chose. In a two-player game the other role goes to
+// the second player and the control flow follows; otherwise the game starts.
+function pickRole(role) {
+  game.play.role = role;
+  if (game.screen.twoPlayerMode) {
+    pickP1Role(role);
+    game.screen.state = SELECT_CONTROL;
+    return;
+  }
+  startGame();
+}
+
+// The item the current screen shows: the highlighted one for an arrow cursor,
+// the one named by the control step for a step cursor.
+function currentItem(row) {
+  if (row.cursor === 'arrow') return row.items[game.screen[row.selection]] ?? null;
+  if (row.cursor === 'step') return itemForStep(row.id, game.screen.gameControlStep);
+  return null;
+}
+
+// Move the arrow cursor one item, wrapping over the item list.
+function stepCursor(row, step) {
+  if (row.cursor !== 'arrow' || row.items.length === 0) return false;
+  const n = row.items.length;
+  const field = row.selection;
+  game.screen[field] = (game.screen[field] + step + n) % n;
+  return true;
+}
+
+// A pointer, key or pad named one item of the current screen by its page id.
+// The selection is written first and restored when the transition refuses, so
+// a rejected intent leaves navigation state untouched.
+function selectById(row, id, intent) {
+  for (let i = 0; i < row.items.length; i++) {
+    if (row.items[i].id !== id) continue;
+    const field = row.selection;
+    const previous = field ? game.screen[field] : null;
+    if (field) game.screen[field] = i;
+    if (!applyAction(row.items[i], intent)) {
+      if (field) game.screen[field] = previous;
+      return false;
+    }
+    return true;
+  }
+  for (const control of row.controls) {
+    if (control.id !== id) continue;
+    return applyAction(control, intent);
+  }
+  return false;
+}
+
+// The first item or control that returns to the main menu, if this screen has
+// one.
+function applyBack(row, intent) {
+  for (const item of row.items) {
+    if (item.action === TRANSITIONS['back-menu']) return applyAction(item, intent);
+  }
+  for (const control of row.controls) {
+    if (control.action === TRANSITIONS['back-menu']) return applyAction(control, intent);
+  }
+  return false;
+}
+
+// A layout key locks the model of the player whose step is on screen.
+function lockForCurrentStep(row, model) {
+  if (row.cursor !== 'step' || !model) return false;
+  const item = itemForStep(row.id, game.screen.gameControlStep);
+  if (!item || item.action !== TRANSITIONS['lock-model']) return false;
+  return lockControlModel(item.player, model);
+}
+
+// The start key: in the main menu it opens the role sub-menu like the Play
+// item does; anywhere else it starts the game.
+function startFromCurrent(row, intent) {
+  for (const item of row.items) {
+    if (item.action === TRANSITIONS['select-role']) return applyAction(item, intent);
+  }
+  startGame();
+  return true;
+}
+
+// Apply one navigation intent against the current screen's table entry. An
+// intent the current screen has no item for is rejected and changes nothing.
+function applyIntent(intent) {
+  const row = SCREEN_BY_ID[game.screen.state];
+  if (!row) return false;
+  switch (intent.action) {
+    case 'menuUp':
+    case 'menuDown':
+      return stepCursor(row, intent.action === 'menuUp' ? -1 : 1);
+    case 'confirm': {
+      const item = currentItem(row);
+      return item !== null && applyAction(item, intent);
+    }
+    case 'select':
+      return selectById(row, intent.id, intent);
+    case 'lockModel':
+      return lockForCurrentStep(row, intent.model);
+    case 'toMenu':
+      return applyBack(row, intent);
+    case 'startGame':
+      return startFromCurrent(row, intent);
+    default:
+      return false;
+  }
+}
+
+// Empty the queue and apply every intent in the order the devices produced it.
+export function drainIntents() {
+  while (intentQueue.length > 0) applyIntent(intentQueue.shift());
+}
+
+// The screen navigation as an engine system: it drains the intent queue at the
+// start of its update, before any gameplay system reads navigation state.
+export const screenSystem = {
+  name: 'screen',
+  init(ctx) {
+    intentQueue.length = 0;
+  },
+  update(ctx) {
+    drainIntents();
+  },
+};
+
 

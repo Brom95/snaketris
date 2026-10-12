@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 
 const screens = await import('../js/screens.js');
 const C = await import('../js/constants.js');
+const state = await import('../js/state.js');
 
 const page = await readFile(new URL('../snaketris.html', import.meta.url), 'utf8');
 
@@ -118,4 +119,68 @@ test('itemForStep answers the step-driven screens and opensScreen the arrow ones
   assert.equal(screens.opensScreen(C.MENU, 2), C.RECORDS);
   assert.equal(screens.opensScreen(C.SELECT_ROLE, 0), null);
   assert.equal(screens.opensScreen(C.RECORDS, 0), null);
+});
+
+// This file installs no DOM stub, so `document` is undefined here: any
+// navigation path that reached a page element would throw. The intents below
+// are the only thing the screen system reads.
+test('the screen system drives navigation from intents with no page present', async () => {
+  state.resetGame();
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.RECORDS);
+  assert.equal(state.game.screen.menuSelect, 2);
+
+  state.resetGame();
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.SELECT_ROLE);
+  screens.pushIntent({ action: 'menuDown' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.roleSelect, 1);
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.PLAYING);
+  assert.equal(state.game.play.role, 'tetris');
+});
+
+test('a two-player role pick hands the other role to the second player', async () => {
+  state.resetGame();
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.twoPlayerMode, true);
+  assert.equal(state.game.screen.state, C.SELECT_ROLE);
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.SELECT_CONTROL);
+  assert.equal(state.game.screen.p1Role, 'snake');
+  assert.equal(state.game.screen.p2Role, 'tetris');
+  assert.equal(state.game.screen.gameControlStep, C.GAME_CONTROL_P1);
+});
+
+test('an intent the current screen has no item for leaves navigation unchanged', async () => {
+  state.resetGame();
+  screens.pushIntent({ action: 'toMenu' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.MENU);
+  assert.equal(state.game.screen.menuSelect, 0);
+
+  screens.pushIntent({ action: 'select', id: 'control-item-p2' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.MENU);
+  assert.equal(state.game.screen.menuSelect, 0);
+
+  state.game.screen.state = C.SELECT_CONTROL;
+  screens.pushIntent({ action: 'menuDown' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.gameControlStep, C.GAME_CONTROL_P1);
+  assert.equal(state.game.screen.controlSelect, 0);
+
+  screens.pushIntent({ action: 'select', id: 'control-item-p1' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.p1Model, null);
+  assert.equal(state.game.screen.controlSelect, 0);
 });

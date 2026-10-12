@@ -2,9 +2,9 @@
 
 ## 1. Screen table data
 
-- [ ] 1.1 Add `js/screens.js` exporting the screen table: one entry per screen (`MENU`, `SELECT_ROLE`, `SELECT_CONTROL`, `RECORDS`, `HELP`, `GAME_OVER`), each with its items in page order, and for each item its label, marker, key hints, and the screen or transition it opens. Declare back and reassign controls per screen. Verify a unit test `tests/screens.test.js` reads the table and asserts every screen, its item order, and each item target.
-- [ ] 1.2 Verify the table matches the current screens: assert the table's menu labels equal `MENU_ITEMS`, its role items equal `ROLE_SCREEN_ITEMS`, and its control items equal `CONTROL_SCREEN_ITEMS`, so no screen or label is invented.
-- [ ] 1.3 Verify every table entry resolves to a real page element id by asserting each item carries the id the page already uses, and document in `design.md` notes which ids the table owns.
+- [x] 1.1 Add `js/screens.js` exporting the screen table: one entry per screen (`MENU`, `SELECT_ROLE`, `SELECT_CONTROL`, `RECORDS`, `HELP`, `GAME_OVER`), each with its items in page order, and for each item its label, marker, key hints, and the screen or transition it opens. Declare back and reassign controls per screen. Verify a unit test `tests/screens.test.js` reads the table and asserts every screen, its item order, and each item target.
+- [x] 1.2 Verify the table matches the current screens: assert the table's menu labels equal `MENU_ITEMS`, its role items equal `ROLE_SCREEN_ITEMS`, and its control items equal `CONTROL_SCREEN_ITEMS`, so no screen or label is invented.
+- [x] 1.3 Verify every table entry resolves to a real page element id by asserting each item carries the id the page already uses, and document in `design.md` notes which ids the table owns.
 
 ## 2. State split
 
@@ -14,10 +14,10 @@
 
 ## 3. Screen system in the registry
 
-- [ ] 3.1 Implement the screen system: an ordered `{ name, init, update }` entry that drains the intent queue at the start of its update step and applies transitions from the table. Verify a headless unit test drives `MENU` to `SELECT_ROLE` to `PLAYING` with no page element present and no `document` lookup on that path.
-- [ ] 3.2 Verify the screen system rejects an intent the current screen has no item for, and that navigation state does not change.
-- [ ] 3.3 Register the screen system as the fourth entry in `js/app.js createEngine([...])`, after the three gameplay systems. Verify `tests/app.test.js` asserts the new order, and state in the commit note that the pre-existing engine-order failure at HEAD is accounted for, not fixed.
-- [ ] 3.4 Verify presentation is not registered: assert the registry holds no canvas painting step and no page painting step.
+- [x] 3.1 Implement the screen system: an ordered `{ name, init, update }` entry that drains the intent queue at the start of its update step and applies transitions from the table. Verify a headless unit test drives `MENU` to `SELECT_ROLE` to `PLAYING` with no page element present and no `document` lookup on that path.
+- [x] 3.2 Verify the screen system rejects an intent the current screen has no item for, and that navigation state does not change.
+- [x] 3.3 Register the screen system as the fourth entry in `js/app.js createEngine([...])`, after the three gameplay systems. Verify `tests/app.test.js` asserts the new order, and state in the commit note that the pre-existing engine-order failure at HEAD is accounted for, not fixed.
+- [x] 3.4 Verify presentation is not registered: assert the registry holds no canvas painting step and no page painting step.
 
 ## 4. Input thinning
 
