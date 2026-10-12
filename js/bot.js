@@ -306,20 +306,6 @@ function anchorRange(shape) {
 
 // Pure piece decision: best (state, column) pair. Ties prefer the column
 // closest to center, then the lowest state index.
-// How quickly the snake can reach a landing: the smallest wrap-around distance
-// from the head to any of the piece's landing cells. Larger means the snake
-// reaches those cells least (and latest). Null when there is no snake to deny
-// food to, so the caller falls back to the centre tie-break.
-function snakeFarthestDistance(cells) {
-  const head = game.snake[0];
-  if (!head) return null;
-  let best = Infinity;
-  for (const [r, c] of cells) {
-    const d = torusDelta(head.r, r, ROWS) + torusDelta(head.c, c, COLS);
-    if (d < best) best = d;
-  }
-  return best;
-}
 export function choosePieceMove(p) {
   let best = null;
   for (let state = 0; state < 4; state++) {
