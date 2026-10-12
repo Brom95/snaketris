@@ -13,7 +13,7 @@
 import { check, makeCanvas, report, stubDom } from './harness.mjs';
 import { MENU_ITEMS, MENU, SELECT_ROLE, RECORDS, HELP } from '../js/constants.js';
 import { game } from '../js/state.js';
-import { toMenu } from '../js/screens.js';
+import { drainIntents, toMenu } from '../js/screens.js';
 import { initInput, onKey } from '../js/input.js';
 import { initUi, syncViews } from '../js/ui.js';
 import { readFileSync } from 'node:fs';
@@ -58,6 +58,7 @@ initUi();
 
 function press(key) {
   onKey({ key, preventDefault: () => {} });
+  drainIntents();
 }
 
 // ---------- Static checks ----------

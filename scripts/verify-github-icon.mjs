@@ -20,6 +20,7 @@ import { check, makeCanvas, report, stubDom } from './harness.mjs';
 import { initInput, onInterfacePointerUp, onPointerUp } from '../js/input.js';
 import { onPointerDown } from '../js/devices.js';
 import { game } from '../js/state.js';
+import { drainIntents } from '../js/screens.js';
 import { MENU, RECORDS, HELP, GAME_OVER, MENU_ITEMS, GITHUB_URL } from '../js/constants.js';
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -96,6 +97,7 @@ function center(box) {
 // never the canvas).
 function clickPage(x, y) {
   onInterfacePointerUp({ target: { note: 'interface element' }, clientX: x, clientY: y });
+  drainIntents();
 }
 
 function menuState() {

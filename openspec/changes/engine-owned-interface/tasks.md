@@ -21,9 +21,9 @@
 
 ## 4. Input thinning
 
-- [ ] 4.1 Reduce `js/input.js` to device-to-intent work plus the queue push: delete `confirmSelection`, `openMenuItem`, and the index-based `moveSelection` branches. Verify no index-based screen branch remains in `input.js` and that `handleIntent` routes only steering, piece control, and queue pushes.
-- [ ] 4.2 Verify the shared steering branch (`setDirection`, PLAYING gate plus no-reverse) stays byte-for-byte stable. Verify `tests/input.test.js` and the keyboard, touch, and gamepad harnesses still pass.
-- [ ] 4.3 Verify `npm run verify` reports every harness exit code unchanged from the documented baseline.
+- [x] 4.1 Reduce `js/input.js` to device-to-intent work plus the queue push: delete `confirmSelection`, `openMenuItem`, and the index-based `moveSelection` branches. Verify no index-based screen branch remains in `input.js` and that `handleIntent` routes only steering, piece control, and queue pushes.
+- [x] 4.2 Verify the shared steering branch (`setDirection`, PLAYING gate plus no-reverse) stays byte-for-byte stable. Verify `tests/input.test.js` and the keyboard, touch, and gamepad harnesses still pass.
+- [x] 4.3 Verify `npm run verify` reports every harness exit code unchanged from the documented baseline.
 
 ## 5. Interface painting from the table
 

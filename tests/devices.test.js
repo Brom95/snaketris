@@ -9,6 +9,7 @@ const stub = installDomStub();
 const { game } = await import('../js/state.js');
 const devices = await import('../js/devices.js');
 const input = await import('../js/input.js');
+const screens = await import('../js/screens.js');
 
 devices.setCanvas(stub.canvas);
 
@@ -16,6 +17,7 @@ devices.setCanvas(stub.canvas);
 function pollAndApply() {
   const intent = devices.pollController();
   input.handleIntent(intent);
+  screens.drainIntents();
   return intent;
 }
 

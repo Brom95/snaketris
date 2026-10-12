@@ -28,7 +28,7 @@ import { check, makePad, report, stubDom } from './harness.mjs';
 import { pollController, keyToDir, tapToDir, swipeToDir, clearControllerPrev } from '../js/devices.js';
 import { initInput, handleIntent, setDirection } from '../js/input.js';
 import { game, startGame, gameOver } from '../js/state.js';
-import { toMenu } from '../js/screens.js';
+import { drainIntents, toMenu } from '../js/screens.js';
 import { PLAYING, SELECT_ROLE, MENU, GAME_OVER, RECORDS, HELP, MENU_ITEMS } from '../js/constants.js';
 
 // DPAD_UP=12, DPAD_DOWN=13, DPAD_LEFT=14, DPAD_RIGHT=15, A=0, B=1.
@@ -64,6 +64,7 @@ const dom = stubDom({
 function frame(pad) {
   dom.setGamepads(pad === null ? [] : [pad]);
   handleIntent(pollController());
+  drainIntents();
 }
 
 function frames(seq) {
@@ -367,6 +368,7 @@ game.screen.menuSelect = 0;
 // Frame 1: only the stick is held down -> its own edge moves the selection.
 dom.setGamepads([makePad([], [0, 0.8])]);
 handleIntent(pollController());
+drainIntents();
 check(game.screen.menuSelect === 1, 'frame1 stick-down edge: 0 -> 1');
 
 // Frame 2: the stick is still held while the D-pad down button (index 13) is
@@ -374,11 +376,13 @@ check(game.screen.menuSelect === 1, 'frame1 stick-down edge: 0 -> 1');
 // its unpressed -> pressed edge fires and the selection advances again.
 dom.setGamepads([makePad([DOWN], [0, 0.8])]);
 handleIntent(pollController());
+drainIntents();
 check(game.screen.menuSelect === 2, 'frame2 D-pad down edge while stick held: 1 -> 2 (edge not swallowed)');
 
 // Frame 3: D-pad released, stick still held -> no new edge on either channel.
 dom.setGamepads([makePad([], [0, 0.8])]);
 handleIntent(pollController());
+drainIntents();
 check(game.screen.menuSelect === 2, 'frame3 stick held, no new edge: selection stays 2');
 resetController();
 

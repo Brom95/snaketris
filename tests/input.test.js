@@ -32,31 +32,42 @@ test('role screen: R opens it, up/down wrap over Snake, Tetris, Back', () => {
   fresh();
   assert.equal(state.game.screen.state, 'MENU');
   input.onKey({ key: 'r', preventDefault() {} });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, 'SELECT_ROLE');
 
   input.onKey({ key: 's', preventDefault() {} }); // down → Tetris
+  screens.drainIntents();
   assert.equal(state.game.screen.roleSelect, 1);
   input.onKey({ key: 's', preventDefault() {} }); // down → Back
+  screens.drainIntents();
   assert.equal(state.game.screen.roleSelect, 2);
   input.onKey({ key: 's', preventDefault() {} }); // down wraps to Snake
+  screens.drainIntents();
   assert.equal(state.game.screen.roleSelect, 0);
   input.onKey({ key: 'w', preventDefault() {} }); // up wraps to Back
+  screens.drainIntents();
   assert.equal(state.game.screen.roleSelect, 2);
   input.onKey({ key: 'Enter', preventDefault() {} });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, 'MENU');
   assert.equal(state.game.screen.roleSelect, 0);
   assert.equal(state.game.play.pieces.length, 0);
 
   input.onKey({ key: 'r', preventDefault() {} }); // reopen the role screen
+  screens.drainIntents();
   input.onKey({ key: 's', preventDefault() {} }); // down → Tetris
+  screens.drainIntents();
   assert.equal(state.game.screen.roleSelect, 1);
   input.onKey({ key: 'Enter', preventDefault() {} });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, 'PLAYING');
   assert.equal(state.game.play.role, 'tetris');
 
   fresh();
   input.onKey({ key: 'r', preventDefault() {} });
+  screens.drainIntents();
   input.onKey({ key: 'Escape', preventDefault() {} });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, 'MENU');
 });
 
@@ -66,6 +77,7 @@ test('clicking a role item starts the game with that role', () => {
   stub.roleItems[0].getBoundingClientRect = () => ({ left: 0, top: 0, right: 320, bottom: 24 });
   stub.roleItems[1].getBoundingClientRect = () => ({ left: 0, top: 30, right: 320, bottom: 54 });
   input.onInterfacePointerUp({ target: stub.document, clientX: 10, clientY: 40 });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, 'PLAYING');
   assert.equal(state.game.play.role, 'tetris');
 
@@ -74,6 +86,7 @@ test('clicking a role item starts the game with that role', () => {
   fresh();
   state.game.screen.state = 'SELECT_ROLE';
   input.onInterfacePointerUp({ target: stub.document, clientX: 10, clientY: 10 });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, 'PLAYING');
   assert.equal(state.game.play.role, 'snake');
 });
@@ -82,6 +95,7 @@ test('clicking Play in the main menu opens the role sub-menu', () => {
   fresh();
   stub.menuItems[0].getBoundingClientRect = () => ({ left: 0, top: 0, right: 320, bottom: 24 });
   input.onInterfacePointerUp({ target: stub.document, clientX: 10, clientY: 10 });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, 'SELECT_ROLE');
 });
 
@@ -92,6 +106,7 @@ test('clicking Back on the role screen returns to the menu without starting a ga
   stub.roleItems[1].getBoundingClientRect = () => ({ left: 0, top: 30, right: 320, bottom: 54 });
   stub.elements['role-back'].getBoundingClientRect = () => ({ left: 0, top: 60, right: 320, bottom: 84 });
   input.onInterfacePointerUp({ target: stub.document, clientX: 10, clientY: 70 });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, 'MENU');
   assert.equal(state.game.screen.roleSelect, 0);
   assert.equal(state.game.play.pieces.length, 0);
@@ -172,10 +187,12 @@ test('single key press locks the current player model in SELECT_CONTROL', () => 
   state.game.screen.twoPlayerMode = true;
   // A layout key locks P1 immediately; no confirm step.
   input.onKey({ key: 'w', preventDefault() {} });
+  screens.drainIntents();
   assert.equal(state.game.screen.p1Model, 'wasd');
   assert.equal(state.game.screen.p1Selection, 'wasd');
   // The next key press locks P2.
   input.onKey({ key: 'ArrowUp', preventDefault() {} });
+  screens.drainIntents();
   assert.equal(state.game.screen.p2Model, 'arrows');
   assert.equal(state.game.screen.p2Selection, 'arrows');
 });
@@ -185,10 +202,13 @@ test('P2 key press that reuses P1 keyboard layout is rejected', () => {
   state.game.screen.state = 'SELECT_CONTROL';
   state.game.screen.twoPlayerMode = true;
   input.onKey({ key: 'w', preventDefault() {} }); // P1 locks WASD.
+  screens.drainIntents();
   input.onKey({ key: 'w', preventDefault() {} }); // P2 tries WASD -> conflict.
+  screens.drainIntents();
   assert.equal(state.game.screen.p2Model, null);
   assert.equal(state.game.screen.controlError, 'P2: cannot use the same layout as P1');
   // P2 can still use a different keyboard layout.
   input.onKey({ key: 'ArrowUp', preventDefault() {} });
+  screens.drainIntents();
   assert.equal(state.game.screen.p2Model, 'arrows');
 });
