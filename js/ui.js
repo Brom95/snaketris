@@ -5,13 +5,26 @@
 import {
   SELECT_ROLE, SELECT_DURATION, SELECT_CONTROL, PLAYING, RECORDS, GAME_OVER,
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
-  ROLE_MARKERS,
   GAME_CONTROL_PLAYER_MARKERS,
   twoPlayerOffered,
 } from './constants.js';
 import { game, remainingSeconds } from './state.js';
-import { entryRole } from './highscores.js';
+import { recordLines } from './highscores.js';
 import { SCREENS, SCREEN_BY_ID, itemForStep, controlModelAssigned } from './screens.js';
+import { createLayout } from '../engine/js/layout.js';
+import { createInterface } from '../engine/js/interface.js';
+import { paintPage, registerPagePainter } from '../engine/js/present.js';
+
+// The engine viewport rule, fed with the game's field box and the page's gap
+// values. One instance answers both the stacked-layout rule and the gap.
+const layout = createLayout({
+  boardWidth: BOARD_W,
+  boardHeight: BOARD_H,
+  stackMaxWidth: UI_STACK_MAX_WIDTH,
+  columnMin: UI_COLUMN_MIN,
+  gap: FIELD_V_GAP,
+  gapMobile: FIELD_V_GAP_MOBILE,
+});
 
 // Elements this module owns that the screen table does not name.
 let uiEl = null;
@@ -28,101 +41,69 @@ let controlSummaryEl = null;
 let roleTitleEl = null;
 let controlTitleEl = null;
 
-// One element owner: every id the screen table names is looked up here, once,
-// and handed out to whoever paints or hit-tests it. js/input.js hit-tests the
-// same lists, so the page and the table cannot drift apart silently.
-const elById = new Map();
-const itemsByScreen = new Map();
-const controlsByScreen = new Map();
+// One element owner lives in the engine: every id the screen table names is looked
+// up there, once, and handed out to whoever paints or hit-tests it. js/input.js
+// hit-tests the same lists, so the page and the table cannot drift apart silently.
+const iface = createInterface();
+const lookup = iface.lookup;
+const show = iface.show;
+const highlightItem = iface.highlight;
+
+// The one paint context every page painter reads: the state root, and the
+// records board the page entry supplies (null when no board is shown).
+const paintCtx = { state: game, board: null };
 
 // Per-player feedback blocks, keyed by the player number the table carries.
 const statusElsByPlayer = new Map();
 const summaryElsByPlayer = new Map();
 
-// Called by app.js once the page is parsed; stores the interface elements.
+// Called by app.js once the page is parsed; stores the interface elements and
+// indexes every id the registered table names, in table order.
 export function initUi() {
-  uiEl = document.getElementById('ui');
-  scoreEl = document.getElementById('score');
-  timerEl = document.getElementById('timer');
-  statusEl = document.getElementById('status');
-  recordsListEl = document.getElementById('records-list');
-  recordsEmptyEl = document.getElementById('records-empty');
-  fieldEl = document.getElementById('game');
-  roleLineEl = document.getElementById('role-line');
-  controlErrorEl = document.getElementById('control-error');
-  controlKeyHintsEl = document.getElementById('control-key-hints');
-  controlSummaryEl = document.getElementById('control-summary');
-  roleTitleEl = document.getElementById('role-title');
-  controlTitleEl = document.getElementById('control-title');
-  statusElsByPlayer.set(1, document.getElementById('control-p1-status'));
-  statusElsByPlayer.set(2, document.getElementById('control-p2-status'));
-  summaryElsByPlayer.set(1, document.getElementById('summary-line-1'));
-  summaryElsByPlayer.set(2, document.getElementById('summary-line-2'));
-  indexInterface();
-}
-
-// Look up every id the table names, in table order. A page element that is
-// absent keeps its slot, so every table index stays true.
-function indexInterface() {
-  for (const row of SCREENS) {
-    if (row.view) lookup(row.view);
-    const items = [];
-    for (const item of row.items) items.push(lookup(item.id));
-    const controls = [];
-    for (const control of row.controls) controls.push(lookup(control.id));
-    itemsByScreen.set(row.id, items);
-    controlsByScreen.set(row.id, controls);
-  }
-}
-
-function lookup(id) {
-  if (!id) return null;
-  const el = document.getElementById(id);
-  elById.set(id, el);
-  return el;
+  uiEl = lookup('ui');
+  scoreEl = lookup('score');
+  timerEl = lookup('timer');
+  statusEl = lookup('status');
+  recordsListEl = lookup('records-list');
+  recordsEmptyEl = lookup('records-empty');
+  fieldEl = lookup('game');
+  roleLineEl = lookup('role-line');
+  controlErrorEl = lookup('control-error');
+  controlKeyHintsEl = lookup('control-key-hints');
+  controlSummaryEl = lookup('control-summary');
+  roleTitleEl = lookup('role-title');
+  controlTitleEl = lookup('control-title');
+  statusElsByPlayer.set(1, lookup('control-p1-status'));
+  statusElsByPlayer.set(2, lookup('control-p2-status'));
+  summaryElsByPlayer.set(1, lookup('summary-line-1'));
+  summaryElsByPlayer.set(2, lookup('summary-line-2'));
+  iface.indexRows(SCREENS);
+  // The engine page pass: each painter runs once per rendered frame, in this
+  // order. Registration is name-keyed, so a second initUi cannot paint twice.
+  registerPagePainter('views', paintViews);
+  registerPagePainter('score', paintScore);
+  registerPagePainter('status', paintStatus);
+  registerPagePainter('placeScore', placeScore);
+  registerPagePainter('roleLine', paintRoleLine);
+  registerPagePainter('records', paintRecords);
 }
 
 // The interface elements of one screen: its items, then its controls.
 export function hitTargets(screenId) {
-  const out = [];
-  for (const el of itemsByScreen.get(screenId) ?? []) if (el) out.push(el);
-  for (const el of controlsByScreen.get(screenId) ?? []) if (el) out.push(el);
-  return out;
-}
-
-// Shows or hides one interface element. `.view` hides by default, `.view.on`
-// shows it; the class toggle keeps the base class intact.
-function show(el, on) {
-  if (el) el.classList.toggle('on', on);
-}
-
-// ISO-8601 "2026-09-26T12:34:56.789Z" -> "2026-09-26" (deterministic).
-function formatDate(iso) {
-  const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return y + '-' + m + '-' + day;
+  return iface.hitTargets(screenId);
 }
 
 // The leaderboard rows are rebuilt from the board the caller supplies, so this
-// module stays free of storage concerns. Every row carries its role marker.
+// module stays free of storage concerns. The records owner formats each line;
+// this module only puts one formatted line into one list item.
 function fillRecords(board) {
   recordsListEl.textContent = '';
-  for (let i = 0; i < board.length; i++) {
+  for (const line of recordLines(board)) {
     const li = document.createElement('li');
-    li.textContent = ROLE_MARKERS[entryRole(board[i])] + '  ' + board[i].score + '  ·  ' + formatDate(board[i].date);
+    li.textContent = line;
     recordsListEl.appendChild(li);
   }
   show(recordsEmptyEl, board.length === 0);
-}
-
-// Highlight one item in a list by index. The `::before` marker and the
-// highlight colour come from the page CSS. Index -1 clears the whole list.
-function highlightItem(items, index) {
-  for (let i = 0; i < items.length; i++) {
-    show(items[i], i === index);
-  }
 }
 
 // Both side scores, each labelled with its side. The chosen role is not named.
@@ -156,13 +137,23 @@ function placeScore() {
   }
 }
 
-// The one view authority: `game.screen.state` decides which interface elements are
-// on screen. Called every frame from the render path.
+// The one page-paint entry: the engine page pass runs every registered painter
+// once per rendered frame. The records board is supplied here because this
+// module owns no storage.
 export function syncViews(recordsBoard) {
+  paintCtx.board = recordsBoard;
+  paintPage(paintCtx);
+}
+
+// The visibility half: every registered row's view, the field, the countdown,
+// the wide-viewport menu item, the cursors, the stage titles and the step
+// feedback.
+function paintViews(pctx) {
   const state = game.screen.state;
   const row = SCREEN_BY_ID[state];
-  if (scoreEl) scoreEl.textContent = scoreText();
-  const fieldOn = row !== undefined && row.field;
+  // The engine view-sync mechanism toggles every registered row's view from the
+  // current screen id and reports whether that row shows the field.
+  const fieldOn = iface.paintViews(SCREENS, state);
   show(fieldEl, fieldOn);
   show(scoreEl, fieldOn);
   // The countdown is plain remaining seconds with no unit suffix, on screen only
@@ -171,23 +162,29 @@ export function syncViews(recordsBoard) {
     timerEl.textContent = String(remainingSeconds());
     show(timerEl, state === PLAYING || state === GAME_OVER);
   }
-  placeScore();
-  show(statusEl, state === GAME_OVER);
-  if (state === GAME_OVER && statusEl) statusEl.textContent = statusText();
-  // The role screen is a separate view: opening it hides the main menu.
-  for (const screen of SCREENS) show(elById.get(screen.view), screen.id === state);
   // Two-player menu item: shown when the viewport is wide enough, hidden at or
   // below UI_STACK_MAX_WIDTH.
-  const twoPlayerItem = elById.get('menu-item-two-player');
-  if (twoPlayerItem) {
-    twoPlayerItem.style.display = twoPlayerOffered() ? '' : 'none';
-  }
+  const twoPlayerItem = iface.element('menu-item-two-player');
+  if (twoPlayerItem) twoPlayerItem.style.display = twoPlayerOffered() ? '' : 'none';
   paintHighlights(state);
   paintStageTitle(state, row);
-  paintRoleLine(state);
   if (row !== undefined && row.cursor === 'step') paintControlFeedback(row);
   else if (controlErrorEl) controlErrorEl.textContent = '';
-  if (state === RECORDS) fillRecords(recordsBoard || []);
+}
+
+function paintScore(pctx) {
+  if (scoreEl) scoreEl.textContent = scoreText();
+}
+
+function paintStatus(pctx) {
+  const state = game.screen.state;
+  show(statusEl, state === GAME_OVER);
+  if (state === GAME_OVER && statusEl) statusEl.textContent = statusText();
+}
+
+function paintRecords(pctx) {
+  if (game.screen.state !== RECORDS) return;
+  fillRecords(pctx.board || []);
 }
 
 // Every preparation stage says its own name and the action it expects, so the
@@ -215,8 +212,9 @@ function paintStageTitle(state, row) {
 
 // The role line names both roles through the whole preparation flow. It stays
 // empty until a role is chosen, so it never prints the text "null".
-function paintRoleLine(state) {
+function paintRoleLine(pctx) {
   if (!roleLineEl) return;
+  const state = game.screen.state;
   const named = game.screen.twoPlayerMode && game.screen.p1Role && game.screen.p2Role;
   const on = named && (state === SELECT_ROLE || state === SELECT_CONTROL);
   roleLineEl.textContent = on
@@ -229,7 +227,7 @@ function paintRoleLine(state) {
 // gets its own cursor; every other screen is cleared, exactly as before.
 function paintHighlights(state) {
   for (const row of SCREENS) {
-    const items = itemsByScreen.get(row.id) ?? [];
+    const items = iface.items(row.id);
     if (row.id !== state) {
       highlightItem(items, -1);
       continue;
@@ -263,7 +261,7 @@ function paintControlFeedback(row) {
   }
   show(controlErrorEl, !!game.screen.controlError);
   if (controlErrorEl) controlErrorEl.textContent = game.screen.controlError || '';
-  const controls = controlsByScreen.get(row.id) ?? [];
+  const controls = iface.controls(row.id);
   for (let i = 0; i < row.controls.length; i++) {
     const spec = row.controls[i];
     const el = controls[i];
@@ -310,25 +308,20 @@ function markerOf(row, player) {
   return GAME_CONTROL_PLAYER_MARKERS[player];
 }
 
-// The one viewport rule: the same scale and gap answer both whether the interface
-// column stacks above the field and how much height the field may take.
-function fieldScale() {
-  return Math.min(window.innerWidth / BOARD_W, (window.innerHeight - 2 * FIELD_V_GAP) / BOARD_H);
-}
-
+// The one viewport rule lives in the engine; this module hands out its two
+// readings so the page and the field fit cannot drift apart.
 export function layoutRule() {
-  const narrow = window.innerWidth <= UI_STACK_MAX_WIDTH;
-  return {
-    stacked: narrow || window.innerWidth - BOARD_W * fieldScale() < UI_COLUMN_MIN + FIELD_V_GAP,
-    gap: narrow ? FIELD_V_GAP_MOBILE : FIELD_V_GAP,
-  };
+  return layout.rule();
 }
 
 // Height the stacked interface occupies, including the gap around the field.
-// Zero when the interface shares a track beside the field. On narrow
-// viewports the gap is halved so the board starts higher on screen.
+// Zero when the interface shares a track beside the field.
 export function interfaceBandHeight() {
-  const rule = layoutRule();
-  if (!rule.stacked || !uiEl) return 0;
-  return uiEl.getBoundingClientRect().height + rule.gap;
+  return layout.band(uiEl);
+}
+
+// Size one page element to the viewport rule: the engine fit reads the same
+// rule as the band above.
+export function sizeField(element, reserved) {
+  layout.fit(element, reserved);
 }

@@ -1,35 +1,63 @@
-// Raw input devices → normalized intents. Each device translates its own raw
+// Raw input devices -> normalized intents. Each device translates its own raw
 // events into a coarse intent (a direction or an action) and carries no
 // state-machine logic of its own — the flow in js/input.js routes every
-// intent through one navigation path.
+// intent through one navigation path. The event plumbing (listeners, pointer
+// capture, the controller poll loop, the thumbstick quantization) lives in
+// engine/js/devices.js; this module owns the mappings and the resolvers.
 
 import { game } from './state.js';
 import { currentControlPlayer } from './screens.js';
 import { BOARD_W, BOARD_H } from './constants.js';
+import {
+  configureSurface,
+  registerDeviceResolvers,
+  attachSurface,
+  surfacePoint,
+  pointerDown,
+  pointerMove,
+  pointerEnd,
+  pointerCancel,
+  pollDevices,
+  clearDeviceEdges,
+  stickDirection,
+} from '../engine/js/devices.js';
 
-let canvas = null;
+// The engine entry point for handing over resolvers, re-exported so the flow
+// layer can register its own half through the same import path.
+export { registerDeviceResolvers };
 
-// Sets the canvas element the device adapters use for coordinate mapping.
-export function setCanvas(c) { canvas = c; }
+const TAP_THRESHOLD = 24; // displacement below one cell classifies as a tap
+
+// The surface size is a game fact handed to the engine mechanism once, at
+// module load, so the engine names no board number.
+configureSurface({ width: BOARD_W, height: BOARD_H });
 
 // ---------- Coordinate helpers (device-side) ----------
-// Displacement in logical canvas coords for a pointer event.
-export function toLogical(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: (clientX - rect.left) / rect.width * BOARD_W,
-    y: (clientY - rect.top) / rect.height * BOARD_H
-  };
+export function setCanvas(c) {
+  attachSurface(c);
 }
 
-// Keyboard raw key → direction.
+export function toLogical(clientX, clientY) {
+  return surfacePoint(clientX, clientY);
+}
+
+// Keyboard raw key -> direction.
 export function keyToDir(key) {
   switch (key) {
-    case 'arrowup': case 'w': return { r: -1, c: 0 };
-    case 'arrowdown': case 's': return { r: 1, c: 0 };
-    case 'arrowleft': case 'a': return { r: 0, c: -1 };
-    case 'arrowright': case 'd': return { r: 0, c: 1 };
-    default: return null;
+    case 'arrowup':
+    case 'w':
+      return { r: -1, c: 0 };
+    case 'arrowdown':
+    case 's':
+      return { r: 1, c: 0 };
+    case 'arrowleft':
+    case 'a':
+      return { r: 0, c: -1 };
+    case 'arrowright':
+    case 'd':
+      return { r: 0, c: 1 };
+    default:
+      return null;
   }
 }
 
@@ -63,14 +91,17 @@ export function swipeToDir(dx, dy) {
   return dy < 0 ? { r: -1, c: 0 } : { r: 1, c: 0 };
 }
 
+// ---------- Keyboard mapping ----------
 // Navigation keys for the main menu and the two sub-menus below it. R starts a
 // game from the main menu; Escape leaves a sub-menu.
-function menuKeyIntent(k, state) {
+function menuKeyIntent(k) {
   if (k === 'arrowup' || k === 'w') return { action: 'menuUp' };
   if (k === 'arrowdown' || k === 's') return { action: 'menuDown' };
   if (k === 'enter' || k === ' ') return { action: 'confirm' };
-  if (state === 'MENU' && k === 'r') return { action: 'startGame' };
-  if ((state === 'SELECT_ROLE' || state === 'SELECT_DURATION') && k === 'escape') return { action: 'toMenu' };
+  if (game.screen.state === 'MENU' && k === 'r') return { action: 'startGame' };
+  if ((game.screen.state === 'SELECT_ROLE' || game.screen.state === 'SELECT_DURATION') && k === 'escape') {
+    return { action: 'toMenu' };
+  }
   return null;
 }
 
@@ -96,16 +127,6 @@ function roleForKeyboardKey(k) {
   return null;
 }
 
-// The role one physical gamepad drives: the player who locked THAT pad. A pad
-// nobody owns drives nothing, so two players need two distinct pads. Outside a
-// two-player game the single role answers.
-function roleForPad(padId) {
-  if (!game.screen.twoPlayerMode) return game.play.role;
-  if (game.screen.p1Pad === padId) return game.screen.p1Role || game.play.role;
-  if (game.screen.p2Pad === padId) return game.screen.p2Role;
-  return null;
-}
-
 // Keys while a game runs: the Tetris side steers the falling piece, the Snake
 // side steers the snake. Which side a key belongs to is the player's, not one
 // shared role, so two layouts drive two different characters.
@@ -123,50 +144,42 @@ function playingKeyIntent(k) {
   return d ? { dir: d } : null;
 }
 
-// ---------- Keyboard device ----------
-const TAP_THRESHOLD = 24; // displacement below one cell classifies as a tap
+// Keys in the records and help views: any of the three keys leaves the view.
+function viewKeyIntent(k) {
+  return k === 'enter' || k === ' ' || k === 'escape' ? { action: 'toMenu' } : null;
+}
 
-// Raw keydown → intent. The keyboard is the only device that can produce
+// Keys after a game ends: R or either confirm key returns to the menu.
+function overKeyIntent(k) {
+  return k === 'r' || k === 'enter' || k === ' ' ? { action: 'toMenu' } : null;
+}
+
+// One lookup per screen state, so the mapping reads the state instead of
+// testing it. A state with no entry maps no key.
+const KEY_BY_STATE = {
+  MENU: menuKeyIntent,
+  SELECT_DURATION: menuKeyIntent,
+  SELECT_ROLE: menuKeyIntent,
+  PLAYING: playingKeyIntent,
+  RECORDS: viewKeyIntent,
+  HELP: viewKeyIntent,
+  GAME_OVER: overKeyIntent,
+};
+
+// Raw keydown -> intent. The keyboard is the only device that can produce
 // every action; pointer and gamepad cover a subset.
 export function keyToIntent(key) {
-  const k = key.toLowerCase();
-  if (game.screen.state === 'MENU' || game.screen.state === 'SELECT_ROLE' || game.screen.state === 'SELECT_DURATION') return menuKeyIntent(k, game.screen.state);
-  if (game.screen.state === 'PLAYING') return playingKeyIntent(k);
-  if (game.screen.state === 'RECORDS' || game.screen.state === 'HELP') {
-    return (k === 'enter' || k === ' ' || k === 'escape') ? { action: 'toMenu' } : null;
-  }
-  if (game.screen.state === 'GAME_OVER') {
-    return (k === 'r' || k === 'enter' || k === ' ') ? { action: 'toMenu' } : null;
-  }
-  return null;
+  const map = KEY_BY_STATE[game.screen.state];
+  return map ? map(key.toLowerCase()) : null;
 }
 
 // ---------- Pointer device (touch + mouse) ----------
-let activePointerId = null;
-let pointerStart = null; // start position in logical canvas coords
-
-export function onPointerDown(e) {
-  if (activePointerId !== null) return; // ignore second concurrent pointer
-  activePointerId = e.pointerId;
-  canvas.setPointerCapture(e.pointerId);
-  pointerStart = toLogical(e.clientX, e.clientY);
-}
-
-export function onPointerMove(e) {
-  if (e.pointerId !== activePointerId) return;
-  // Capture keeps the gesture routed to us even off-canvas; only the end
-  // position matters, so no per-move work is needed.
-}
-
-// Raw pointer event → intent. A tap or swipe inside the canvas produces a
-// direction; non-game states produce a toMenu action.
-export function onPointerUp(e) {
-  if (e.pointerId !== activePointerId) return null;
-  activePointerId = null;
-  const end = toLogical(e.clientX, e.clientY);
-  const dx = end.x - pointerStart.x;
-  const dy = end.y - pointerStart.y;
-  pointerStart = null;
+// A tap or swipe inside the surface produces a direction; non-game states
+// produce a toMenu action. The engine owns the gesture bookkeeping and calls
+// this resolver with the two ends of the gesture.
+function gestureIntent(start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
 
   // MENU lives entirely on the page (see onInterfacePointerUp), so a gesture
   // that ends on the board does nothing here.
@@ -201,62 +214,37 @@ function snakeGesture(dx, dy, x, y) {
   return { dir: swipeToDir(dx, dy) };
 }
 
+// Thin wrappers over the engine gesture mechanism: each answers one raw event
+// and returns the shape it produced, or null.
+export function onPointerDown(e) {
+  return pointerDown(e);
+}
+
+export function onPointerMove(e) {
+  return pointerMove(e);
+}
+
+export function onPointerUp(e) {
+  return pointerEnd(e);
+}
+
 export function onPointerCancel(e) {
-  if (e.pointerId !== activePointerId) return;
-  activePointerId = null;
-  pointerStart = null;
+  return pointerCancel(e);
 }
 
 // ---------- Gamepad device ----------
 // Standard Gamepad API mapping (per design D4).
-const DPAD_UP = 12;      // D-pad up (standard Gamepad API button index)
-const DPAD_DOWN = 13;    // D-pad down
-const DPAD_LEFT = 14;    // D-pad left
-const DPAD_RIGHT = 15;   // D-pad right
-const BUTTON_A = 0;      // A: confirm / accept
-const BUTTON_B = 1;      // B: back / cancel
-const STICK_DEADZONE = 0.3; // ignore small axis values (stick drift)
+// The button indices and the deadzone live in the engine; the meaning of each
+// signal set lives here.
 
-// Per-pad edge-detection state, keyed by pad id. Each connected pad keeps
-// its own prevButtons and prevStickDir so two pads never share state.
-// `connectedPadIds` tracks connection order: index 0 is P1, index 1 is P2.
-let padStates = new Map();
-let connectedPadIds = [];
-
-function getPadState(id) {
-  if (!padStates.has(id)) {
-    padStates.set(id, { prevButtons: null, prevStickDir: null });
-  }
-  return padStates.get(id);
-}
-
-function routePads(pads) {
-  // Keep only currently-connected pads in connection order.
-  const connected = [];
-  for (const p of pads) {
-    if (p && !connectedPadIds.includes(p.id)) {
-      connectedPadIds.push(p.id);
-      connected.push(p);
-    } else if (p) {
-      connected.push(p);
-    }
-  }
-  return connected;
-}
-
-// Quantize the left thumbstick to a single cardinal direction. The axis with
-// the larger magnitude past STICK_DEADZONE wins; inside the deadzone the stick
-// contributes no direction (null). This mirrors the dominant-axis logic of
-// tapToDir/swipeToDir.
-export function stickDir(gp) {
-  const ax = gp.axes[0]; // left stick X: negative -> left, positive -> right
-  const ay = gp.axes[1]; // left stick Y: negative -> up, positive -> down
-  const axPast = Math.abs(ax) > STICK_DEADZONE ? Math.abs(ax) : 0;
-  const ayPast = Math.abs(ay) > STICK_DEADZONE ? Math.abs(ay) : 0;
-  if (axPast >= ayPast) {
-    return axPast === 0 ? null : { r: 0, c: ax < 0 ? -1 : 1 };
-  }
-  return { r: ay < 0 ? -1 : 1, c: 0 };
+// The role one physical gamepad drives: the player who locked THAT pad. A pad
+// nobody owns drives nothing, so two players need two distinct pads. Outside a
+// two-player game the single role answers.
+function roleForPad(padId) {
+  if (!game.screen.twoPlayerMode) return game.play.role;
+  if (game.screen.p1Pad === padId) return game.screen.p1Role || game.play.role;
+  if (game.screen.p2Pad === padId) return game.screen.p2Role;
+  return null;
 }
 
 // Intent while a game runs. In Tetris role the piece is steered: left/right
@@ -311,84 +299,6 @@ function menuIntent(state, s) {
   return null;
 }
 
-// One pad's poll → intent. Edge detection is per pad, so two pads never share
-// held state, and the pad's owner decides which character it steers.
-function readPad(gp) {
-  const padState = getPadState(gp.id);
-  const buttons = gp.buttons;
-  const stick = stickDir(gp);
-
-  // Button-only pressed state. A thumbstick value must never be OR-ed into a
-  // button's current/previous state: a held stick would then mark the matching
-  // D-pad button as "already pressed", swallowing its edge.
-  const aNow = !!buttons[BUTTON_A].pressed;
-  const bNow = !!buttons[BUTTON_B].pressed;
-  const upNow = !!buttons[DPAD_UP].pressed;
-  const downNow = !!buttons[DPAD_DOWN].pressed;
-  const leftNow = !!buttons[DPAD_LEFT].pressed;
-  const rightNow = !!buttons[DPAD_RIGHT].pressed;
-
-  const prev = padState.prevButtons || {};
-  const aEdge = aNow && !prev[BUTTON_A];
-  const bEdge = bNow && !prev[BUTTON_B];
-  const upEdge = upNow && !prev[DPAD_UP];
-  const downEdge = downNow && !prev[DPAD_DOWN];
-
-  const stickUp = !!stick && stick.r === -1;
-  const stickDown = !!stick && stick.r === 1;
-  const stickUpEdge = stickUp && !(padState.prevStickDir && padState.prevStickDir.r === -1);
-  const stickDownEdge = stickDown && !(padState.prevStickDir && padState.prevStickDir.r === 1);
-
-  const role = roleForPad(gp.id);
-  let intent = null;
-  // A pad no player owns drives no character while a game runs. It can still
-  // act on the navigation screens, where the action does not name a character.
-  if (role !== null || game.screen.state !== 'PLAYING') {
-    intent = chooseIntent(game.screen.state, role, {
-      aEdge, bEdge, upEdge, downEdge,
-      stickUpEdge, stickDownEdge,
-      leftNow, rightNow, upNow, downNow, stick,
-      padId: gp.id,
-    });
-  }
-
-  // Update previous poll state on every pass, including the pass that emits
-  // an intent. Without this, a held button re-fires its edge each frame.
-  padState.prevButtons = {
-    [BUTTON_A]: aNow,
-    [BUTTON_B]: bNow,
-    [DPAD_UP]: buttons[DPAD_UP].pressed,
-    [DPAD_DOWN]: buttons[DPAD_DOWN].pressed,
-    [DPAD_LEFT]: buttons[DPAD_LEFT].pressed,
-    [DPAD_RIGHT]: buttons[DPAD_RIGHT].pressed
-  };
-  padState.prevStickDir = stick;
-  return intent;
-}
-
-// Raw poll → intent. Polls EVERY connected pad so each player drives their own
-// device, and returns the first intent a pad produced.
-export function pollController() {
-  if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return null;
-  const connected = routePads(navigator.getGamepads());
-  if (connected.length === 0) {
-    // No gamepad: clear every pad's previous poll state so a reconnect cannot
-    // inherit a stale held state (design D3).
-    for (const id of connectedPadIds) {
-      const s = getPadState(id);
-      s.prevButtons = null;
-      s.prevStickDir = null;
-    }
-    return null;
-  }
-  let first = null;
-  for (const gp of connected) {
-    const intent = readPad(gp);
-    if (first === null && intent) first = intent;
-  }
-  return first;
-}
-
 // State-dependent intent for one poll. Edge-only buttons drive menu actions;
 // the D-pad/stick direction is applied while held.
 function chooseIntent(state, role, s) {
@@ -409,13 +319,35 @@ function chooseIntent(state, role, s) {
   return null;
 }
 
+// One pad's signal set -> intent. The pad's owner decides which character it
+// steers; a pad nobody owns drives no character while a game runs, but it can
+// still act on the navigation screens, where the action names no character.
+function padIntent(s) {
+  const state = game.screen.state;
+  const role = roleForPad(s.padId);
+  if (!(role !== null || state !== 'PLAYING')) return null;
+  return chooseIntent(state, role, s);
+}
+
+// Raw poll -> intent. The engine owns the poll loop and the edge detection;
+// this module supplies the mapping through the resolver slot.
+export function pollController() {
+  return pollDevices();
+}
+
 // Clears the gamepad edge-detection state for every connected pad. Called on
 // gamepad connect/disconnect (design D5) so no stale held state survives a
 // gamepad change.
 export function clearControllerPrev() {
-  for (const id of connectedPadIds) {
-    const s = getPadState(id);
-    s.prevButtons = null;
-    s.prevStickDir = null;
-  }
+  clearDeviceEdges();
 }
+
+// The engine quantizes the thumbstick; the name stays here so a caller of the
+// device layer reads one vocabulary.
+export function stickDir(gp) {
+  return stickDirection(gp);
+}
+
+// The mapping resolvers the engine mechanism calls. Registered at module load,
+// so a device test that never opens a page still maps a gesture or a poll.
+registerDeviceResolvers({ gesture: gestureIntent, pad: padIntent });

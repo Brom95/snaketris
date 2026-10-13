@@ -32,6 +32,7 @@ export const TRANSITIONS = {
   'lock-model': 'lock-model', // lock the item's player's control model
   reassign: 'reassign', // clear one player's selection and model
   'start-game': 'start-game', // start when the flow allows it
+  'start-bare': 'start-bare', // the start key with no item on screen: start whatever the flow allows
 };
 
 // cursor: 'arrow' — one item is highlighted and the arrow cycles over `items`.
@@ -43,6 +44,7 @@ export const SCREENS = [
     field: false,
     cursor: 'arrow',
     selection: 'menuSelect',
+    startAction: TRANSITIONS['select-role'],
     items: [
       {
         id: 'menu-item-play',
@@ -86,6 +88,7 @@ export const SCREENS = [
     field: false,
     cursor: 'arrow',
     selection: 'durationSelect',
+    startAction: TRANSITIONS['start-bare'],
     items: [
       {
         id: 'duration-item-1',
@@ -127,6 +130,7 @@ export const SCREENS = [
     field: false,
     cursor: 'arrow',
     selection: 'roleSelect',
+    startAction: TRANSITIONS['start-bare'],
     items: [
       {
         id: 'role-item-snake',
@@ -160,6 +164,9 @@ export const SCREENS = [
     field: false,
     cursor: 'step',
     selection: 'controlSelect',
+    stepField: 'gameControlStep',
+    lockAction: TRANSITIONS['lock-model'],
+    startAction: TRANSITIONS['start-bare'],
     items: [
       {
         id: 'control-item-p1',
@@ -217,6 +224,7 @@ export const SCREENS = [
     field: true,
     cursor: 'none',
     selection: null,
+    startAction: TRANSITIONS['start-bare'],
     items: [],
     controls: [],
   },
@@ -226,6 +234,7 @@ export const SCREENS = [
     field: true,
     cursor: 'none',
     selection: null,
+    startAction: TRANSITIONS['start-bare'],
     items: [],
     controls: [
       { id: 'status', label: 'Menu', marker: null, action: TRANSITIONS['back-menu'] },
@@ -237,6 +246,7 @@ export const SCREENS = [
     field: false,
     cursor: 'arrow',
     selection: 'recordsSelect',
+    startAction: TRANSITIONS['start-bare'],
     items: [
       {
         id: 'records-board-1',
@@ -273,6 +283,7 @@ export const SCREENS = [
     field: false,
     cursor: 'none',
     selection: null,
+    startAction: TRANSITIONS['start-bare'],
     items: [],
     controls: [
       { id: 'help-return', label: 'Menu', marker: null, action: TRANSITIONS['back-menu'] },
@@ -287,29 +298,11 @@ export const SCREEN_BY_ID = SCREENS.reduce((acc, row) => {
   return acc;
 }, {});
 
-// The item of a step-driven screen for one control step, or null.
-export function itemForStep(screenId, step) {
-  const row = SCREEN_BY_ID[screenId];
-  if (!row) return null;
-  for (const item of row.items) {
-    if (item.step === step) return item;
-  }
-  return null;
-}
-
-// The screen a menu item opens, or null when the item runs a transition that
-// stays on the navigation flow.
-export function opensScreen(screenId, index) {
-  const row = SCREEN_BY_ID[screenId];
-  if (!row) return null;
-  return row.items[index]?.opens ?? null;
-}
-
 // The match duration whose leaderboard the records view shows right now: the
 // board the arrow cursor selects. app.js hands this to the page painter, so the
 // list and the cursor can never name different boards.
 export function selectedBoardMinutes() {
-  const item = currentItem(SCREEN_BY_ID[RECORDS]);
+  const item = currentItem(RECORDS);
   return item?.minutes ?? DURATION_MINUTES[0];
 }
 
@@ -318,50 +311,51 @@ export function selectedBoardMinutes() {
 // gameplay field changes here, and no page element, pointer coordinate, key
 // code or device state is read here.
 import { game, startGame } from './state.js';
+import { currentItem, gotoScreen, registerNavigation } from '../engine/js/navigation.js';
 
-// A fresh navigation half: the main menu, no selections, nothing locked.
-// A hoisted function declaration, so state.js can call it while building the
-// root `game` object even when this module is mid-evaluation.
-export function newScreen() {
-  return {
-    state: MENU,
-    menuSelect: 0,
-    roleSelect: 0,
-    durationSelect: 0,
-    controlSelect: 0,
-    recordsSelect: 0,
-    p1Role: null,
-    p2Role: null,
-    twoPlayerMode: false,
-    p1Selection: null,
-    p2Selection: null,
-    p1Model: null,
-    p2Model: null,
+// The navigation half as [name, initial] pairs, in page order. js/state.js
+// registers this table into the engine state skeleton, so the engine refills
+// the half from here on every reset and names none of these fields itself.
+// A hoisted function declaration, because js/state.js reads it while this
+// module is still mid-evaluation (the two modules import each other).
+export function screenFields() {
+  return [
+    ['state', MENU],
+    ['menuSelect', 0],
+    ['roleSelect', 0],
+    ['durationSelect', 0],
+    ['controlSelect', 0],
+    ['recordsSelect', 0],
+    ['p1Role', null],
+    ['p2Role', null],
+    ['twoPlayerMode', false],
+    ['p1Selection', null],
+    ['p2Selection', null],
+    ['p1Model', null],
+    ['p2Model', null],
     // The physical gamepad each player owns, by Gamepad API id. A pad drives
     // only the player who locked it, so two players need two distinct pads.
-    p1Pad: null,
-    p2Pad: null,
-    controlError: '',
-    controlConfirmed: false,
-    gameControlStep: GAME_CONTROL_P1,
-  };
+    ['p1Pad', null],
+    ['p2Pad', null],
+    ['controlError', ''],
+    ['controlConfirmed', false],
+    ['gameControlStep', GAME_CONTROL_P1],
+  ];
 }
 
-// Replace the navigation half with a fresh one. The root `game` object stays
-// the same, so every module that imported it sees the new half.
-export function resetScreen() {
-  game.screen = newScreen();
-}
+// The engine skeleton owns the reset of both halves. The game re-exports the
+// name so every existing caller keeps its import line.
+export { resetScreen } from '../engine/js/state.js';
 
 // The screen the interface shows once a game ends: the shared Start step in
-// two-player mode, the game-over overlay otherwise. game.screen.state must hold
-// a screen id the screen table resolves; a bare step constant hides every view.
+// two-player mode, the game-over overlay otherwise. The game reports the screen and the engine
+// navigates to it; a bare step constant hides every view.
 export function applyGameOverScreen() {
   if (!game.screen.twoPlayerMode) {
-    game.screen.state = GAME_OVER;
+    gotoScreen(GAME_OVER);
     return;
   }
-  game.screen.state = SELECT_CONTROL;
+  gotoScreen(SELECT_CONTROL);
   game.screen.gameControlStep = GAME_CONTROL_START;
 }
 
@@ -449,7 +443,7 @@ export function pickP1Role(role) {
 
 // Return to the main menu and clear the selections.
 export function toMenu() {
-  game.screen.state = MENU;
+  gotoScreen(MENU);
   game.screen.menuSelect = 0;
   game.screen.durationSelect = 0;
   game.screen.roleSelect = 0;
@@ -458,70 +452,7 @@ export function toMenu() {
 // Back from SELECT_CONTROL returns to the duration screen, the stage before the
 // role screen. A player who leaves the control screen re-asks the match length.
 export function backToRoleSelect() {
-  game.screen.state = SELECT_DURATION;
-}
-
-// ---------- The intent queue and the screen system ----------
-// The input layer normalises a device event into an intent and pushes it here.
-// The screen system drains the queue once per tick, at the start of its update,
-// so an intent applies on the tick after it was produced. This module is the
-// only place that interprets an intent: it reads the screen table and the
-// navigation half, and never a page element, a pointer coordinate, a key code
-// or a device.
-const intentQueue = [];
-
-export function pushIntent(intent) {
-  if (intent) intentQueue.push(intent);
-}
-
-// Run one table transition for the item the intent selected. Returns false
-// when the transition is not allowed now, so the caller can undo its writes.
-function applyAction(item, intent) {
-  switch (item.action) {
-    case TRANSITIONS.open:
-    case TRANSITIONS['select-role']:
-      game.screen.state = item.opens;
-      return true;
-    case TRANSITIONS['two-player']:
-      if (!offersItem(item)) return false;
-      game.screen.twoPlayerMode = true;
-      game.screen.state = item.opens;
-      return true;
-    case TRANSITIONS['pick-duration']:
-      game.play.durationMinutes = item.minutes;
-      game.play.durationTicks = item.minutes * TICKS_PER_MINUTE;
-      game.screen.state = SELECT_ROLE;
-      return true;
-    case TRANSITIONS['back-duration']:
-      toMenu();
-      return true;
-    case TRANSITIONS['pick-role']:
-      pickRole(item.role);
-      return true;
-    case TRANSITIONS['back-menu']:
-      toMenu();
-      return true;
-    case TRANSITIONS['back-role-select']:
-      backToRoleSelect();
-      return true;
-    case TRANSITIONS['pick-board']:
-      // The records view stays open; the item's board is already the selection
-      // this call wrote, so the next paint reads it.
-      return true;
-    case TRANSITIONS['lock-model']:
-      if (!intent.model || !item.player) return false;
-      return lockControlModel(item.player, intent.model);
-    case TRANSITIONS.reassign:
-      if (item.player === 1) reassignP1();
-      else reassignP2();
-      return true;
-    case TRANSITIONS['start-game']:
-      if (!game.screen.p1Model || !game.screen.p2Model) return false;
-      startGame();
-      return true;
-    default:
-      return false;
-  }
+  gotoScreen(SELECT_DURATION);
 }
 
 // Lock the role the player chose. In a two-player game the other role goes to
@@ -530,18 +461,10 @@ function pickRole(role) {
   game.play.role = role;
   if (game.screen.twoPlayerMode) {
     pickP1Role(role);
-    game.screen.state = SELECT_CONTROL;
+    gotoScreen(SELECT_CONTROL);
     return;
   }
   startGame();
-}
-
-// The item the current screen shows: the highlighted one for an arrow cursor,
-// the one named by the control step for a step cursor.
-function currentItem(row) {
-  if (row.cursor === 'arrow') return row.items[game.screen[row.selection]] ?? null;
-  if (row.cursor === 'step') return itemForStep(row.id, game.screen.gameControlStep);
-  return null;
 }
 
 // True when the interface can offer this item right now. A wide-only item is
@@ -550,117 +473,93 @@ function offersItem(item) {
   return !item.requiresWide || twoPlayerOffered();
 }
 
-// Move the arrow cursor one item, wrapping over the item list and skipping
-// items the viewport does not offer.
-function stepCursor(row, step) {
-  if (row.cursor !== 'arrow' || row.items.length === 0) return false;
-  const n = row.items.length;
-  const field = row.selection;
-  let index = game.screen[field];
-  for (let k = 0; k < n; k++) {
-    index = (index + step + n) % n;
-    if (!offersItem(row.items[index])) continue;
-    game.screen[field] = index;
+// ---------- The handler map the engine looks up ----------
+// The engine owns the intent queue, the cursor mechanics and the dispatch. This map is the only
+// place the game interprets an action: a handler gets the item the intent selected (null when the
+// start key runs with no item) plus the intent, and returns true when it changed navigation state.
+const HANDLERS = {
+  [TRANSITIONS.open]: (item, intent) => {
+    gotoScreen(item.opens);
     return true;
-  }
-  return false;
-}
-
-// A pointer, key or pad named one item of the current screen by its page id.
-// The selection is written first and restored when the transition refuses, so
-// a rejected intent leaves navigation state untouched.
-function selectById(row, id, intent) {
-  for (let i = 0; i < row.items.length; i++) {
-    if (row.items[i].id !== id) continue;
-    const field = row.selection;
-    const previous = field ? game.screen[field] : null;
-    if (field) game.screen[field] = i;
-    if (!applyAction(row.items[i], intent)) {
-      if (field) game.screen[field] = previous;
-      return false;
-    }
-    return true;
-  }
-  for (const control of row.controls) {
-    if (control.id !== id) continue;
-    return applyAction(control, intent);
-  }
-  return false;
-}
-
-// The first item or control that returns to the main menu, if this screen has
-// one. The duration screen's Back item runs its own transition, so both menu-
-// returning back actions count here.
-function applyBack(row, intent) {
-  for (const item of row.items) {
-    if (item.action === TRANSITIONS['back-menu'] || item.action === TRANSITIONS['back-duration'] || item.action === TRANSITIONS['back-role-select']) return applyAction(item, intent);
-  }
-  for (const control of row.controls) {
-    if (control.action === TRANSITIONS['back-menu'] || control.action === TRANSITIONS['back-duration']) return applyAction(control, intent);
-  }
-  return false;
-}
-
-// A layout key or a pad locks the model of the player whose step is on screen.
-// `pad` names the physical gamepad so the lock can claim that device.
-function lockForCurrentStep(row, model, pad) {
-  if (row.cursor !== 'step' || !model) return false;
-  const item = itemForStep(row.id, game.screen.gameControlStep);
-  if (!item || item.action !== TRANSITIONS['lock-model']) return false;
-  return lockControlModel(item.player, model, pad);
-}
-
-// The start key: in the main menu it opens the role sub-menu like the Play
-// item does; anywhere else it starts the game.
-function startFromCurrent(row, intent) {
-  for (const item of row.items) {
-    if (item.action === TRANSITIONS['select-role']) return applyAction(item, intent);
-  }
-  startGame();
-  return true;
-}
-
-// Apply one navigation intent against the current screen's table entry. An
-// intent the current screen has no item for is rejected and changes nothing.
-function applyIntent(intent) {
-  const row = SCREEN_BY_ID[game.screen.state];
-  if (!row) return false;
-  switch (intent.action) {
-    case 'menuUp':
-    case 'menuDown':
-      return stepCursor(row, intent.action === 'menuUp' ? -1 : 1);
-    case 'confirm': {
-      const item = currentItem(row);
-      return item !== null && applyAction(item, intent);
-    }
-    case 'select':
-      return selectById(row, intent.id, intent);
-    case 'lockModel':
-      return lockForCurrentStep(row, intent.model);
-    case 'toMenu':
-      return applyBack(row, intent);
-    case 'startGame':
-      return startFromCurrent(row, intent);
-    default:
-      return false;
-  }
-}
-
-// Empty the queue and apply every intent in the order the devices produced it.
-export function drainIntents() {
-  while (intentQueue.length > 0) applyIntent(intentQueue.shift());
-}
-
-// The screen navigation as an engine system: it drains the intent queue at the
-// start of its update, before any gameplay system reads navigation state.
-export const screenSystem = {
-  name: 'screen',
-  init(ctx) {
-    intentQueue.length = 0;
   },
-  update(ctx) {
-    drainIntents();
+  [TRANSITIONS['select-role']]: (item, intent) => {
+    gotoScreen(item.opens);
+    return true;
+  },
+  [TRANSITIONS['two-player']]: (item, intent) => {
+    if (!offersItem(item)) return false;
+    game.screen.twoPlayerMode = true;
+    gotoScreen(item.opens);
+    return true;
+  },
+  [TRANSITIONS['pick-duration']]: (item, intent) => {
+    game.play.durationMinutes = item.minutes;
+    game.play.durationTicks = item.minutes * TICKS_PER_MINUTE;
+    gotoScreen(SELECT_ROLE);
+    return true;
+  },
+  [TRANSITIONS['back-duration']]: (item, intent) => {
+    toMenu();
+    return true;
+  },
+  [TRANSITIONS['pick-role']]: (item, intent) => {
+    pickRole(item.role);
+    return true;
+  },
+  [TRANSITIONS['back-menu']]: (item, intent) => {
+    toMenu();
+    return true;
+  },
+  [TRANSITIONS['back-role-select']]: (item, intent) => {
+    backToRoleSelect();
+    return true;
+  },
+  [TRANSITIONS['pick-board']]: (item, intent) => {
+    // The records view stays open; the item's board is already the selection this call wrote.
+    return true;
+  },
+  [TRANSITIONS['lock-model']]: (item, intent) => {
+    if (!intent.model || !item.player) return false;
+    return lockControlModel(item.player, intent.model);
+  },
+  [TRANSITIONS.reassign]: (item, intent) => {
+    if (item.player === 1) reassignP1();
+    else reassignP2();
+    return true;
+  },
+  [TRANSITIONS['start-game']]: (item, intent) => {
+    if (!game.screen.p1Model || !game.screen.p2Model) return false;
+    startGame();
+    return true;
+  },
+  // The start key away from the main menu starts with no item guard, unlike the Start item.
+  [TRANSITIONS['start-bare']]: (item, intent) => {
+    startGame();
+    return true;
   },
 };
+
+// The actions a `toMenu` intent may run. Items may leave from any earlier stage; a screen's own
+// Back control returns only from the stages whose Back control goes to the main menu.
+const BACK_ITEM_ACTIONS = [
+  TRANSITIONS['back-menu'],
+  TRANSITIONS['back-duration'],
+  TRANSITIONS['back-role-select'],
+];
+const BACK_CONTROL_ACTIONS = [TRANSITIONS['back-menu'], TRANSITIONS['back-duration']];
+
+// The game registers its rows, its handler map and its own field names into the engine navigation.
+registerNavigation({
+  rows: SCREENS,
+  handlers: HANDLERS,
+  offers: offersItem,
+  backItems: BACK_ITEM_ACTIONS,
+  backControls: BACK_CONTROL_ACTIONS,
+  stateField: 'state',
+});
+
+// The engine owns the queue, the cursor mechanics and the screen system. The game re-exports the
+// names so every existing caller keeps its import line.
+export { pushIntent, drainIntents, screenSystem, itemForStep, opensScreen, currentItem } from '../engine/js/navigation.js';
 
 

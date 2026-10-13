@@ -1,5 +1,5 @@
 // Piece lifecycle + difficulty ramp.
-import { COLS, ROWS, EMPTY, SOLID, TETROMINOES, PIECE_TYPES, PIECE_BOX, SRS_KICKS, BASE_FALL, MAX_FALL, SPAWN_INTERVAL, PLAYING, LINE_CLEAR_POINTS, LANDING_CELL_POINTS } from './constants.js';
+import { COLS, ROWS, EMPTY, SOLID, COLORS, TETROMINOES, PIECE_TYPES, PIECE_BOX, SRS_KICKS, BASE_FALL, MAX_FALL, SPAWN_INTERVAL, PLAYING, LINE_CLEAR_POINTS, LANDING_CELL_POINTS } from './constants.js';
 import { game, gameOver } from './state.js';
 import { getCell, setCell } from './grid.js';
 import { consumePieceAtHead, snakeTicksPerCell } from './snake.js';
@@ -27,6 +27,16 @@ export function pieceCells(p) {
     }
   }
   return cells;
+}
+
+// The piece painter, run by the engine canvas pass. It asks the canvas owner
+// for the 2d context and the cell primitive, so it needs no module-level canvas.
+export function paintPieces(pctx) {
+  const g = pctx.field.context();
+  g.fillStyle = COLORS.edible;
+  for (const p of game.play.pieces) {
+    for (const cell of pieceCells(p)) pctx.field.drawCell(cell.r, cell.c);
+  }
 }
 
 // True when a shape at (row, col) would leave the left/right edges or the

@@ -8,38 +8,47 @@
 // entry points.
 import { PLAYING, ROWS, SPAWN_INTERVAL, DURATION_MINUTES, TICKS_PER_MINUTE } from './constants.js';
 import { initGrid } from './grid.js';
-import { newScreen, resetScreen, applyGameOverScreen } from './screens.js';
+import { screenFields, applyGameOverScreen } from './screens.js';
+import { state, configureState, resetState } from '../engine/js/state.js';
 
-export const game = {
-  play: {
-    snake: [],
-    pieces: [],
-    snakeScore: 0,
-    tetrisScore: 0,
-    landedBlocks: 0,
-    completedPieces: 0, // pieces that either landed or were fully consumed
-    // Eaten cells beyond MAX_SNAKE_LEN. Each one recolours one body segment.
-    overflow: 0,
-    dir: { r: 0, c: 1 },
-    nextDir: { r: 0, c: 1 },
-    snakeAcc: 0,
-    spawnAcc: 0,
-    pieceMoveAcc: 0,
-    tick: 0,
-    gameOverReason: null, // why the last game ended: 'snake-death' | 'top-out' | 'time-up' | null
-    role: 'snake', // the side the player drives; the bot drives the other
-    // The finished game reported to the records layer: an array of
-    // { score, role } entries, or null when nothing is waiting. The core
-    // writes this field only; the records layer is the only board writer.
-    result: null,
-    // The match length the player chose before play, in minutes. A match cannot
-    // start without it: every path into play passes through the duration screen.
-    durationMinutes: DURATION_MINUTES[0],
-    // The countdown budget in engine ticks, never wall-clock seconds.
-    durationTicks: DURATION_MINUTES[0] * TICKS_PER_MINUTE,
+// The engine skeleton holds the two containers; this module registers the
+// game's field tables into it and hands out the same binding every other
+// module already imports.
+export const game = state;
+
+// The gameplay fields, as [name, initial] pairs. The engine refills them on
+// every reset and never names one of them itself.
+const PLAY_FIELDS = [
+  ['snake', []],
+  ['pieces', []],
+  ['snakeScore', 0],
+  ['tetrisScore', 0],
+  ['landedBlocks', 0],
+  ['completedPieces', 0], // pieces that either landed or were fully consumed
+  ['overflow', 0], // eaten cells beyond MAX_SNAKE_LEN, each recolours one segment
+  ['dir', { r: 0, c: 1 }],
+  ['nextDir', { r: 0, c: 1 }],
+  ['snakeAcc', 0],
+  ['spawnAcc', 0],
+  ['pieceMoveAcc', 0],
+  ['tick', 0], // the engine owns this slot: it advances it once per tick
+  ['gameOverReason', null], // 'snake-death' | 'top-out' | 'time-up' | null
+  ['role', 'snake'], // the side the player drives; the bot drives the other
+  ['result', null], // the finished game waiting for the records layer
+  ['durationMinutes', DURATION_MINUTES[0]],
+  ['durationTicks', DURATION_MINUTES[0] * TICKS_PER_MINUTE],
+];
+
+// The engine refills both halves from the tables, then runs this hook so the
+// game can rebuild what no table can express: the grid and the starting snake.
+configureState({
+  play: PLAY_FIELDS,
+  screen: screenFields(),
+  afterReset: () => {
+    initGrid();
+    resetSnake();
   },
-  screen: newScreen(),
-};
+});
 
 function resetSnake() {
   const mid = Math.floor(ROWS / 2);
@@ -52,29 +61,10 @@ function resetSnake() {
   game.play.nextDir = { r: 0, c: 1 };
 }
 
-// The gameplay half: grid, snake, pieces, scores, accumulators.
-function resetPlay() {
-  initGrid();
-  resetSnake();
-  game.play.pieces = [];
-  game.play.snakeScore = 0;
-  game.play.tetrisScore = 0;
-  game.play.landedBlocks = 0;
-  game.play.completedPieces = 0;
-  game.play.overflow = 0;
-  game.play.snakeAcc = 0;
-  game.play.spawnAcc = 0;
-  game.play.pieceMoveAcc = 0;
-  game.play.tick = 0;
-  game.play.gameOverReason = null;
-  game.play.result = null;
-}
-
-// The navigation half lives in js/screens.js: `resetScreen` replaces it with a
-// fresh one, so no navigation constant is named here.
+// The engine skeleton refills both halves from the registered tables and runs
+// the afterReset hook above, so this module names no reset step.
 export function resetGame() {
-  resetPlay();
-  resetScreen();
+  resetState();
 }
 
 export function startGame() {
@@ -138,6 +128,16 @@ export function advanceCountdown() {
   if (game.play.tick < game.play.durationTicks) return;
   gameOver('time-up');
 }
+
+// The countdown as a registry system. It declares only endTick, so the engine
+// runs it in the closing phase; its position in the systems list fixes that
+// closing order and not the update order.
+export const countdownSystem = {
+  name: 'countdown',
+  endTick(ctx) {
+    advanceCountdown();
+  },
+};
 
 // The seconds the interface shows: the tick budget left, rounded up so the
 // readout opens at the full minute and reaches 0 only on the final tick.

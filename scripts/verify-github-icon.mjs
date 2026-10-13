@@ -57,8 +57,8 @@ const jsFiles = readdirSync(jsDir)
 const noWindowOpen = jsFiles.every((f) => !/window\.open/.test(f.src));
 const noIconConstants = jsFiles.every((f) => !/GITHUB_ICON_/.test(f.src));
 const noOctocat = jsFiles.every((f) => !/drawOctocat/.test(f.src));
-const urlOnlyInConstants = jsFiles
-  .filter((f) => /GITHUB_URL/.test(f.src))
+const urlOwners = jsFiles
+  .filter((f) => /export\s+const\s+GITHUB_URL\b/.test(f.src))
   .map((f) => f.name);
 
 // ---------- Behavioural plumbing ----------
@@ -120,8 +120,8 @@ console.log('=== Nothing paints or opens the icon any more ===');
 check(noWindowOpen, 'no js/ file calls window.open');
 check(noIconConstants, 'no js/ file references GITHUB_ICON_*');
 check(noOctocat, 'no js/ file references drawOctocat');
-check(urlOnlyInConstants.length === 1 && urlOnlyInConstants[0] === 'constants.js',
-  'GITHUB_URL is declared once, in constants.js: ' + urlOnlyInConstants.join(', '));
+check(urlOwners.length === 1 && urlOwners[0] === 'copy.js',
+  'GITHUB_URL is declared once, in the page-copy owner: ' + urlOwners.join(', '));
 
 // ---------- Interface selection still cycles three items ----------
 

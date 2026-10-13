@@ -1,14 +1,22 @@
-// Rendering. The canvas + context are set by app.js (initRender); render()
-// reads the shared `game` state and the grid for painting.
+// Rendering. The engine owns the drawing buffer, its size and the cell primitive;
+// this module owns what the game paints: the grid, the solid blocks, the snake.
 import {
-  COLS, ROWS, CELL, SOLID, COLORS, TIER_WIDTH,
+  COLS, ROWS, CELL, BOARD_W, BOARD_H, SOLID, COLORS, TIER_WIDTH,
 } from './constants.js';
 import { game } from './state.js';
 import { getGrid } from './grid.js';
-import { pieceCells } from './pieces.js';
+import { paintPieces } from './pieces.js';
+import { createCanvas } from '../engine/js/canvas.js';
+import { paintCanvas, registerCanvasPainter } from '../engine/js/present.js';
 
-let canvas = null;
+// The engine drawing buffer: sized from the game's board numbers at construction.
+const field = createCanvas({ width: BOARD_W, height: BOARD_H, cell: CELL });
+
 let ctx = null;
+
+// The one paint context every canvas painter reads: the state root, and this
+// module's canvas owner (its buffer size, its 2d context, its cell helper).
+const paintCtx = { state: game, field };
 
 // The tier colours of the snake body, in recolor order: blue, then purple,
 // then gold. After gold the body stays gold.
@@ -24,14 +32,14 @@ export function bodyColor(index) {
   return TIERS[tier];
 }
 
-// Called by app.js after the canvas exists; stores it and its 2d context.
+// Called by app.js after the canvas exists; hands the element to the engine buffer
+// and registers the painters the engine pass runs, in draw order.
 export function initRender(canvasEl) {
-  canvas = canvasEl;
-  ctx = canvas.getContext('2d');
-}
-
-function drawCell(r, c) {
-  ctx.fillRect(c * CELL + 1, r * CELL + 1, CELL - 2, CELL - 2);
+  field.attach(canvasEl);
+  ctx = field.context();
+  registerCanvasPainter('field', paintField);
+  registerCanvasPainter('snake', paintSnake);
+  registerCanvasPainter('pieces', paintPieces);
 }
 
 function drawGrid() {
@@ -40,25 +48,27 @@ function drawGrid() {
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
     ctx.moveTo(c * CELL, 0);
-    ctx.lineTo(c * CELL, canvas.height);
+    ctx.lineTo(c * CELL, field.height());
     ctx.stroke();
   }
   for (let r = 1; r < ROWS; r++) {
     ctx.beginPath();
     ctx.moveTo(0, r * CELL);
-    ctx.lineTo(canvas.width, r * CELL);
+    ctx.lineTo(field.width(), r * CELL);
     ctx.stroke();
   }
   // The field limits read as a wall in the landed-block colour. The stroke is
   // inset by one pixel so a 2-pixel-wide stroke is not clipped by the canvas edge.
   ctx.strokeStyle = COLORS.solid;
   ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+  ctx.strokeRect(1, 1, field.width() - 2, field.height() - 2);
 }
 
-export function render() {
+// The field painter: background, inner grid lines, the frame, and the solid
+// blocks. Runs first so every later painter draws on top of it.
+function paintField(pctx) {
   ctx.fillStyle = COLORS.bg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, field.width(), field.height());
   drawGrid();
 
   // Solid blocks
@@ -66,20 +76,21 @@ export function render() {
   ctx.fillStyle = COLORS.solid;
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (grid[r][c] === SOLID) drawCell(r, c);
+      if (grid[r][c] === SOLID) field.drawCell(r, c);
     }
   }
+}
 
-  // Snake
+// The body painter: one cell per segment, head colour first, then the tier
+// colour the current overflow reaches at that index.
+function paintSnake(pctx) {
   for (let i = 0; i < game.play.snake.length; i++) {
     ctx.fillStyle = bodyColor(i);
-    drawCell(game.play.snake[i].r, game.play.snake[i].c);
+    field.drawCell(game.play.snake[i].r, game.play.snake[i].c);
   }
+}
 
-  // Falling pieces (edible while falling), drawn after the snake so they
-  // appear on top of it.
-  ctx.fillStyle = COLORS.edible;
-  for (const p of game.play.pieces) {
-    for (const cell of pieceCells(p)) drawCell(cell.r, cell.c);
-  }
+// The engine per-frame canvas pass: every registered painter, in draw order.
+export function render() {
+  paintCanvas(paintCtx);
 }

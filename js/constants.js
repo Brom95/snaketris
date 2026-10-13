@@ -1,232 +1,70 @@
-// snaketris — shared constants. No imports.
+// snaketris — constants shim. The three owners of these values live beside this
+// file: config.js holds the parameters the engine receives at construction,
+// rules.js holds the game rules, copy.js holds the page copy. This file stays
+// so every existing `from './constants.js'` import keeps working unchanged; a
+// consumer that knows which owner it wants may import that one directly.
+// These are re-exports only: they create no local binding here.
 
-// Grid cell identities
-export const EMPTY = 0;
-export const SNAKE = 1;
-export const EDIBLE = 2;
-export const SOLID = 3;
+export {
+  COLS,
+  ROWS,
+  CELL,
+  TICK,
+  BOARD_W,
+  BOARD_H,
+  FIELD_V_GAP,
+  FIELD_V_GAP_MOBILE,
+  UI_STACK_MAX_WIDTH,
+  UI_COLUMN_MIN,
+  twoPlayerOffered,
+} from './config.js';
 
-// Logical grid size (cells), scaled to CSS pixels.
-// Classic Tetris proportions: 10 wide × 20 tall.
-export const COLS = 10;
-export const ROWS = 20;
-export const CELL = 24; // cell size in CSS pixels
+export {
+  EMPTY,
+  SNAKE,
+  EDIBLE,
+  SOLID,
+  MENU,
+  SELECT_DURATION,
+  SELECT_ROLE,
+  SELECT_CONTROL,
+  PLAYING,
+  GAME_OVER,
+  RECORDS,
+  HELP,
+  GAME_CONTROL_INIT,
+  GAME_CONTROL_P1,
+  GAME_CONTROL_P2,
+  GAME_CONTROL_START,
+  SPAWN_INTERVAL,
+  DURATION_MINUTES,
+  TICKS_PER_MINUTE,
+  BASE_FALL,
+  MAX_FALL,
+  SNAKE_SPEED_DELTA,
+  MIN_SNAKE_TICKS,
+  MAX_SNAKE_LEN,
+  TIER_WIDTH,
+  PIECE_BONUS,
+  LINE_CLEAR_POINTS,
+  LANDING_CELL_POINTS,
+  TETROMINOES,
+  PIECE_TYPES,
+  PIECE_BOX,
+  SRS_KICKS,
+} from './rules.js';
 
-// State machine
-export const MENU = 'MENU';
-export const SELECT_DURATION = 'SELECT_DURATION';
-export const SELECT_ROLE = 'SELECT_ROLE';
-export const SELECT_CONTROL = 'SELECT_CONTROL';
-export const PLAYING = 'PLAYING';
-export const GAME_OVER = 'GAME_OVER';
-export const RECORDS = 'RECORDS';
-export const HELP = 'HELP';
-
-// The menu labels, in the order they appear as page elements in snaketris.html.
-export const MENU_ITEMS = ['Play', 'Two Players', 'Records', 'How to Play'];
-
-// The two roles, in the order they appear as page elements in snaketris.html.
-// Each role's marker is shown on the role sub-menu item and on every record
-// entry, so the same glyph is used in both places.
-export const ROLE_ITEMS = ['Snake', 'Tetris'];
-export const ROLE_MARKERS = { snake: '\u{1F40D}', tetris: '\u{1F3D7}\u{FE0F}' };
-
-// The role screen's selectable items in page order: the two roles plus Back.
-// The arrow cycles over this list; only the first two entries are roles.
-export const ROLE_SCREEN_ITEMS = ['Snake', 'Tetris', 'Back'];
-
-// The control confirmation screen's selectable items in page order: P1 select,
-// P2 select, Start (enabled after both confirm). Back is a separate always-
-// visible button outside this list.
-export const CONTROL_SCREEN_ITEMS = ['P1 Select', 'P2 Select', 'Start'];
-
-// The one-item-at-a-time control flow steps. The game enters GAME_CONTROL_P1
-// when two-player mode starts, moves to GAME_CONTROL_P2 once P1 locks a model,
-// and to GAME_CONTROL_START once P2 locks a model.
-export const GAME_CONTROL_INIT = 'GAME_CONTROL_INIT';
-export const GAME_CONTROL_P1 = 'GAME_CONTROL_P1';
-export const GAME_CONTROL_P2 = 'GAME_CONTROL_P2';
-export const GAME_CONTROL_START = 'GAME_CONTROL_START';
-
-// The four layout keys for each keyboard model, keyed by model name. A model is
-// "keyboard" when it has an entry here; gamepad and any other model are not.
-export const GAME_CONTROL_KEYBOARD_MODELS = {
-  wasd: ['w', 'a', 's', 'd'],
-  arrows: ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'],
-};
-
-// The keyboard model names, in display order. Kept separate so the UI can list
-// them without depending on the key arrays.
-export const GAME_CONTROL_KEYBOARD_MODEL_NAMES = ['wasd', 'arrows'];
-
-// The emoji marker shown with each player's name on the control screen.
-export const GAME_CONTROL_PLAYER_MARKERS = { 1: '\u{1F3AE}', 2: '\u{1F579}\u{FE0F}' }; // 🎮 🕹
-
-// Emoji marker shown with each keyboard model name in the key-hint line.
-export const GAME_CONTROL_MODEL_EMOJI = { wasd: '\u{2328}\u{FE0F}', arrows: '\u{2B06}\u{FE0F}\u{2B07}\u{FE0F}\u{2B05}\u{FE0F}\u{2B06}\u{FE0F}' }; // ⌨️ ⬆⬇⬅⬆
-
-// URL for the GitHub repository.
-export const GITHUB_URL = 'https://github.com/Brom95/snaketris';
-
-// Timing (fixed-timestep)
-export const TICK = 1 / 60;        // fixed update step, seconds
-export const SPAWN_INTERVAL = 60;  // new piece every N ticks
-
-// The selectable match durations, in the order they appear as page elements in
-// snaketris.html.
-export const DURATION_MINUTES = [1, 3, 5];
-
-// The duration screen's selectable items in page order: the three durations
-// plus Back. The arrow cycles over this list; only the first three entries are
-// durations.
-export const DURATION_SCREEN_ITEMS = ['1 minute', '3 minutes', '5 minutes', 'Back'];
-
-// One minute of engine time in ticks. A match counts down in ticks, never in
-// wall-clock seconds: the fixed-timestep accumulator stops advancing while the
-// tab is hidden, so a Date.now() countdown would skip time the player did not
-// play.
-export const TICKS_PER_MINUTE = 60 / TICK; // 3600 ticks at TICK = 1/60
-
-// Piece fall speed model (cells/tick)
-export const BASE_FALL = 0.04;     // base piece fall speed, cells per tick
-export const MAX_FALL = 0.9;       // hard cap so pieces never tunnel a cell
-// The snake moves SNAKE_SPEED_DELTA ticks/cell faster than the piece;
-// it is never slower than MIN_SNAKE_TICKS ticks/cell.
-export const SNAKE_SPEED_DELTA = 2;
-export const MIN_SNAKE_TICKS = 1;
-
-// Snake size: one head plus MAX_SNAKE_LEN - 1 body segments. Growth stops at
-// the cap; every later eaten cell is recorded as one overflow block, which
-// drives the body colour tiers.
-export const MAX_SNAKE_LEN = 10;
-export const TIER_WIDTH = MAX_SNAKE_LEN - 1; // body segments one tier colours
-
-// Scoring
-export const PIECE_BONUS = 4;             // extra points for eating a whole piece
-export const LINE_CLEAR_POINTS = 10;      // points for one cleared row
-export const LANDING_CELL_POINTS = 2;     // points for one landed solid block
-
-// Native (logical) board size in CSS pixels. The buffer is never resized;
-// only the CSS display size is scaled to fit the viewport (fitCanvas).
-export const BOARD_W = COLS * CELL;
-export const BOARD_H = ROWS * CELL;
-
-// Vertical gap (screen px) reserved between the field and the top/bottom
-// viewport edges: breathing room left above and below the board. Two native
-// cells ≈ one displayed cell at 1080 p (displayed cell ≈ 49 px) and more at
-// smaller viewports.
-export const FIELD_V_GAP = 2 * CELL;
-// On narrow viewports (≤ UI_STACK_MAX_WIDTH) the top/bottom reservation is
-// halved so the board starts higher on screen.
-export const FIELD_V_GAP_MOBILE = CELL;
-
-// Page layout (viewport px). The interface column is sized by its own rule and
-// never follows the field's scale; both values are mirrored verbatim in the
-// page CSS (snaketris.html): the `#ui` width and the stacking breakpoint.
-export const UI_STACK_MAX_WIDTH = 760; // at or below this viewport width the interface stacks above the field
-export const UI_COLUMN_MIN = 320; // mirrors `#ui { width: min(320px, 92vw) }`
-
-// The one viewport rule for the two-player menu item: a stacked layout is a
-// phone, and a phone has no second pad, so two-player mode is offered only when
-// the interface sits beside the field. js/ui.js hides the item and js/screens.js
-// keeps the menu cursor off it; both call this one predicate so the two rules
-// cannot drift apart. With no window present (a headless test that installs no
-// DOM stub) the wide layout is assumed, so navigation tests keep their old path.
-export function twoPlayerOffered() {
-  if (typeof window === 'undefined') return true;
-  return window.innerWidth > UI_STACK_MAX_WIDTH;
-}
-
-// Palette
-export const COLORS = {
-  bg: '#0b0e14',
-  grid: 'rgba(255,255,255,0.05)',
-  snakeHead: '#4ade80',
-  snakeBody: '#9ca3af',
-  tierBlue: '#2563eb',
-  tierPurple: '#8b5cf6',
-  tierGold: '#facc15',
-  edible: '#7dd3fc',
-  solid: '#f97316',
-  text: '#e8ecf4',
-  overlay: 'rgba(11,14,20,0.8)',
-};
-
-// The seven classic tetrominoes in Super Rotation System order. Each entry
-// holds the four rotation states of one piece; state 0 is the spawn state.
-// Offsets are [dr, dc] from the top-left corner of the piece's bounding box:
-// 4x4 for I, 2x2 for O, 3x3 for T, S, Z, L and J.
-export const TETROMINOES = {
-  I: [
-    [[1, 0], [1, 1], [1, 2], [1, 3]],
-    [[0, 2], [1, 2], [2, 2], [3, 2]],
-    [[2, 0], [2, 1], [2, 2], [2, 3]],
-    [[0, 1], [1, 1], [2, 1], [3, 1]],
-  ],
-  O: [
-    [[0, 0], [0, 1], [1, 0], [1, 1]],
-    [[0, 0], [0, 1], [1, 0], [1, 1]],
-    [[0, 0], [0, 1], [1, 0], [1, 1]],
-    [[0, 0], [0, 1], [1, 0], [1, 1]],
-  ],
-  T: [
-    [[0, 1], [1, 0], [1, 1], [1, 2]],
-    [[0, 1], [1, 1], [1, 2], [2, 1]],
-    [[1, 0], [1, 1], [1, 2], [2, 1]],
-    [[0, 1], [1, 0], [1, 1], [2, 1]],
-  ],
-  S: [
-    [[0, 1], [0, 2], [1, 0], [1, 1]],
-    [[0, 1], [1, 1], [1, 2], [2, 2]],
-    [[1, 1], [1, 2], [2, 0], [2, 1]],
-    [[0, 0], [1, 0], [1, 1], [2, 1]],
-  ],
-  Z: [
-    [[0, 0], [0, 1], [1, 1], [1, 2]],
-    [[0, 2], [1, 1], [1, 2], [2, 1]],
-    [[1, 0], [1, 1], [2, 1], [2, 2]],
-    [[0, 1], [1, 0], [1, 1], [2, 0]],
-  ],
-  L: [
-    [[0, 0], [1, 0], [2, 0], [2, 1]],
-    [[0, 0], [0, 1], [0, 2], [1, 0]],
-    [[0, 1], [0, 2], [1, 2], [2, 2]],
-    [[1, 2], [2, 0], [2, 1], [2, 2]],
-  ],
-  J: [
-    [[0, 2], [1, 2], [2, 1], [2, 2]],
-    [[1, 0], [2, 0], [2, 1], [2, 2]],
-    [[0, 0], [0, 1], [1, 0], [2, 0]],
-    [[0, 0], [0, 1], [0, 2], [1, 2]],
-  ],
-};
-
-// The piece types, in the order they appear in TETROMINOES.
-export const PIECE_TYPES = ['I', 'O', 'T', 'S', 'Z', 'L', 'J'];
-
-// Side of the SRS bounding box of each piece. A turn rotates a cell offset
-// about the centre of this box.
-export const PIECE_BOX = { I: 4, O: 2, T: 3, S: 3, Z: 3, L: 3, J: 3 };
-
-// Wall-kick offsets [dc, dr] tried in order for every state transition.
-// T, S, Z, L and J share one table; I has its own. Keys are 'from->to', and
-// the I keys are prefixed with 'I:'. The published SRS tables use (x, y) with
-// y pointing up, so the grid offset is (dc, dr) = (x, -y).
-export const SRS_KICKS = {
-  '0->1': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
-  '1->0': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
-  '1->2': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
-  '2->1': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
-  '2->3': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
-  '3->2': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
-  '3->0': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
-  '0->3': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
-  'I:0->1': [[0, 0], [-2, 0], [1, 0], [-2, 1], [1, -2]],
-  'I:1->0': [[0, 0], [2, 0], [-1, 0], [2, -1], [-1, 2]],
-  'I:1->2': [[0, 0], [-1, 0], [2, 0], [-1, -2], [2, 1]],
-  'I:2->1': [[0, 0], [1, 0], [-2, 0], [1, 2], [-2, -1]],
-  'I:2->3': [[0, 0], [2, 0], [-1, 0], [2, -1], [-1, 2]],
-  'I:3->2': [[0, 0], [-2, 0], [1, 0], [-2, 1], [1, -2]],
-  'I:3->0': [[0, 0], [1, 0], [-2, 0], [1, 2], [-2, -1]],
-  'I:0->3': [[0, 0], [-1, 0], [2, 0], [-1, -2], [2, 1]],
-};
+export {
+  MENU_ITEMS,
+  ROLE_ITEMS,
+  ROLE_MARKERS,
+  ROLE_SCREEN_ITEMS,
+  CONTROL_SCREEN_ITEMS,
+  GAME_CONTROL_KEYBOARD_MODELS,
+  GAME_CONTROL_KEYBOARD_MODEL_NAMES,
+  GAME_CONTROL_PLAYER_MARKERS,
+  GAME_CONTROL_MODEL_EMOJI,
+  GITHUB_URL,
+  DURATION_SCREEN_ITEMS,
+  COLORS,
+} from './copy.js';

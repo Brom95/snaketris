@@ -1,10 +1,11 @@
 // app.js — entry point. Wires every module, owns the game loop and the
 // canvas. Called once on module load (deferred `<script type="module">`),
 // so the DOM is parsed by the time it runs.
-import { COLS, ROWS, CELL, TICK } from './constants.js';
-import { game, resetGame, advanceCountdown } from './state.js';
+import { TICK } from './constants.js';
+import { game, resetGame, countdownSystem } from './state.js';
 import { loadBoard, recordsSystem } from './highscores.js';
-import { createClock, createEngine } from './engine.js';
+import { createClock } from '../engine/js/clock.js';
+import { createEngine } from '../engine/js/registry.js';
 import { botSystem } from './bot.js';
 import { snakeSystem } from './snake.js';
 import { piecesSystem } from './pieces.js';
@@ -15,18 +16,20 @@ import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
 // The ordered systems: the bot decides first (its direction is applied before
 // the snake steps), then the snake steps, then the pieces fall and eat, then
-// the records owner persists a result the core reported this tick, and last
-// the screen system drains the navigation intents the devices produced. The
-// records step runs before navigation so a same-tick restart cannot drop a
-// reported result. The registry holds no painting step: canvas painting and
-// page painting run once per rendered frame in frame(), not once per tick.
-export const systems = [botSystem, snakeSystem, piecesSystem, recordsSystem, screenSystem];
+// the countdown (which declares only endTick, so its place fixes the closing
+// order and not the update order), then the records owner persists a result
+// the core reported, and last the screen system drains the navigation intents
+// the devices produced. The records step runs before navigation so a same-tick
+// restart cannot drop a reported result. The registry holds no painting step:
+// canvas painting and page painting run once per rendered frame in frame(),
+// not once per tick.
+export const systems = [botSystem, snakeSystem, piecesSystem, countdownSystem, recordsSystem, screenSystem];
 const engine = createEngine(systems);
 
-// The context handed to each system's update(ctx). The systems read the
-// shared `game` module directly; ctx is the hook for any future per-frame
-// data a system needs (kept minimal now).
-const ctx = { game };
+// The context handed to each system's phase call. The engine reads the state
+// root through it: ctx.state.play.tick is the tick slot it owns, ctx.state.screen
+// is the navigation half it resets.
+const ctx = { state: game };
 
 // Fixed-timestep clock: accumulates frame time and yields 0..N ticks to run.
 // Mirrors the accumulator pattern that lived in app.update().
@@ -46,18 +49,12 @@ function fitField(force = false) {
   fitCanvas(band);
 }
 
-// One fixed-timestep tick: advance the shared tick counter and run every
-// system in declared order. The countdown runs last so a crash on the final
-// tick claims its own end reason before the countdown can report 'time-up'.
-// The countdown can report on the tick's closing edge, after the records step
-// already ran, so that step gets one more pass: it is a no-op unless a report
-// is waiting, and it keeps a time-up match's score on the board in the tick
-// that ended the match.
+// One fixed-timestep tick: the engine advances the tick slot it owns, runs
+// every system's update in declared order, then runs every endTick in declared
+// order. No entry point calls a system directly and none increments the tick.
 export function update() {
-  game.play.tick++;
   engine.update(ctx);
-  advanceCountdown();
-  recordsSystem.update(ctx);
+  engine.endTick(ctx);
 }
 
 // rAF callback: advance the clock, run that many ticks, then render.
@@ -74,11 +71,10 @@ export function frame(now) {
 }
 
 // Full setup: create/size the canvas, register input + render, seed state,
-// start the loop.
+// start the loop. The engine canvas owner sizes the buffer when the element
+// is attached, so the entry point names no board numbers.
 export function init() {
   const canvas = document.getElementById('game');
-  canvas.width = COLS * CELL;
-  canvas.height = ROWS * CELL;
   initRender(canvas);
   initInput(canvas);
   initUi();

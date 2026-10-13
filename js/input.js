@@ -4,23 +4,19 @@
 // setDirection (byte-for-byte stable) + canvas fitting + listener registration.
 
 import {
-  BOARD_W, BOARD_H,
   PLAYING, MENU, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER,
 } from './constants.js';
 import { game } from './state.js';
 import { pushIntent } from './screens.js';
-import { hitTargets, layoutRule } from './ui.js';
+import { hitTargets, sizeField } from './ui.js';
 import { requestPieceShift, rotatePiece } from './pieces.js';
 import {
   keyToIntent,
   keyboardModelForKey,
+  registerDeviceResolvers,
   setCanvas as deviceSetCanvas,
-  onPointerDown as devicePointerDown,
-  onPointerMove as devicePointerMove,
   onPointerUp as devicePointerUp,
-  onPointerCancel as devicePointerCancel,
   pollController as devicePoll,
-  clearControllerPrev,
 } from './devices.js';
 
 let canvas = null;
@@ -98,48 +94,23 @@ export function onPointerUp(e) {
 }
 
 // ---------- Canvas fitting + listener registration ----------
+// The viewport rule and the contain fit live in the engine (js/ui.js owns the
+// instance); this module only hands the field element to it.
 export function fitCanvas(reserved = 0) {
-  // Contain fit: scale so the whole board fits the viewport, preserving
-  // aspect ratio. No upper cap — the field may enlarge on large screens so
-  // it fills the smaller viewport side (e.g. full height on a desktop).
-  // Reserve the same gap the interface rule reports: the field is inset from the
-  // top and bottom viewport edges by at least one board cell of breathing room.
-  // On narrow viewports the reservation is halved so the board starts higher.
-  const gap = layoutRule().gap;
-  const availableH = Math.max(
-    window.innerHeight - 2 * gap - reserved,
-    gap
-  );
-  const scale = Math.min(
-    window.innerWidth / BOARD_W,
-    availableH / BOARD_H
-  );
-  canvas.style.width = (BOARD_W * scale) + 'px';
-  canvas.style.height = (BOARD_H * scale) + 'px';
+  sizeField(canvas, reserved);
 }
 
-// Called by app.js after the canvas exists; stores it and registers all
-// listeners. Keeps the dependency graph one-way (app -> input).
+// Called by app.js after the canvas exists; stores it and hands the surface to
+// the engine, which registers every device listener. Keeps the dependency graph
+// one-way (app -> input).
 export function initInput(canvasEl) {
   canvas = canvasEl;
   deviceSetCanvas(canvasEl);
-  canvas.addEventListener('pointerdown', devicePointerDown);
-  canvas.addEventListener('pointermove', devicePointerMove);
-  canvas.addEventListener('pointerup', onPointerUp);
-  canvas.addEventListener('pointercancel', devicePointerCancel);
-  canvas.addEventListener('keydown', onKey);
-  document.addEventListener('keydown', onKey);
-  // Gamepad connection lifecycle (design D5): clear any leftover controller
-  // poll state on connect/disconnect so no stale held state survives a gamepad
-  // change. Connection state itself is derived from polling, so no index
-  // bookkeeping is needed here.
-  window.addEventListener('gamepadconnected', clearControllerPrev);
-  window.addEventListener('gamepaddisconnected', clearControllerPrev);
-  // Interface elements live outside the canvas, so their pointer events never
-  // reach the canvas listeners; one document-level listener covers them and
-  // bails out for anything happening on the board (see onInterfacePointerUp).
-  // js/ui.js owns every interface element; this module hit-tests the same map.
-  document.addEventListener('pointerup', onInterfacePointerUp);
+  // The flow half of the resolvers: every shape the engine produces is routed
+  // through handleIntent, and the raw key/page events reach this module's own
+  // handlers. Registered here, not at module load, because the mapping module
+  // (js/devices.js) registers its own half first and this module imports it.
+  registerDeviceResolvers({ shape: handleIntent, key: onKey, page: onInterfacePointerUp });
 }
 
 // ---------- Interface (page) pointer input ----------

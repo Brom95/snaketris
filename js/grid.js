@@ -1,28 +1,23 @@
-// Grid model: one grid, every cell carries an identity.
+// The game grid: one instance of the engine grid, sized by the game's board
+// constants. Cell identities are the game's: EMPTY | SNAKE | EDIBLE | SOLID.
 import { COLS, ROWS, EMPTY } from './constants.js';
+import { createGrid } from '../engine/js/grid.js';
 
-// grid[row][col] — every cell carries an identity:
-// EMPTY | SNAKE | EDIBLE | SOLID
-// Snakes and falling pieces are tracked in their own lists; the grid
-// holds EMPTY/SOLID (plus the SNAKE/EDIBLE identities for completeness).
-let grid = [];
+const gridInstance = createGrid({ cols: COLS, rows: ROWS, empty: EMPTY });
 
 export function initGrid() {
-  grid = [];
-  for (let r = 0; r < ROWS; r++) {
-    grid.push(new Array(COLS).fill(EMPTY));
-  }
+  gridInstance.init();
 }
 
 export function getCell(row, col) {
-  return grid[row][col];
+  return gridInstance.getCell(row, col);
 }
 
 // Full grid snapshot for bulk rendering (render.js).
 export function getGrid() {
-  return grid;
+  return gridInstance.getGrid();
 }
 
 export function setCell(row, col, id) {
-  grid[row][col] = id;
+  gridInstance.setCell(row, col, id);
 }
