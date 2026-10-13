@@ -4,7 +4,7 @@
 // intent through one navigation path.
 
 import { game } from './state.js';
-import { currentControlPlayer, lockControlModel } from './screens.js';
+import { currentControlPlayer } from './screens.js';
 import { BOARD_W, BOARD_H } from './constants.js';
 
 let canvas = null;
@@ -96,14 +96,14 @@ function roleForKeyboardKey(k) {
   return null;
 }
 
-// The role the gamepad drives: the player who locked the gamepad model. Both
-// players locked it, or nobody did, leaves the first pad on P1 — js/devices.js
-// polls only one pad, so a second pad is out of scope.
-function roleForGamepad() {
+// The role one physical gamepad drives: the player who locked THAT pad. A pad
+// nobody owns drives nothing, so two players need two distinct pads. Outside a
+// two-player game the single role answers.
+function roleForPad(padId) {
   if (!game.screen.twoPlayerMode) return game.play.role;
-  if (game.screen.p1Model === 'gamepad') return game.screen.p1Role || game.play.role;
-  if (game.screen.p2Model === 'gamepad') return game.screen.p2Role;
-  return game.play.role;
+  if (game.screen.p1Pad === padId) return game.screen.p1Role || game.play.role;
+  if (game.screen.p2Pad === padId) return game.screen.p2Role;
+  return null;
 }
 
 // Keys while a game runs: the Tetris side steers the falling piece, the Snake
@@ -309,26 +309,9 @@ function menuIntent(state, s) {
   return null;
 }
 
-// Raw poll → intent. The D-pad/stick direction is applied when held (like
-// holding a key); the edge-only button state drives menu actions.
-export function pollController() {
-  if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return null;
-  const pads = navigator.getGamepads();
-  let gp = null;
-  for (let i = 0; i < pads.length; i++) {
-    if (pads[i]) { gp = pads[i]; break; }
-  }
-  if (!gp) {
-    // No gamepad: clear the pad's previous poll state so a reconnect cannot
-    // inherit a stale held state (design D3).
-    for (const id of connectedPadIds) {
-      const s = getPadState(id);
-      s.prevButtons = null;
-      s.prevStickDir = null;
-    }
-    return null;
-  }
-  if (!connectedPadIds.includes(gp.id)) connectedPadIds.push(gp.id);
+// One pad's poll → intent. Edge detection is per pad, so two pads never share
+// held state, and the pad's owner decides which character it steers.
+function readPad(gp) {
   const padState = getPadState(gp.id);
   const buttons = gp.buttons;
   const stick = stickDir(gp);
@@ -354,11 +337,18 @@ export function pollController() {
   const stickUpEdge = stickUp && !(padState.prevStickDir && padState.prevStickDir.r === -1);
   const stickDownEdge = stickDown && !(padState.prevStickDir && padState.prevStickDir.r === 1);
 
-  const intent = chooseIntent(game.screen.state, roleForGamepad(), {
-    aEdge, bEdge, upEdge, downEdge,
-    stickUpEdge, stickDownEdge,
-    leftNow, rightNow, upNow, downNow, stick,
-  });
+  const role = roleForPad(gp.id);
+  let intent = null;
+  // A pad no player owns drives no character while a game runs. It can still
+  // act on the navigation screens, where the action does not name a character.
+  if (role !== null || game.screen.state !== 'PLAYING') {
+    intent = chooseIntent(game.screen.state, role, {
+      aEdge, bEdge, upEdge, downEdge,
+      stickUpEdge, stickDownEdge,
+      leftNow, rightNow, upNow, downNow, stick,
+      padId: gp.id,
+    });
+  }
 
   // Update previous poll state on every pass, including the pass that emits
   // an intent. Without this, a held button re-fires its edge each frame.
@@ -374,16 +364,40 @@ export function pollController() {
   return intent;
 }
 
+// Raw poll → intent. Polls EVERY connected pad so each player drives their own
+// device, and returns the first intent a pad produced.
+export function pollController() {
+  if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return null;
+  const connected = routePads(navigator.getGamepads());
+  if (connected.length === 0) {
+    // No gamepad: clear every pad's previous poll state so a reconnect cannot
+    // inherit a stale held state (design D3).
+    for (const id of connectedPadIds) {
+      const s = getPadState(id);
+      s.prevButtons = null;
+      s.prevStickDir = null;
+    }
+    return null;
+  }
+  let first = null;
+  for (const gp of connected) {
+    const intent = readPad(gp);
+    if (first === null && intent) first = intent;
+  }
+  return first;
+}
+
 // State-dependent intent for one poll. Edge-only buttons drive menu actions;
 // the D-pad/stick direction is applied while held.
 function chooseIntent(state, role, s) {
   if (state === 'PLAYING') return playingIntent(role, s);
   if (state === 'MENU' || state === 'SELECT_ROLE') return menuIntent(state, s);
-  // Two-player control screen: A locks the next player's gamepad model, or
-  // starts the game once both players have locked. Edge-only, one press.
+  // Two-player control screen: A locks the next player's gamepad model, and
+  // names the pad they pressed with so the lock claims that device. Once both
+  // players have locked, A starts the game. Edge-only, one press.
   if (state === 'SELECT_CONTROL' && game.screen.twoPlayerMode) {
     const player = currentControlPlayer();
-    if (player) return { action: 'lockModel', model: 'gamepad' };
+    if (player) return { action: 'lockModel', model: 'gamepad', pad: s.padId };
     return { action: 'confirm' };
   }
   // B returns to the menu from the records and help views; A does the same

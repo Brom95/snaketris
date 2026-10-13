@@ -109,6 +109,17 @@ export const FIELD_V_GAP_MOBILE = CELL;
 export const UI_STACK_MAX_WIDTH = 760; // at or below this viewport width the interface stacks above the field
 export const UI_COLUMN_MIN = 320; // mirrors `#ui { width: min(320px, 92vw) }`
 
+// The one viewport rule for the two-player menu item: a stacked layout is a
+// phone, and a phone has no second pad, so two-player mode is offered only when
+// the interface sits beside the field. js/ui.js hides the item and js/screens.js
+// keeps the menu cursor off it; both call this one predicate so the two rules
+// cannot drift apart. With no window present (a headless test that installs no
+// DOM stub) the wide layout is assumed, so navigation tests keep their old path.
+export function twoPlayerOffered() {
+  if (typeof window === 'undefined') return true;
+  return window.innerWidth > UI_STACK_MAX_WIDTH;
+}
+
 // Palette
 export const COLORS = {
   bg: '#0b0e14',

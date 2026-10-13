@@ -13,6 +13,7 @@ import {
   ROLE_MARKERS,
   GAME_CONTROL_P1, GAME_CONTROL_P2, GAME_CONTROL_START,
   GAME_CONTROL_PLAYER_MARKERS,
+  twoPlayerOffered,
 } from './constants.js';
 
 // The transitions an item can ask for. The screen system is the only module
@@ -54,6 +55,7 @@ export const SCREENS = [
         hints: null,
         action: TRANSITIONS['two-player'],
         opens: SELECT_ROLE,
+        requiresWide: true,
       },
       {
         id: 'menu-item-records',
@@ -255,6 +257,10 @@ export function newScreen() {
     p2Selection: null,
     p1Model: null,
     p2Model: null,
+    // The physical gamepad each player owns, by Gamepad API id. A pad drives
+    // only the player who locked it, so two players need two distinct pads.
+    p1Pad: null,
+    p2Pad: null,
     controlError: '',
     controlConfirmed: false,
     gameControlStep: GAME_CONTROL_P1,
@@ -298,24 +304,32 @@ function advanceControlStep() {
   }
 }
 
-// Lock a player's control model from a single key press. Sets the selection
-// and the locked model, clears any previous conflict error, and advances the
-// control step. Returns true on success, or false when P2 tried to reuse P1's
-// keyboard layout. Gamepad is always shareable.
-export function lockControlModel(player, model) {
+// Lock a player's control model. A keyboard layout is exclusive: two players
+// cannot share one layout. A gamepad is exclusive too, and it is exclusive by
+// physical device: `pad` is the Gamepad API id of the pad the player pressed
+// with, and a pad the other player already owns is refused. Returns true on
+// success, or false when the model or the pad is already taken.
+export function lockControlModel(player, model, pad = null) {
   game.screen.controlError = '';
-  // P2: keyboard models are exclusive with P1's locked model; gamepad is
-  // shareable.
   if (player === 2 && model !== 'gamepad' && game.screen.p1Model === model) {
     game.screen.controlError = 'P2: cannot use the same layout as P1';
     return false;
   }
+  if (model === 'gamepad' && pad != null) {
+    const owner = player === 1 ? game.screen.p2Pad : game.screen.p1Pad;
+    if (owner === pad) {
+      game.screen.controlError = `P${player}: cannot use the same gamepad as P${player === 1 ? 2 : 1}`;
+      return false;
+    }
+  }
   if (player === 1) {
     game.screen.p1Selection = model;
     game.screen.p1Model = model;
+    game.screen.p1Pad = model === 'gamepad' ? pad : null;
   } else {
     game.screen.p2Selection = model;
     game.screen.p2Model = model;
+    game.screen.p2Pad = model === 'gamepad' ? pad : null;
   }
   advanceControlStep();
   return true;
@@ -326,12 +340,14 @@ export function lockControlModel(player, model) {
 export function reassignP1() {
   game.screen.p1Selection = null;
   game.screen.p1Model = null;
+  game.screen.p1Pad = null;
   game.screen.gameControlStep = GAME_CONTROL_P1;
 }
 
 export function reassignP2() {
   game.screen.p2Selection = null;
   game.screen.p2Model = null;
+  game.screen.p2Pad = null;
   game.screen.gameControlStep = GAME_CONTROL_P2;
 }
 
@@ -385,6 +401,7 @@ function applyAction(item, intent) {
       game.screen.state = item.opens;
       return true;
     case TRANSITIONS['two-player']:
+      if (!offersItem(item)) return false;
       game.screen.twoPlayerMode = true;
       game.screen.state = item.opens;
       return true;
@@ -433,13 +450,26 @@ function currentItem(row) {
   return null;
 }
 
-// Move the arrow cursor one item, wrapping over the item list.
+// True when the interface can offer this item right now. A wide-only item is
+// hidden on a narrow viewport, so the cursor must never land on it.
+function offersItem(item) {
+  return !item.requiresWide || twoPlayerOffered();
+}
+
+// Move the arrow cursor one item, wrapping over the item list and skipping
+// items the viewport does not offer.
 function stepCursor(row, step) {
   if (row.cursor !== 'arrow' || row.items.length === 0) return false;
   const n = row.items.length;
   const field = row.selection;
-  game.screen[field] = (game.screen[field] + step + n) % n;
-  return true;
+  let index = game.screen[field];
+  for (let k = 0; k < n; k++) {
+    index = (index + step + n) % n;
+    if (!offersItem(row.items[index])) continue;
+    game.screen[field] = index;
+    return true;
+  }
+  return false;
 }
 
 // A pointer, key or pad named one item of the current screen by its page id.
@@ -476,12 +506,13 @@ function applyBack(row, intent) {
   return false;
 }
 
-// A layout key locks the model of the player whose step is on screen.
-function lockForCurrentStep(row, model) {
+// A layout key or a pad locks the model of the player whose step is on screen.
+// `pad` names the physical gamepad so the lock can claim that device.
+function lockForCurrentStep(row, model, pad) {
   if (row.cursor !== 'step' || !model) return false;
   const item = itemForStep(row.id, game.screen.gameControlStep);
   if (!item || item.action !== TRANSITIONS['lock-model']) return false;
-  return lockControlModel(item.player, model);
+  return lockControlModel(item.player, model, pad);
 }
 
 // The start key: in the main menu it opens the role sub-menu like the Play

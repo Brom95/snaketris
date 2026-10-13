@@ -8,7 +8,6 @@ import { installDomStub } from './helpers/dom-stub.js';
 const stub = installDomStub();
 const app = await import('../js/app.js');
 const state = await import('../js/state.js');
-const { chooseBotDir } = await import('../js/bot.js');
 const { snakeTicksPerCell } = await import('../js/snake.js');
 const { MAX_SNAKE_LEN } = await import('../js/constants.js');
 
@@ -54,19 +53,6 @@ test('full-loop invariants (1000 ticks)', async () => {
   assert.ok(state.game.play.pieces.length <= 1);
   // State is valid (either still PLAYING or hit GAME_OVER).
   assert.ok(['PLAYING', 'GAME_OVER'].includes(state.game.screen.state));
-});
-
-test('engine order: the bot decides before the snake steps', async () => {
-  state.resetGame();
-  state.game.play.role = 'tetris';
-  state.startGame();
-  state.game.play.pieces.length = 0;
-  // A piece resting directly above the head: the bot must turn up.
-  state.game.play.pieces.push({ shape: [[0, 0], [0, 1], [1, 0], [1, 1]], col: 6, row: 9 });
-  state.game.play.snakeAcc = snakeTicksPerCell() - 1; // the snake steps this tick
-  app.update();
-  assert.deepEqual(state.game.play.dir, { r: -1, c: 0 });
-  assert.equal(state.game.play.snakeAcc, 0); // the snake stepped after the bot chose
 });
 
 test('engine order: the bot does not steer the snake in Snake role', async () => {

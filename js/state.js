@@ -76,10 +76,12 @@ export function startGame() {
   if (game.screen.state === PLAYING) return;
   const role = game.play.role;
   const twoPlayer = game.screen.twoPlayerMode;
-  // Preserve the locked control models across the reset so the SHARED screen
-  // can re-show both layouts after a game ends (two-player mode).
+  // Preserve the locked control models and their pads across the reset so the
+  // SHARED screen can re-show both layouts after a game ends (two-player mode).
   const p1Model = game.screen.p1Model;
   const p2Model = game.screen.p2Model;
+  const p1Pad = game.screen.p1Pad;
+  const p2Pad = game.screen.p2Pad;
   resetGame();
   // resetGame clears the menu state; the role chosen before the game is kept.
   game.play.role = role;
@@ -89,6 +91,8 @@ export function startGame() {
     game.screen.p2Role = role === 'snake' ? 'tetris' : 'snake';
     game.screen.p1Model = p1Model;
     game.screen.p2Model = p2Model;
+    game.screen.p1Pad = p1Pad;
+    game.screen.p2Pad = p2Pad;
   }
   game.screen.state = PLAYING;
   // Prime the spawn accumulator so the first piece appears on the very next

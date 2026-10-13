@@ -210,3 +210,27 @@ test('a finished game lands on a screen the table resolves', async () => {
   assert.equal(screens.SCREEN_BY_ID[state.game.screen.state].id, C.SELECT_CONTROL);
   assert.equal(state.game.screen.gameControlStep, C.GAME_CONTROL_START);
 });
+
+test('a gamepad is locked by one player only', async () => {
+  state.resetGame();
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.twoPlayerMode, true);
+  assert.equal(state.game.screen.gameControlStep, C.GAME_CONTROL_P1);
+
+  assert.equal(screens.lockControlModel(1, 'gamepad', 'pad-a'), true);
+  assert.equal(state.game.screen.p1Model, 'gamepad');
+  assert.equal(state.game.screen.p1Pad, 'pad-a');
+  assert.equal(state.game.screen.gameControlStep, C.GAME_CONTROL_P2);
+
+  assert.equal(screens.lockControlModel(2, 'gamepad', 'pad-a'), false);
+  assert.equal(state.game.screen.controlError, 'P2: cannot use the same gamepad as P1');
+  assert.equal(state.game.screen.p2Model, null);
+  assert.equal(state.game.screen.p2Pad, null);
+  assert.equal(state.game.screen.gameControlStep, C.GAME_CONTROL_P2);
+
+  assert.equal(screens.lockControlModel(2, 'gamepad', 'pad-b'), true);
+  assert.equal(state.game.screen.p2Pad, 'pad-b');
+  assert.equal(state.game.screen.gameControlStep, C.GAME_CONTROL_START);
+});

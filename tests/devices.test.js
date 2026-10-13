@@ -218,18 +218,102 @@ test('a keyboard layout no player locked drives nothing', () => {
   assert.deepEqual(devices.keyToIntent('a'), { dir: { r: 0, c: -1 } });
 });
 
-test('the pad drives the player who locked the gamepad model', () => {
+test('the pad drives the player who locked THAT pad', () => {
   startIn('PLAYING', 'snake');
   game.screen.twoPlayerMode = true;
   game.screen.p1Role = 'tetris';
   game.screen.p2Role = 'snake';
   game.screen.p1Model = 'gamepad';
+  game.screen.p1Pad = 'pad-a';
   game.screen.p2Model = 'wasd';
 
+  const padA = { id: 'pad-a', buttons: [], axes: [0, 0] };
+  for (let i = 0; i < 16; i++) padA.buttons.push({ pressed: i === 14 });
   stub.gamepads.length = 0;
-  stub.gamepads.push(makePad([14])); // D-pad left
+  stub.gamepads.push(padA);
   assert.deepEqual(devices.pollController(), { action: 'pieceShift', dc: -1 });
 
   // P2 kept the WASD layout, so those keys still steer the snake.
   assert.deepEqual(devices.keyToIntent('a'), { dir: { r: 0, c: -1 } });
+});
+
+test('each pad drives the character of the player who owns it', () => {
+  startIn('PLAYING', 'snake');
+  game.screen.twoPlayerMode = true;
+  game.screen.p1Role = 'snake';
+  game.screen.p2Role = 'tetris';
+  game.screen.p1Model = 'gamepad';
+  game.screen.p1Pad = 'pad-a';
+  game.screen.p2Model = 'gamepad';
+  game.screen.p2Pad = 'pad-b';
+
+  const padA = { id: 'pad-a', buttons: [], axes: [0, 0] };
+  const padB = { id: 'pad-b', buttons: [], axes: [0, 0] };
+  for (let i = 0; i < 16; i++) { padA.buttons.push({ pressed: false }); padB.buttons.push({ pressed: false }); }
+  padA.buttons[12].pressed = true; // D-pad up
+  padB.buttons[15].pressed = true; // D-pad right
+
+  // P1 owns pad A and took the Snake role: pad A steers the snake.
+  stub.gamepads.length = 0;
+  stub.gamepads.push(padA);
+  assert.deepEqual(devices.pollController(), { dir: { r: -1, c: 0 } });
+
+  // P2 owns pad B and took the Tetris role: pad B moves the piece, and pad A's
+  // held state never leaks into it.
+  stub.gamepads.length = 0;
+  stub.gamepads.push(padB);
+  assert.deepEqual(devices.pollController(), { action: 'pieceShift', dc: 1 });
+});
+
+test('a pad no player owns drives no character', () => {
+  startIn('PLAYING', 'snake');
+  game.screen.twoPlayerMode = true;
+  game.screen.p1Role = 'snake';
+  game.screen.p2Role = 'tetris';
+  game.screen.p1Model = 'wasd';
+  game.screen.p2Model = 'arrows';
+
+  const padC = { id: 'pad-c', buttons: [], axes: [0, 0] };
+  for (let i = 0; i < 16; i++) padC.buttons.push({ pressed: i === 12 });
+  stub.gamepads.length = 0;
+  stub.gamepads.push(padC);
+  assert.equal(devices.pollController(), null);
+});
+
+test('a narrow viewport never reaches two-player mode', () => {
+  screens.resetScreen();
+  stub.window.innerWidth = 300; // at or below UI_STACK_MAX_WIDTH: a phone
+  screens.pushIntent({ action: 'menuDown' });
+  screens.drainIntents();
+  // The cursor jumps over the hidden two-player item onto Records.
+  assert.equal(game.screen.menuSelect, 2);
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(game.screen.state, 'RECORDS');
+  assert.equal(game.screen.twoPlayerMode, false);
+
+  screens.pushIntent({ action: 'toMenu' });
+  screens.drainIntents();
+  assert.equal(game.screen.state, 'MENU');
+  assert.equal(game.screen.menuSelect, 0);
+
+  screens.pushIntent({ action: 'menuUp' });
+  screens.drainIntents();
+  assert.equal(game.screen.menuSelect, 3); // Help
+  screens.pushIntent({ action: 'menuUp' });
+  screens.drainIntents();
+  assert.equal(game.screen.menuSelect, 2); // Records
+  screens.pushIntent({ action: 'menuUp' });
+  screens.drainIntents();
+  assert.equal(game.screen.menuSelect, 0); // Play: the hidden item is skipped
+
+  // Even a pointer that names the hidden item cannot arm two-player mode.
+  screens.pushIntent({ action: 'select', id: 'menu-item-two-player' });
+  screens.drainIntents();
+  assert.equal(game.screen.state, 'MENU');
+  assert.equal(game.screen.menuSelect, 0);
+  assert.equal(game.screen.twoPlayerMode, false);
+
+  screens.resetScreen();
+  stub.window.innerWidth = 1920;
 });

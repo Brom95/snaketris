@@ -3,11 +3,11 @@
 // step with `game.screen.state`, the single view authority. Imports only constants.js
 // and state.js, so the module graph stays one-way (app -> ui).
 import {
-  MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER, PLAYING,
+  SELECT_ROLE, SELECT_CONTROL, RECORDS, GAME_OVER,
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
   ROLE_MARKERS,
-  GAME_CONTROL_P1, GAME_CONTROL_P2, GAME_CONTROL_START,
   GAME_CONTROL_PLAYER_MARKERS,
+  twoPlayerOffered,
 } from './constants.js';
 import { game } from './state.js';
 import { entryRole } from './highscores.js';
@@ -169,7 +169,7 @@ export function syncViews(recordsBoard) {
   // below UI_STACK_MAX_WIDTH.
   const twoPlayerItem = elById.get('menu-item-two-player');
   if (twoPlayerItem) {
-    twoPlayerItem.style.display = window.innerWidth > UI_STACK_MAX_WIDTH ? '' : 'none';
+    twoPlayerItem.style.display = twoPlayerOffered() ? '' : 'none';
   }
   paintHighlights(state);
   paintStageTitle(state, row);
