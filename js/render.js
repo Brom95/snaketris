@@ -37,18 +37,23 @@ function drawCell(r, c) {
 function drawGrid() {
   ctx.strokeStyle = COLORS.grid;
   ctx.lineWidth = 1;
-  for (let c = 0; c <= COLS; c++) {
+  for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
     ctx.moveTo(c * CELL, 0);
     ctx.lineTo(c * CELL, canvas.height);
     ctx.stroke();
   }
-  for (let r = 0; r <= ROWS; r++) {
+  for (let r = 1; r < ROWS; r++) {
     ctx.beginPath();
     ctx.moveTo(0, r * CELL);
     ctx.lineTo(canvas.width, r * CELL);
     ctx.stroke();
   }
+  // The field limits read as a wall in the landed-block colour. The stroke is
+  // inset by one pixel so a 2-pixel-wide stroke is not clipped by the canvas edge.
+  ctx.strokeStyle = COLORS.solid;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
 }
 
 export function render() {

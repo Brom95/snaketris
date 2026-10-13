@@ -62,7 +62,7 @@ function seededRandom() {
 export function installDomStub() {
   const ctxFake = new Proxy({
     fillRect: () => {}, stroke: () => {}, beginPath: () => {},
-    moveTo: () => {}, lineTo: () => {}, fillText: () => {},
+    moveTo: () => {}, lineTo: () => {}, fillText: () => {}, strokeRect: () => {},
   }, {
     set(t, p, v) { if (p in t) return true; t[p] = v; return true; }
   });
