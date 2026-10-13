@@ -5,12 +5,12 @@ import assert from 'node:assert/strict';
 import { installDomStub } from './helpers/dom-stub.js';
 
 const stub = installDomStub();
-const { game, resetGame, startGame, gameOver } = await import('../js/state.js');
+const { game, resetGame, startGame, gameOver, advanceCountdown } = await import('../js/state.js');
 const { toMenu } = await import('../js/screens.js');
 const ui = await import('../js/ui.js');
 const input = await import('../js/input.js');
 const {
-  ROLE_MARKERS, MENU, SELECT_ROLE, SELECT_CONTROL, PLAYING, GAME_OVER, RECORDS,
+  ROLE_MARKERS, MENU, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL, PLAYING, GAME_OVER, RECORDS, HELP,
   GAME_CONTROL_P1, GAME_CONTROL_P2, GAME_CONTROL_START, GAME_CONTROL_PLAYER_MARKERS,
 } = await import('../js/constants.js');
 const { FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H } = await import('../js/constants.js');
@@ -18,6 +18,7 @@ const { FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H } = await import('../j
 ui.initUi();
 
 const scoreEl = stub.elements.score;
+const timerEl = stub.elements.timer;
 const statusEl = stub.elements.status;
 const menuViewEl = stub.elements['menu-view'];
 const roleViewEl = stub.elements['role-view'];
@@ -267,4 +268,58 @@ test('initUi resolves both stage titles and each stage names itself, its positio
   game.screen.gameControlStep = GAME_CONTROL_START;
   ui.syncViews([]);
   assert.equal(controlTitleEl.textContent, 'Confirm controls — step 3 of 3: both players');
+});
+
+// ---------- The countdown readout -----------------------------------------
+test('the countdown readout is on screen only while a match runs or has just ended', () => {
+  resetGame();
+  for (const state of [MENU, SELECT_DURATION, SELECT_CONTROL, RECORDS, HELP]) {
+    game.screen.state = state;
+    ui.syncViews([]);
+    assert.ok(!on(timerEl), 'the countdown leaked into ' + state);
+  }
+
+  game.play.durationMinutes = 3;
+  startGame();
+  ui.syncViews([]);
+  assert.equal(game.screen.state, PLAYING);
+  assert.ok(on(timerEl));
+  assert.equal(timerEl.textContent, '180');
+
+  game.play.tick = 60;
+  ui.syncViews([]);
+  assert.equal(timerEl.textContent, '179');
+
+  game.play.tick = game.play.durationTicks;
+  advanceCountdown();
+  ui.syncViews([]);
+  assert.equal(game.screen.state, GAME_OVER);
+  assert.ok(on(timerEl));
+  assert.equal(timerEl.textContent, '0');
+});
+
+test('the game-over message names the time-up reason and both final scores', () => {
+  resetGame();
+  game.play.role = 'snake';
+  game.play.durationMinutes = 1;
+  startGame();
+  game.play.snakeScore = 8;
+  game.play.tetrisScore = 3;
+  game.play.tick = game.play.durationTicks;
+  advanceCountdown();
+  ui.syncViews([]);
+  assert.ok(statusEl.textContent.includes('time up'));
+  assert.ok(statusEl.textContent.includes('Snake 8, Tetris 3'));
+  assert.ok(statusEl.textContent.includes('Snake wins'));
+
+  resetGame();
+  game.play.role = 'tetris';
+  game.play.snakeScore = 4;
+  game.play.tetrisScore = 11;
+  game.play.tick = game.play.durationTicks;
+  gameOver('time-up');
+  ui.syncViews([]);
+  assert.ok(statusEl.textContent.includes('time up'));
+  assert.ok(statusEl.textContent.includes('Snake 4, Tetris 11'));
+  assert.ok(statusEl.textContent.includes('Tetris wins'));
 });

@@ -5,7 +5,7 @@
 
 import {
   BOARD_W, BOARD_H,
-  PLAYING, MENU, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER,
+  PLAYING, MENU, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL, RECORDS, HELP, GAME_OVER,
 } from './constants.js';
 import { game } from './state.js';
 import { pushIntent } from './screens.js';
@@ -167,7 +167,7 @@ export function onInterfacePointerUp(e) {
   const y = e.clientY;
   const state = game.screen.state;
   // The selection screens hit-test the element map js/ui.js owns, in table order.
-  if (state === MENU || state === SELECT_ROLE || state === SELECT_CONTROL) {
+  if (state === MENU || state === SELECT_DURATION || state === SELECT_ROLE || state === SELECT_CONTROL) {
     const el = firstHit(hitTargets(state), x, y);
     if (el) pushIntent({ action: 'select', id: el.id });
     return;

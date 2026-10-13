@@ -3,19 +3,20 @@
 // step with `game.screen.state`, the single view authority. Imports only constants.js
 // and state.js, so the module graph stays one-way (app -> ui).
 import {
-  SELECT_ROLE, SELECT_CONTROL, RECORDS, GAME_OVER,
+  SELECT_ROLE, SELECT_DURATION, SELECT_CONTROL, PLAYING, RECORDS, GAME_OVER,
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
   ROLE_MARKERS,
   GAME_CONTROL_PLAYER_MARKERS,
   twoPlayerOffered,
 } from './constants.js';
-import { game } from './state.js';
+import { game, remainingSeconds } from './state.js';
 import { entryRole } from './highscores.js';
 import { SCREENS, SCREEN_BY_ID, itemForStep, controlModelAssigned } from './screens.js';
 
 // Elements this module owns that the screen table does not name.
 let uiEl = null;
 let scoreEl = null;
+let timerEl = null;
 let statusEl = null;
 let recordsListEl = null;
 let recordsEmptyEl = null;
@@ -42,6 +43,7 @@ const summaryElsByPlayer = new Map();
 export function initUi() {
   uiEl = document.getElementById('ui');
   scoreEl = document.getElementById('score');
+  timerEl = document.getElementById('timer');
   statusEl = document.getElementById('status');
   recordsListEl = document.getElementById('records-list');
   recordsEmptyEl = document.getElementById('records-empty');
@@ -135,7 +137,8 @@ function statusText() {
   else if (game.play.gameOverReason === 'top-out') winner = 'Snake wins';
   else if (game.play.snakeScore > game.play.tetrisScore) winner = 'Snake wins';
   else if (game.play.tetrisScore > game.play.snakeScore) winner = 'Tetris wins';
-  return 'Game Over — Snake ' + game.play.snakeScore + ', Tetris ' + game.play.tetrisScore + ' — ' + winner +
+  const reason = game.play.gameOverReason === 'time-up' ? 'time up — ' : '';
+  return 'Game Over — ' + reason + 'Snake ' + game.play.snakeScore + ', Tetris ' + game.play.tetrisScore + ' — ' + winner +
     ' — press R or click for menu';
 }
 
@@ -144,11 +147,13 @@ function statusText() {
 // overlay over the top edge, so the full field height below that band is
 // unobstructed. Clearing any inline styles returns it to flow.
 function placeScore() {
-  if (!scoreEl) return;
-  scoreEl.style.position = '';
-  scoreEl.style.top = '';
-  scoreEl.style.left = '';
-  scoreEl.style.width = '';
+  for (const el of [scoreEl, timerEl]) {
+    if (!el) continue;
+    el.style.position = '';
+    el.style.top = '';
+    el.style.left = '';
+    el.style.width = '';
+  }
 }
 
 // The one view authority: `game.screen.state` decides which interface elements are
@@ -160,6 +165,12 @@ export function syncViews(recordsBoard) {
   const fieldOn = row !== undefined && row.field;
   show(fieldEl, fieldOn);
   show(scoreEl, fieldOn);
+  // The countdown is plain remaining seconds with no unit suffix, on screen only
+  // while a match is running or has just ended.
+  if (timerEl) {
+    timerEl.textContent = String(remainingSeconds());
+    show(timerEl, state === PLAYING || state === GAME_OVER);
+  }
   placeScore();
   show(statusEl, state === GAME_OVER);
   if (state === GAME_OVER && statusEl) statusEl.textContent = statusText();

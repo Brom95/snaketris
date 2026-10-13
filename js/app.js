@@ -2,13 +2,13 @@
 // canvas. Called once on module load (deferred `<script type="module">`),
 // so the DOM is parsed by the time it runs.
 import { COLS, ROWS, CELL, TICK } from './constants.js';
-import { game, resetGame } from './state.js';
+import { game, resetGame, advanceCountdown } from './state.js';
 import { loadBoard, recordsSystem } from './highscores.js';
 import { createClock, createEngine } from './engine.js';
 import { botSystem } from './bot.js';
 import { snakeSystem } from './snake.js';
 import { piecesSystem } from './pieces.js';
-import { screenSystem } from './screens.js';
+import { screenSystem, selectedBoardMinutes } from './screens.js';
 import { initInput, fitCanvas, pollController } from './input.js';
 import { initRender, render } from './render.js';
 import { initUi, syncViews, interfaceBandHeight } from './ui.js';
@@ -47,10 +47,17 @@ function fitField(force = false) {
 }
 
 // One fixed-timestep tick: advance the shared tick counter and run every
-// system in declared order. The systems each guard on game.screen.state themselves.
+// system in declared order. The countdown runs last so a crash on the final
+// tick claims its own end reason before the countdown can report 'time-up'.
+// The countdown can report on the tick's closing edge, after the records step
+// already ran, so that step gets one more pass: it is a no-op unless a report
+// is waiting, and it keeps a time-up match's score on the board in the tick
+// that ended the match.
 export function update() {
   game.play.tick++;
   engine.update(ctx);
+  advanceCountdown();
+  recordsSystem.update(ctx);
 }
 
 // rAF callback: advance the clock, run that many ticks, then render.
@@ -62,7 +69,7 @@ export function frame(now) {
   for (let i = 0; i < n; i++) update();
   pollController();
   render();
-  syncViews(game.screen.state === 'RECORDS' ? loadBoard() : null);
+  syncViews(game.screen.state === 'RECORDS' ? loadBoard(selectedBoardMinutes()) : null);
   fitField();
 }
 

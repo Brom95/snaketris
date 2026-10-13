@@ -38,7 +38,9 @@ const menu = await freshPage(context, ROOT);
 const menuItems = await menu.$$eval('#menu-items > li', (els) => els.map((e) => e.textContent));
 check(menuItems.length === MENU_ITEMS.length, 'main menu has ' + MENU_ITEMS.length + ' items: ' + menuItems.join(', '));
 await menu.click('#menu-item-play');
-await stateIs(menu, 'SELECT_ROLE');
+check(await stateIs(menu, 'SELECT_DURATION'), 'confirming Play opens the duration sub-menu');
+await menu.click('#duration-item-1');
+check(await stateIs(menu, 'SELECT_ROLE'), 'confirming 1 minute opens the role screen');
 const roleTexts = await menu.$$eval('#role-items > li', (els) => els.map((e) => e.textContent));
 check(roleTexts.length === 3, 'role screen has three selectable items: ' + roleTexts.join(' | '));
 check(roleTexts[0].includes('\u{1F40D}'), 'the Snake item carries the snake marker');
@@ -50,9 +52,11 @@ check(await shown(menu, '#menu-items', false), 'the menu items are hidden on the
 check(await shown(menu, '#github-link', false), 'the GitHub link is hidden on the role screen');
 check(await shown(menu, '#role-back', true), 'the role screen shows a Back control');
 await menu.click('#role-back');
-check(await stateIs(menu, 'MENU'), 'Back returns to the main menu');
-check(await shown(menu, '#menu-items', true), 'the menu items are visible again after Back');
+check(await stateIs(menu, 'SELECT_DURATION'), 'Back from the role screen returns to the duration sub-menu');
 check(await shown(menu, '#role-view', false), 'the role screen is hidden after Back');
+await menu.click('#duration-back');
+check(await stateIs(menu, 'MENU'), 'Back from the duration sub-menu returns to the main menu');
+check(await shown(menu, '#menu-items', true), 'the menu items are visible again after Back');
 
 console.log('=== Static menu geometry ===');
 const menuSets = await boxesAtEverySelection(menu, '#menu-items > li', 3, 'ArrowDown');
@@ -68,6 +72,8 @@ check(menuSets.every((set) => set.every((b) => b.marker === '0' || b.marker === 
 
 console.log('=== Static role-screen geometry ===');
 await menu.click('#menu-item-play');
+await stateIs(menu, 'SELECT_DURATION');
+await menu.click('#duration-item-1');
 await stateIs(menu, 'SELECT_ROLE');
 const roleSets = await boxesAtEverySelection(menu, '#role-items > li', 3, 'ArrowDown');
 check(stable(roleSets, 'width'), 'every role item keeps its width while the arrow moves: ' +
@@ -207,7 +213,7 @@ await stateIs(snake.page, 'MENU');
 await snake.page.click('#menu-item-records');
 await stateIs(snake.page, 'RECORDS');
 await waitFor(snake.page, () => document.querySelectorAll('#records-list > li').length > 0, undefined, 5000);
-const stored = await snake.page.evaluate(() => localStorage.getItem('snaketris.highscores'));
+const stored = await snake.page.evaluate(() => localStorage.getItem('snaketris.highscores.1'));
 dump('stored board', stored);
 const rows = await snake.page.$$eval('#records-list > li', (els) => els.map((e) => e.textContent));
 check(rows.length > 0, 'the records board lists ' + rows.length + ' entry(ies)');

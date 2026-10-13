@@ -63,14 +63,14 @@ export function swipeToDir(dx, dy) {
   return dy < 0 ? { r: -1, c: 0 } : { r: 1, c: 0 };
 }
 
-// Navigation keys for the main menu and the role sub-menu. R starts a game
-// from the main menu; Escape leaves the sub-menu.
+// Navigation keys for the main menu and the two sub-menus below it. R starts a
+// game from the main menu; Escape leaves a sub-menu.
 function menuKeyIntent(k, state) {
   if (k === 'arrowup' || k === 'w') return { action: 'menuUp' };
   if (k === 'arrowdown' || k === 's') return { action: 'menuDown' };
   if (k === 'enter' || k === ' ') return { action: 'confirm' };
   if (state === 'MENU' && k === 'r') return { action: 'startGame' };
-  if (state === 'SELECT_ROLE' && k === 'escape') return { action: 'toMenu' };
+  if ((state === 'SELECT_ROLE' || state === 'SELECT_DURATION') && k === 'escape') return { action: 'toMenu' };
   return null;
 }
 
@@ -130,7 +130,7 @@ const TAP_THRESHOLD = 24; // displacement below one cell classifies as a tap
 // every action; pointer and gamepad cover a subset.
 export function keyToIntent(key) {
   const k = key.toLowerCase();
-  if (game.screen.state === 'MENU' || game.screen.state === 'SELECT_ROLE') return menuKeyIntent(k, game.screen.state);
+  if (game.screen.state === 'MENU' || game.screen.state === 'SELECT_ROLE' || game.screen.state === 'SELECT_DURATION') return menuKeyIntent(k, game.screen.state);
   if (game.screen.state === 'PLAYING') return playingKeyIntent(k);
   if (game.screen.state === 'RECORDS' || game.screen.state === 'HELP') {
     return (k === 'enter' || k === ' ' || k === 'escape') ? { action: 'toMenu' } : null;
@@ -299,13 +299,15 @@ function pieceSteerIntent(s) {
   return null;
 }
 
-// Intent in the main menu and the role sub-menu: up/down move the highlight
-// (edge-only), A confirms. B cancels the sub-menu only.
+// Intent in the main menu and the sub-menus below it: up/down move the highlight
+// (edge-only), A confirms, B leaves the sub-menu for the menu.
 function menuIntent(state, s) {
   if (s.upEdge || s.stickUpEdge) return { action: 'menuUp' };
   if (s.downEdge || s.stickDownEdge) return { action: 'menuDown' };
   if (s.aEdge) return { action: 'confirm' };
-  if (state === 'SELECT_ROLE' && s.bEdge) return { action: 'toMenu' };
+  if (state === 'SELECT_ROLE' || state === 'SELECT_DURATION') {
+    if (s.bEdge) return { action: 'toMenu' };
+  }
   return null;
 }
 
@@ -391,7 +393,7 @@ export function pollController() {
 // the D-pad/stick direction is applied while held.
 function chooseIntent(state, role, s) {
   if (state === 'PLAYING') return playingIntent(role, s);
-  if (state === 'MENU' || state === 'SELECT_ROLE') return menuIntent(state, s);
+  if (state === 'MENU' || state === 'SELECT_ROLE' || state === 'SELECT_DURATION') return menuIntent(state, s);
   // Two-player control screen: A locks the next player's gamepad model, and
   // names the pad they pressed with so the lock claims that device. Once both
   // players have locked, A starts the game. Edge-only, one press.

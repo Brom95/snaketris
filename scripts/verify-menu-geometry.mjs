@@ -11,7 +11,7 @@
 // Run: node scripts/verify-menu-geometry.mjs
 
 import { check, makeCanvas, report, stubDom } from './harness.mjs';
-import { MENU_ITEMS, MENU, SELECT_ROLE, RECORDS, HELP } from '../js/constants.js';
+import { MENU_ITEMS, MENU, SELECT_DURATION, SELECT_ROLE, RECORDS, HELP, DURATION_SCREEN_ITEMS } from '../js/constants.js';
 import { game } from '../js/state.js';
 import { drainIntents, toMenu } from '../js/screens.js';
 import { initInput, onKey } from '../js/input.js';
@@ -46,9 +46,15 @@ const highlightCss = /#menu-items li\.on\b/.test(page) || /li\.on\s*\{/.test(pag
 // Rich enough DOM for ui.js: classList.toggle drives the view/highlight
 // visibility, getBoundingClientRect feeds the interface hit test.
 const dom = stubDom({
-  elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
+  elements: ['ui', 'score', 'status', 'menu-view', 'duration-view', 'role-view', 'records-view', 'help-view',
     'records-list', 'records-empty'],
   lists: { '#menu-items > li': ['menu-item-play', 'menu-item-two-player', 'menu-item-records', 'menu-item-help'] },
+  rects: {
+    'duration-item-1': { left: 0, top: 0, right: 170, bottom: 24 },
+    'duration-item-3': { left: 0, top: 24, right: 170, bottom: 48 },
+    'duration-item-5': { left: 0, top: 48, right: 170, bottom: 72 },
+    'duration-back': { left: 0, top: 72, right: 170, bottom: 96 },
+  },
   window: { innerWidth: 1280, innerHeight: 800 },
   canvas: makeCanvas(),
 });
@@ -85,6 +91,46 @@ for (let sel = 0; sel < MENU_ITEMS.length; sel++) {
     'menuSelect=' + sel + ' highlights only ' + items[sel].id);
 }
 
+// ---------- The duration sub-menu markup and boxes ----------
+
+console.log('=== The duration sub-menu is page markup with its own boxes ===');
+
+const durationList = /<ul id="duration-items">([\s\S]*?)<\/ul>/.exec(page);
+check(durationList !== null, 'snaketris.html has <ul id="duration-items">');
+const durationItems = [];
+const durationTagRe = /<li id="(duration-[a-z0-9\-]+)"([^>]*)>([^<]*)<\/li>/g;
+let d;
+while ((d = durationTagRe.exec(durationList ? durationList[1] : '')) !== null) {
+  durationItems.push({ id: d[1], attrs: d[2], label: d[3] });
+}
+check(durationItems.length === DURATION_SCREEN_ITEMS.length &&
+  durationItems.every((it, i) => it.label === DURATION_SCREEN_ITEMS[i]),
+  'the four duration items carry DURATION_SCREEN_ITEMS in order: ' + durationItems.map((it) => it.label).join(', '));
+check(durationItems.every((it) => /tabindex="-1"/.test(it.attrs)),
+  'every duration item carries tabindex="-1" so the browser never activates it natively');
+
+const durationBoxes = durationItems.map((it) => {
+  const b = dom.el(it.id).getBoundingClientRect();
+  return [b.left, b.top, b.right, b.bottom].join(':');
+});
+check(durationItems.length === 4 &&
+  durationBoxes.every((b) => !/:0:0$/.test(b)) &&
+  new Set(durationBoxes).size === durationItems.length,
+  'each of the four duration items reports a distinct box: ' + durationBoxes.join(' | '));
+
+// The highlight follows game.screen.durationSelect.
+toMenu();
+game.screen.state = SELECT_DURATION;
+for (let sel = 0; sel < DURATION_SCREEN_ITEMS.length; sel++) {
+  game.screen.durationSelect = sel;
+  syncViews(null);
+  const on = durationItems.filter((it) => dom.classes(it.id).has('on')).map((it) => it.id);
+  check(on.length === 1 && on[0] === durationItems[sel].id,
+    'durationSelect=' + sel + ' highlights only ' + durationItems[sel].id);
+}
+game.screen.state = MENU;
+game.screen.durationSelect = 0;
+
 // ---------- Keyboard cycle ----------
 
 console.log('=== Keyboard cycle performs one action per press ===');
@@ -107,7 +153,7 @@ check(game.screen.menuSelect === 2 && game.screen.state === MENU, 'ArrowUp: 3 ->
 toMenu();
 game.screen.menuSelect = 1;
 press('enter');
-check(game.screen.twoPlayerMode && game.screen.state === SELECT_ROLE, 'Enter on "Two Players" opens two-player role select');
+check(game.screen.twoPlayerMode && game.screen.state === SELECT_DURATION, 'Enter on "Two Players" opens the duration sub-menu');
 
 toMenu();
 game.screen.menuSelect = 2;
@@ -116,15 +162,25 @@ check(game.screen.state === RECORDS, 'Space on "Records" opens RECORDS');
 press('escape');
 check(game.screen.state === MENU, 'Escape in RECORDS returns to MENU');
 
-// "Play" no longer starts a game: it opens the role sub-menu.
+// "Play" no longer starts a game: it opens the duration sub-menu, and the
+// duration sub-menu opens the role sub-menu.
 toMenu();
 game.screen.menuSelect = 0;
 press('enter');
-check(game.screen.state === SELECT_ROLE, 'Enter on "Play" opens the role sub-menu');
+check(game.screen.state === SELECT_DURATION && game.screen.durationSelect === 0,
+  'Enter on "Play" opens the duration sub-menu at 1 minute');
+press('arrowdown');
+check(game.screen.durationSelect === 1 && game.screen.state === SELECT_DURATION,
+  'ArrowDown in the duration sub-menu: 1 minute -> 3 minutes');
+press('enter');
+check(game.screen.state === SELECT_ROLE && game.play.durationMinutes === 3,
+  'Enter on "3 minutes" stores the duration and opens the role sub-menu');
+press('escape');
+check(game.screen.state === SELECT_DURATION, 'Escape in the role sub-menu returns to the duration sub-menu');
 
 toMenu();
 press('r');
-check(game.screen.state === SELECT_ROLE, 'R opens the role sub-menu from the menu');
+check(game.screen.state === SELECT_DURATION, 'R opens the duration sub-menu from the menu');
 
 // A single press must not advance the selection twice.
 toMenu();

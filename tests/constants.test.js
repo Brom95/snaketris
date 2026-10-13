@@ -93,6 +93,20 @@ test('state machine includes the role-select state', () => {
   assert.equal(C.MENU_ITEMS.length, 4);
 });
 
+test('state machine includes the duration-select state', () => {
+  assert.equal(C.SELECT_DURATION, 'SELECT_DURATION');
+});
+
+test('the three match durations and their tick budgets are defined', () => {
+  assert.deepEqual(C.DURATION_MINUTES, [1, 3, 5]);
+  assert.deepEqual(C.DURATION_SCREEN_ITEMS, ['1 minute', '3 minutes', '5 minutes', 'Back']);
+  assert.equal(C.TICKS_PER_MINUTE, 3600);
+  assert.deepEqual(
+    C.DURATION_MINUTES.map((m) => m * C.TICKS_PER_MINUTE),
+    [3600, 10800, 18000],
+  );
+});
+
 test('role items and markers are defined', () => {
   assert.deepEqual(C.ROLE_ITEMS, ['Snake', 'Tetris']);
   assert.deepEqual(C.ROLE_SCREEN_ITEMS, ['Snake', 'Tetris', 'Back']);

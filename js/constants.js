@@ -14,6 +14,7 @@ export const CELL = 24; // cell size in CSS pixels
 
 // State machine
 export const MENU = 'MENU';
+export const SELECT_DURATION = 'SELECT_DURATION';
 export const SELECT_ROLE = 'SELECT_ROLE';
 export const SELECT_CONTROL = 'SELECT_CONTROL';
 export const PLAYING = 'PLAYING';
@@ -70,6 +71,21 @@ export const GITHUB_URL = 'https://github.com/Brom95/snaketris';
 // Timing (fixed-timestep)
 export const TICK = 1 / 60;        // fixed update step, seconds
 export const SPAWN_INTERVAL = 60;  // new piece every N ticks
+
+// The selectable match durations, in the order they appear as page elements in
+// snaketris.html.
+export const DURATION_MINUTES = [1, 3, 5];
+
+// The duration screen's selectable items in page order: the three durations
+// plus Back. The arrow cycles over this list; only the first three entries are
+// durations.
+export const DURATION_SCREEN_ITEMS = ['1 minute', '3 minutes', '5 minutes', 'Back'];
+
+// One minute of engine time in ticks. A match counts down in ticks, never in
+// wall-clock seconds: the fixed-timestep accumulator stops advancing while the
+// tab is hidden, so a Date.now() countdown would skip time the player did not
+// play.
+export const TICKS_PER_MINUTE = 60 / TICK; // 3600 ticks at TICK = 1/60
 
 // Piece fall speed model (cells/tick)
 export const BASE_FALL = 0.04;     // base piece fall speed, cells per tick

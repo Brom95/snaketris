@@ -27,6 +27,12 @@ const recordsList = page.includes('<ol id="records-list">');
 const recordsEmpty = page.includes('<p id="records-empty" class="view">No scores yet — play a game!</p>');
 const recordsReturn = page.includes('<p id="records-return" class="return">Menu</p>');
 
+// The records view carries its own duration selector above the list: one item per
+// board, and the cursor names the board the list paints.
+const recordsBoards = page.includes('<ul id="records-boards">');
+const boardItems = ['records-board-1', 'records-board-3', 'records-board-5'];
+const boardMarkup = boardItems.every((id) => page.includes('<li id="' + id + '" tabindex="-1">'));
+
 const helpHeading = page.includes('<h2 id="help-title">How to Play</h2>');
 const controlsSection = page.includes('<section id="help-controls">') && page.includes('<h3>Controls</h3>');
 const rulesSection = page.includes('<section id="help-rules">') && page.includes('<h3>Rules</h3>');
@@ -64,7 +70,13 @@ const noCanvasViews = !/drawRecords|drawHelp|formatDate/.test(renderSrc);
 
 const dom = stubDom({
   elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
-    'records-list', 'records-empty'],
+    'records-list', 'records-empty', 'records-boards',
+    'records-board-1', 'records-board-3', 'records-board-5'],
+  rects: {
+    'records-board-1': { left: 0, top: 0, right: 170, bottom: 24, width: 170, height: 24 },
+    'records-board-3': { left: 0, top: 24, right: 170, bottom: 48, width: 170, height: 24 },
+    'records-board-5': { left: 0, top: 48, right: 170, bottom: 72, width: 170, height: 24 },
+  },
   lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'] },
   storage: new Map(),
 });
@@ -87,6 +99,8 @@ check(recordsHeading, '<h2 id="records-title">Records</h2> exists');
 check(recordsList, 'the leaderboard is a real <ol id="records-list">');
 check(recordsEmpty, 'the empty-state message is a page element');
 check(recordsReturn, 'the return control is a page element');
+check(recordsBoards, 'the duration selector is a real <ul id="records-boards"> above the list');
+check(boardMarkup, 'the selector lists one item per duration board: ' + boardItems.join(', '));
 
 console.log('=== Help view is page markup ===');
 check(helpHeading, '<h2 id="help-title">How to Play</h2> exists');
@@ -105,8 +119,8 @@ check(noCanvasViews, 'render.js has no drawRecords / drawHelp / formatDate');
 console.log('=== Leaderboard rows match the stored board ===');
 
 const recorded = [3, 15, 42, 7, 99, 21, 5, 64, 88, 12, 30, 1];
-for (const s of recorded) recordScore(s);
-const board = loadBoard(); // the storage module's own top-10 sort
+for (const s of recorded) recordScore(s, 'snake', 3);
+const board = loadBoard(3); // the storage module's own top-10 sort
 check(board.length === 10, 'recordScore keeps the top 10 of 12: ' + board.length);
 check(board.every((e, i) => i === 0 || board[i - 1].score >= e.score),
   'entries stay in descending score order: ' + board.map((e) => e.score).join(', '));
@@ -136,6 +150,30 @@ check(rows()[0].textContent === ROLE_MARKERS.snake + '  9  ·  2026-09-04',
 syncViews([]);
 check(rows().length === 0, 'the empty board renders no rows');
 check(dom.classes('records-empty').has('on'), 'the empty-state message is shown when the board is empty');
+
+// ---------- The records view's own duration selector ----------
+
+console.log('=== The records selector paints one board at a time ===');
+const boxes = boardItems.map((id) => dom.el(id).getBoundingClientRect());
+const distinctBoxes = new Set(boxes.map((b) => [b.left, b.top, b.right, b.bottom].join(':')));
+check(distinctBoxes.size === boardItems.length,
+  'three selector boxes, one per duration board: ' + boxes.map((b) => b.left + ',' + b.top + '-' + b.bottom).join(' | '));
+
+game.screen.recordsSelect = 1;
+syncViews(loadBoard(3));
+const lit = boardItems.filter((id) => dom.classes(id).has('on'));
+check(lit.length === 1, 'exactly one selector item is highlighted: ' + lit.join(', '));
+check(lit[0] === 'records-board-3',
+  'the cursor sits on the 3-minute board, the board the list shows: ' + lit.join(', '));
+
+// Moving the cursor to an untouched board repaints the list with no rows and
+// shows the empty-state message for that board.
+game.screen.recordsSelect = 2;
+syncViews(loadBoard(5));
+check(rows().length === 0, 'the 5-minute board paints no rows: ' + rows().length);
+check(dom.classes('records-empty').has('on'), 'the empty-state message follows the selected board');
+check(dom.classes('records-board-5').has('on') && !dom.classes('records-board-3').has('on'),
+  'the cursor moved from the 1-minute board to the 5-minute board');
 
 // ---------- View visibility follows state ----------
 

@@ -364,10 +364,15 @@ export async function centreTapRotates(page) {
   return false;
 }
 
-// Open the role sub-menu and start one game in the given role.
+// Open the role sub-menu and start one game in the given role. The menu opens
+// the duration sub-menu first, so the helper confirms a duration before it can
+// reach the role screen. One minute keeps every game on the 1-minute board,
+// which is the board the records view opens on.
 export async function playRole(context, role, rootDir) {
   const page = await freshPage(context, rootDir);
   await page.click('#menu-item-play');
+  await stateIs(page, 'SELECT_DURATION');
+  await page.click('#duration-item-1');
   await stateIs(page, 'SELECT_ROLE');
   await page.click('#role-item-' + role);
   const ok = await waitFor(page, (wanted) => {

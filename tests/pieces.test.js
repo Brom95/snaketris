@@ -9,7 +9,7 @@ const { moveSnake } = await import(new URL('../js/snake.js', import.meta.url));
 const { currentFallSpeed, spawnPiece, clearFullRows, movePiece, rotatePiece, turnedShape, shapeInState, setPieceState, stepPiece, requestPieceShift, landPiece } = await import(new URL('../js/pieces.js', import.meta.url));
 const { snakeTicksPerCell } = await import(new URL('../js/snake.js', import.meta.url));
 const { setCell, getCell } = await import(new URL('../js/grid.js', import.meta.url));
-const { TETROMINOES, PIECE_TYPES, EMPTY, SOLID, ROWS, COLS } = await import(new URL('../js/constants.js', import.meta.url));
+const { TETROMINOES, PIECE_TYPES, EMPTY, SOLID, ROWS, COLS, DURATION_MINUTES, TICKS_PER_MINUTE } = await import(new URL('../js/constants.js', import.meta.url));
 
 function freshStart() { resetGame(); startGame(); }
 
@@ -353,4 +353,23 @@ test('a partial landing does not end the game', () => {
   assert.equal(game.screen.state, 'PLAYING');
   assert.equal(game.play.landedBlocks, 2);
   assert.equal(game.play.tetrisScore, 6);
+});
+
+// ---------- The match duration does not steer the ramp ----------
+test('fall speed is identical for all three match durations at the same completed-piece count', () => {
+  const tiers = [0, 2, 3, 6, 123];
+  const byDuration = {};
+  for (const minutes of DURATION_MINUTES) {
+    freshStart();
+    game.play.durationMinutes = minutes;
+    game.play.durationTicks = minutes * TICKS_PER_MINUTE;
+    const speeds = [];
+    for (const completed of tiers) {
+      game.play.completedPieces = completed;
+      speeds.push(currentFallSpeed());
+    }
+    byDuration[minutes] = speeds;
+  }
+  assert.deepEqual(byDuration[DURATION_MINUTES[0]], byDuration[DURATION_MINUTES[1]]);
+  assert.deepEqual(byDuration[DURATION_MINUTES[0]], byDuration[DURATION_MINUTES[2]]);
 });

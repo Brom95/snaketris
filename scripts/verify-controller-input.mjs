@@ -28,8 +28,8 @@ import { check, makePad, report, stubDom } from './harness.mjs';
 import { pollController, keyToDir, tapToDir, swipeToDir, clearControllerPrev } from '../js/devices.js';
 import { initInput, handleIntent, setDirection } from '../js/input.js';
 import { game, startGame, gameOver } from '../js/state.js';
-import { drainIntents, toMenu } from '../js/screens.js';
-import { PLAYING, SELECT_ROLE, MENU, GAME_OVER, RECORDS, HELP, MENU_ITEMS } from '../js/constants.js';
+import { drainIntents, toMenu, SCREEN_BY_ID } from '../js/screens.js';
+import { PLAYING, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL, MENU, GAME_OVER, RECORDS, HELP, MENU_ITEMS, DURATION_MINUTES, GAME_CONTROL_P1 } from '../js/constants.js';
 
 // DPAD_UP=12, DPAD_DOWN=13, DPAD_LEFT=14, DPAD_RIGHT=15, A=0, B=1.
 const A = 0;
@@ -220,13 +220,20 @@ resetController();
 toMenu();
 game.screen.menuSelect = 0;
 frames([makePad([A])]);
-check(game.screen.state === SELECT_ROLE, 'A on "Play" opens the role screen (SELECT_ROLE)');
+check(game.screen.state === SELECT_DURATION && game.screen.durationSelect === 0,
+  'A on "Play" opens the duration sub-menu at 1 minute');
+frames([makePad([DOWN]), makePad()]);
+check(game.screen.durationSelect === 1 && game.screen.state === SELECT_DURATION,
+  'D-pad down in the duration sub-menu: 1 minute -> 3 minutes');
+frames([makePad([A])]);
+check(game.screen.state === SELECT_ROLE && game.play.durationMinutes === DURATION_MINUTES[1],
+  'A on "3 minutes" stores the duration and opens the role screen');
 
 resetController();
 toMenu();
 game.screen.menuSelect = 1;
 frames([makePad([A])]);
-check(game.screen.twoPlayerMode && game.screen.state === SELECT_ROLE, 'A on "Two Players" opens two-player role select');
+check(game.screen.twoPlayerMode && game.screen.state === SELECT_DURATION, 'A on "Two Players" opens the duration sub-menu');
 
 resetController();
 toMenu();
@@ -240,7 +247,33 @@ game.screen.menuSelect = 3;
 frames([makePad([A])]);
 check(game.screen.state === HELP, 'A on "How to Play" opens HELP');
 
-// ---------- B back from Records and How to Play ----------
+// ---------- Two-player: the duration screen opens once, before any control step ----------
+
+console.log('=== Two-player duration opens before the control steps ===');
+
+resetController();
+toMenu();
+game.screen.menuSelect = 1;
+frames([makePad([A])]);
+check(game.screen.twoPlayerMode === true && game.screen.state === SELECT_DURATION,
+  'A on "Two Players" opens the duration sub-menu, not the role or the control screen');
+check(SCREEN_BY_ID[SELECT_DURATION].field === false,
+  'the duration screen declares no field, so the canvas stays off screen');
+
+frames([makePad([DOWN]), makePad()]);
+check(game.screen.durationSelect === 1 && game.screen.state === SELECT_DURATION,
+  'D-pad down in the two-player duration sub-menu: 1 minute -> 3 minutes');
+frames([makePad([A])]);
+check(game.screen.state === SELECT_ROLE && game.play.durationMinutes === DURATION_MINUTES[1],
+  'A on "3 minutes" stores the duration once and opens the role screen');
+
+frames([makePad(), makePad([A])]);
+check(game.screen.state === SELECT_CONTROL && game.screen.gameControlStep === GAME_CONTROL_P1,
+  'the role confirm is the first control step, and it comes after the duration screen');
+check(game.play.durationMinutes === DURATION_MINUTES[1],
+  'the duration chosen before the role pick carries through every control step');
+
+// ---------- B back from Records, How to Play and the duration sub-menu ----------
 
 console.log('=== B back to menu ===');
 
@@ -259,6 +292,14 @@ frames([makePad([A])]);
 check(game.screen.state === HELP, 'entering HELP via A');
 frames([makePad([B])]);
 check(game.screen.state === MENU, 'B from HELP returns to MENU');
+
+resetController();
+toMenu();
+game.screen.menuSelect = 0;
+frames([makePad([A])]);
+check(game.screen.state === SELECT_DURATION, 'entering the duration sub-menu via A');
+frames([makePad([B])]);
+check(game.screen.state === MENU && game.screen.durationSelect === 0, 'B from the duration sub-menu returns to MENU');
 
 // ---------- A from game over returns to the menu ----------
 
@@ -284,7 +325,7 @@ resetController();
 toMenu();
 game.screen.menuSelect = 0;
 frames([makePad([A]), makePad([A]), makePad([A])]);
-check(game.screen.state === SELECT_ROLE, 'holding A in menu: fires once -> SELECT_ROLE (no re-fire)');
+check(game.screen.state === SELECT_DURATION, 'holding A in menu: fires once -> SELECT_DURATION (no re-fire)');
 
 resetController();
 toMenu();
@@ -319,9 +360,9 @@ check(game.screen.state === MENU, 'frame2 A held -> no re-fire (stays MENU)');
 // Frame 3: disconnect (no gamepad) clears the edge-detection state.
 frames([null]);
 // Frame 4: reconnect with A "still pressed". Because prev was cleared, this is
-// a fresh edge. In MENU with menuSelect 0, A confirms -> SELECT_ROLE.
+// a fresh edge. In MENU with menuSelect 0, A confirms -> SELECT_DURATION.
 frames([makePad([A])]);
-check(game.screen.state === SELECT_ROLE,
+check(game.screen.state === SELECT_DURATION,
   'reconnect with A: fresh edge fires (prev cleared on disconnect) -> ' + game.screen.state);
 
 // With no gamepad, steering is a no-op.

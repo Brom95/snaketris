@@ -22,7 +22,7 @@ import { initUi } from '../js/ui.js';
 import { onPointerDown } from '../js/devices.js';
 import { game } from '../js/state.js';
 import { drainIntents } from '../js/screens.js';
-import { MENU, RECORDS, HELP, GAME_OVER, MENU_ITEMS, GITHUB_URL } from '../js/constants.js';
+import { MENU, SELECT_DURATION, RECORDS, HELP, GAME_OVER, MENU_ITEMS, GITHUB_URL } from '../js/constants.js';
 
 import { readFileSync, readdirSync } from 'node:fs';
 
@@ -144,7 +144,7 @@ check(game.screen.state === RECORDS && game.screen.menuSelect === 2, 'click on "
 menuState();
 game.screen.menuSelect = 0;
 clickPage(center(ITEMS[0]).x, center(ITEMS[0]).y);
-check(game.screen.state === 'SELECT_ROLE', 'click on "Play" opens the role sub-menu');
+check(game.screen.state === SELECT_DURATION, 'click on "Play" opens the duration sub-menu');
 
 // ---------- The anchor: the browser navigates, the game selects nothing ----------
 

@@ -8,8 +8,9 @@
 // drift apart silently (tests/screens.test.js checks every id against the page).
 
 import {
-  MENU, SELECT_ROLE, SELECT_CONTROL, PLAYING, GAME_OVER, RECORDS, HELP,
+  MENU, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL, PLAYING, GAME_OVER, RECORDS, HELP,
   MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS, CONTROL_SCREEN_ITEMS,
+  DURATION_MINUTES, DURATION_SCREEN_ITEMS, TICKS_PER_MINUTE,
   ROLE_MARKERS,
   GAME_CONTROL_P1, GAME_CONTROL_P2, GAME_CONTROL_START,
   GAME_CONTROL_PLAYER_MARKERS,
@@ -20,11 +21,14 @@ import {
 // that interprets them; no input module branches on a screen.
 export const TRANSITIONS = {
   open: 'open', // move to the item's `opens` screen
-  'select-role': 'select-role', // open the role sub-menu
-  'two-player': 'two-player', // arm two-player mode, then open the role sub-menu
+  'select-role': 'select-role', // open the item's `opens` screen from the menu flow
+  'two-player': 'two-player', // arm two-player mode, then open the item's `opens` screen
+  'pick-duration': 'pick-duration', // lock the item's match duration, then open the role screen
+  'back-duration': 'back-duration', // leave the duration screen for the main menu
   'pick-role': 'pick-role', // lock the item's role, then continue the flow
   'back-menu': 'back-menu', // return to the main menu
-  'back-role-select': 'back-role-select', // leave the control screen for the role screen
+  'back-role-select': 'back-role-select', // leave the control screen for the duration screen
+  'pick-board': 'pick-board', // show the item's duration leaderboard in the records view
   'lock-model': 'lock-model', // lock the item's player's control model
   reassign: 'reassign', // clear one player's selection and model
   'start-game': 'start-game', // start when the flow allows it
@@ -46,7 +50,7 @@ export const SCREENS = [
         marker: null,
         hints: null,
         action: TRANSITIONS['select-role'],
-        opens: SELECT_ROLE,
+        opens: SELECT_DURATION,
       },
       {
         id: 'menu-item-two-player',
@@ -54,7 +58,7 @@ export const SCREENS = [
         marker: null,
         hints: null,
         action: TRANSITIONS['two-player'],
-        opens: SELECT_ROLE,
+        opens: SELECT_DURATION,
         requiresWide: true,
       },
       {
@@ -72,6 +76,47 @@ export const SCREENS = [
         hints: null,
         action: TRANSITIONS.open,
         opens: HELP,
+      },
+    ],
+    controls: [],
+  },
+  {
+    id: SELECT_DURATION,
+    view: 'duration-view',
+    field: false,
+    cursor: 'arrow',
+    selection: 'durationSelect',
+    items: [
+      {
+        id: 'duration-item-1',
+        label: DURATION_SCREEN_ITEMS[0],
+        marker: null,
+        hints: null,
+        minutes: DURATION_MINUTES[0],
+        action: TRANSITIONS['pick-duration'],
+      },
+      {
+        id: 'duration-item-3',
+        label: DURATION_SCREEN_ITEMS[1],
+        marker: null,
+        hints: null,
+        minutes: DURATION_MINUTES[1],
+        action: TRANSITIONS['pick-duration'],
+      },
+      {
+        id: 'duration-item-5',
+        label: DURATION_SCREEN_ITEMS[2],
+        marker: null,
+        hints: null,
+        minutes: DURATION_MINUTES[2],
+        action: TRANSITIONS['pick-duration'],
+      },
+      {
+        id: 'duration-back',
+        label: DURATION_SCREEN_ITEMS[3],
+        marker: null,
+        hints: null,
+        action: TRANSITIONS['back-duration'],
       },
     ],
     controls: [],
@@ -104,7 +149,7 @@ export const SCREENS = [
         label: ROLE_SCREEN_ITEMS[2],
         marker: null,
         hints: null,
-        action: TRANSITIONS['back-menu'],
+        action: TRANSITIONS['back-role-select'],
       },
     ],
     controls: [],
@@ -190,9 +235,34 @@ export const SCREENS = [
     id: RECORDS,
     view: 'records-view',
     field: false,
-    cursor: 'none',
-    selection: null,
-    items: [],
+    cursor: 'arrow',
+    selection: 'recordsSelect',
+    items: [
+      {
+        id: 'records-board-1',
+        label: DURATION_SCREEN_ITEMS[0],
+        marker: null,
+        hints: null,
+        minutes: DURATION_MINUTES[0],
+        action: TRANSITIONS['pick-board'],
+      },
+      {
+        id: 'records-board-3',
+        label: DURATION_SCREEN_ITEMS[1],
+        marker: null,
+        hints: null,
+        minutes: DURATION_MINUTES[1],
+        action: TRANSITIONS['pick-board'],
+      },
+      {
+        id: 'records-board-5',
+        label: DURATION_SCREEN_ITEMS[2],
+        marker: null,
+        hints: null,
+        minutes: DURATION_MINUTES[2],
+        action: TRANSITIONS['pick-board'],
+      },
+    ],
     controls: [
       { id: 'records-return', label: 'Menu', marker: null, action: TRANSITIONS['back-menu'] },
     ],
@@ -235,6 +305,14 @@ export function opensScreen(screenId, index) {
   return row.items[index]?.opens ?? null;
 }
 
+// The match duration whose leaderboard the records view shows right now: the
+// board the arrow cursor selects. app.js hands this to the page painter, so the
+// list and the cursor can never name different boards.
+export function selectedBoardMinutes() {
+  const item = currentItem(SCREEN_BY_ID[RECORDS]);
+  return item?.minutes ?? DURATION_MINUTES[0];
+}
+
 // ---------- The navigation state machine ----------
 // Every transition below reads and writes the navigation half only. No
 // gameplay field changes here, and no page element, pointer coordinate, key
@@ -249,7 +327,9 @@ export function newScreen() {
     state: MENU,
     menuSelect: 0,
     roleSelect: 0,
+    durationSelect: 0,
     controlSelect: 0,
+    recordsSelect: 0,
     p1Role: null,
     p2Role: null,
     twoPlayerMode: false,
@@ -371,12 +451,14 @@ export function pickP1Role(role) {
 export function toMenu() {
   game.screen.state = MENU;
   game.screen.menuSelect = 0;
+  game.screen.durationSelect = 0;
   game.screen.roleSelect = 0;
 }
 
-// Back from SELECT_CONTROL returns to the role selection screen.
+// Back from SELECT_CONTROL returns to the duration screen, the stage before the
+// role screen. A player who leaves the control screen re-asks the match length.
 export function backToRoleSelect() {
-  game.screen.state = SELECT_ROLE;
+  game.screen.state = SELECT_DURATION;
 }
 
 // ---------- The intent queue and the screen system ----------
@@ -405,6 +487,14 @@ function applyAction(item, intent) {
       game.screen.twoPlayerMode = true;
       game.screen.state = item.opens;
       return true;
+    case TRANSITIONS['pick-duration']:
+      game.play.durationMinutes = item.minutes;
+      game.play.durationTicks = item.minutes * TICKS_PER_MINUTE;
+      game.screen.state = SELECT_ROLE;
+      return true;
+    case TRANSITIONS['back-duration']:
+      toMenu();
+      return true;
     case TRANSITIONS['pick-role']:
       pickRole(item.role);
       return true;
@@ -413,6 +503,10 @@ function applyAction(item, intent) {
       return true;
     case TRANSITIONS['back-role-select']:
       backToRoleSelect();
+      return true;
+    case TRANSITIONS['pick-board']:
+      // The records view stays open; the item's board is already the selection
+      // this call wrote, so the next paint reads it.
       return true;
     case TRANSITIONS['lock-model']:
       if (!intent.model || !item.player) return false;
@@ -495,13 +589,14 @@ function selectById(row, id, intent) {
 }
 
 // The first item or control that returns to the main menu, if this screen has
-// one.
+// one. The duration screen's Back item runs its own transition, so both menu-
+// returning back actions count here.
 function applyBack(row, intent) {
   for (const item of row.items) {
-    if (item.action === TRANSITIONS['back-menu']) return applyAction(item, intent);
+    if (item.action === TRANSITIONS['back-menu'] || item.action === TRANSITIONS['back-duration'] || item.action === TRANSITIONS['back-role-select']) return applyAction(item, intent);
   }
   for (const control of row.controls) {
-    if (control.action === TRANSITIONS['back-menu']) return applyAction(control, intent);
+    if (control.action === TRANSITIONS['back-menu'] || control.action === TRANSITIONS['back-duration']) return applyAction(control, intent);
   }
   return false;
 }

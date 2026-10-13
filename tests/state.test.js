@@ -6,9 +6,11 @@ import { installDomStub } from './helpers/dom-stub.js';
 const stub = installDomStub();
 const state = await import('../js/state.js');
 const screens = await import('../js/screens.js');
-const { SELECT_ROLE } = await import('../js/constants.js');
+const { SELECT_ROLE, SELECT_DURATION, SELECT_CONTROL, GAME_CONTROL_START, TICKS_PER_MINUTE } = await import('../js/constants.js');
 const devices = await import('../js/devices.js');
 const input = await import('../js/input.js');
+const { snakeSystem } = await import('../js/snake.js');
+const { piecesSystem } = await import('../js/pieces.js');
 
 // Wire the canvas into both input.js and devices.js (as initInput does in the real game).
 input.initInput(stub.canvas);
@@ -222,8 +224,108 @@ test('a write to one half changes no field of the other half', () => {
   assert.deepEqual(state.game.play, playBefore);
 });
 
-test('backToRoleSelect writes the shared screen constant, not a raw string', () => {
+test('backToRoleSelect leaves the control screen for the duration screen', () => {
   fresh();
   screens.backToRoleSelect();
-  assert.equal(state.game.screen.state, SELECT_ROLE);
+  assert.equal(state.game.screen.state, SELECT_DURATION);
+});
+
+// ---------- The match duration budget ----------
+test('game.play carries a duration budget and a 1-minute default is 3600 ticks', () => {
+  fresh();
+  assert.equal(state.game.play.durationMinutes, 1);
+  assert.equal(state.game.play.durationTicks, 3600);
+  state.startGame();
+  assert.equal(state.game.play.durationMinutes, 1);
+  assert.equal(state.game.play.durationTicks, 3600);
+});
+
+test('the duration chosen before play survives the reset so a rematch keeps it', () => {
+  fresh();
+  state.game.play.durationMinutes = 3;
+  state.startGame();
+  assert.equal(state.game.play.durationTicks, 10800);
+  state.gameOver();
+  state.startGame();
+  assert.equal(state.game.play.durationMinutes, 3);
+  assert.equal(state.game.play.durationTicks, 10800);
+});
+
+test('a two-player rematch counts down from the duration chosen before the first match', () => {
+  fresh();
+  state.game.screen.twoPlayerMode = true;
+  state.game.play.durationMinutes = 5;
+  state.startGame();
+  assert.equal(state.game.play.durationTicks, 5 * TICKS_PER_MINUTE);
+  assert.equal(state.remainingSeconds(), 300);
+  state.gameOver();
+  // The duel ends on the SHARED control step, which sits after the duration
+  // screen, so the rematch never re-asks the duration.
+  assert.equal(state.game.screen.state, SELECT_CONTROL);
+  assert.equal(state.game.screen.gameControlStep, GAME_CONTROL_START);
+  state.startGame();
+  assert.equal(state.game.screen.twoPlayerMode, true);
+  assert.equal(state.game.play.durationMinutes, 5);
+  assert.equal(state.game.play.durationTicks, 5 * TICKS_PER_MINUTE);
+  assert.equal(state.remainingSeconds(), 300);
+});
+
+// ---------- The countdown -------------------
+test('the countdown readout opens at the full minute, ticks down per second and reaches 0 last', () => {
+  fresh();
+  state.game.play.durationMinutes = 3;
+  state.startGame();
+  assert.equal(state.game.play.durationTicks, 3 * TICKS_PER_MINUTE);
+  assert.equal(state.remainingSeconds(), 180);
+  state.game.play.tick = 60; // one second of engine ticks
+  assert.equal(state.remainingSeconds(), 179);
+  state.game.play.tick = state.game.play.durationTicks - 1;
+  assert.equal(state.remainingSeconds(), 1);
+  state.game.play.tick = state.game.play.durationTicks;
+  assert.equal(state.remainingSeconds(), 0);
+});
+
+test('the countdown ends the match with the time-up reason and no system runs on after it', () => {
+  fresh();
+  state.game.play.durationMinutes = 1;
+  state.startGame();
+  const ctx = { game: state.game };
+  for (let t = 0; t < 60; t++) {
+    snakeSystem.update(ctx);
+    piecesSystem.update(ctx);
+  }
+  assert.equal(state.game.screen.state, 'PLAYING');
+  assert.equal(state.game.play.gameOverReason, null);
+  state.game.play.tick = state.game.play.durationTicks;
+  state.advanceCountdown();
+  assert.equal(state.game.screen.state, 'GAME_OVER');
+  assert.equal(state.game.play.gameOverReason, 'time-up');
+  const head = JSON.stringify(state.game.play.snake[0]);
+  const pieces = JSON.stringify(state.game.play.pieces);
+  const snakeScore = state.game.play.snakeScore;
+  const tetrisScore = state.game.play.tetrisScore;
+  for (let t = 0; t < 60; t++) {
+    snakeSystem.update(ctx);
+    piecesSystem.update(ctx);
+  }
+  assert.equal(JSON.stringify(state.game.play.snake[0]), head, 'the snake stepped after the match ended');
+  assert.equal(JSON.stringify(state.game.play.pieces), pieces, 'a piece spawned after the match ended');
+  assert.equal(state.game.play.snakeScore, snakeScore, 'the snake scored after the match ended');
+  assert.equal(state.game.play.tetrisScore, tetrisScore, 'the tetris side scored after the match ended');
+});
+
+test('a crash on the final tick keeps its own reason over the countdown', () => {
+  fresh();
+  state.game.play.durationMinutes = 1;
+  state.startGame();
+  state.game.play.snakeScore = 4;
+  state.game.play.tetrisScore = 9;
+  state.game.play.tick = state.game.play.durationTicks;
+  state.gameOver('snake-death');
+  state.advanceCountdown();
+  assert.equal(state.game.play.gameOverReason, 'snake-death');
+  assert.equal(state.game.screen.state, 'GAME_OVER');
+  assert.deepEqual(state.game.play.result, [{ score: 4, role: 'snake' }]);
+  state.gameOver('time-up');
+  assert.equal(state.game.play.gameOverReason, 'snake-death');
 });

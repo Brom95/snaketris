@@ -6,7 +6,7 @@
 // (js/screens.js) owns the navigation half's shape, its initial values and
 // every navigation transition; this module owns the state and the gameplay
 // entry points.
-import { PLAYING, ROWS, SPAWN_INTERVAL } from './constants.js';
+import { PLAYING, ROWS, SPAWN_INTERVAL, DURATION_MINUTES, TICKS_PER_MINUTE } from './constants.js';
 import { initGrid } from './grid.js';
 import { newScreen, resetScreen, applyGameOverScreen } from './screens.js';
 
@@ -26,12 +26,17 @@ export const game = {
     spawnAcc: 0,
     pieceMoveAcc: 0,
     tick: 0,
-    gameOverReason: null, // why the last game ended: 'snake-death' | 'top-out' | null
+    gameOverReason: null, // why the last game ended: 'snake-death' | 'top-out' | 'time-up' | null
     role: 'snake', // the side the player drives; the bot drives the other
     // The finished game reported to the records layer: an array of
     // { score, role } entries, or null when nothing is waiting. The core
     // writes this field only; the records layer is the only board writer.
     result: null,
+    // The match length the player chose before play, in minutes. A match cannot
+    // start without it: every path into play passes through the duration screen.
+    durationMinutes: DURATION_MINUTES[0],
+    // The countdown budget in engine ticks, never wall-clock seconds.
+    durationTicks: DURATION_MINUTES[0] * TICKS_PER_MINUTE,
   },
   screen: newScreen(),
 };
@@ -76,6 +81,7 @@ export function startGame() {
   if (game.screen.state === PLAYING) return;
   const role = game.play.role;
   const twoPlayer = game.screen.twoPlayerMode;
+  const durationMinutes = game.play.durationMinutes;
   // Preserve the locked control models and their pads across the reset so the
   // SHARED screen can re-show both layouts after a game ends (two-player mode).
   const p1Model = game.screen.p1Model;
@@ -85,6 +91,11 @@ export function startGame() {
   resetGame();
   // resetGame clears the menu state; the role chosen before the game is kept.
   game.play.role = role;
+  // The duration is re-derived from the minutes chosen before play. A two-player
+  // rematch returns to the SHARED step, which sits after the duration screen, so
+  // the budget has to survive the reset; a single-player rematch re-asks it.
+  game.play.durationMinutes = durationMinutes;
+  game.play.durationTicks = durationMinutes * TICKS_PER_MINUTE;
   if (twoPlayer) {
     game.screen.twoPlayerMode = true;
     game.screen.p1Role = role;
@@ -109,10 +120,31 @@ export function restart() {
 // two-player duel reports both sides, a single-player game reports the side
 // the player drove. The records layer persists this report once.
 export function gameOver(reason) {
+  // The first reason set wins. A crash on the same tick as the countdown keeps
+  // the crash reason, so the countdown can never turn a loss into a win.
+  if (game.play.gameOverReason) return;
   game.play.gameOverReason = reason;
   game.play.result = finishedResult();
   // The screen layer decides which screen the interface shows after a game.
   applyGameOverScreen();
+}
+
+// The countdown runs after the gameplay systems so a crash on the final tick
+// claims its own reason first. Measured in engine ticks, never wall-clock
+// seconds: the fixed-timestep accumulator stops while the tab is hidden, and a
+// Date.now() countdown would skip the time the player never played.
+export function advanceCountdown() {
+  if (game.screen.state !== PLAYING) return;
+  if (game.play.tick < game.play.durationTicks) return;
+  gameOver('time-up');
+}
+
+// The seconds the interface shows: the tick budget left, rounded up so the
+// readout opens at the full minute and reaches 0 only on the final tick.
+export function remainingSeconds() {
+  const ticksLeft = game.play.durationTicks - game.play.tick;
+  if (ticksLeft <= 0) return 0;
+  return Math.ceil((ticksLeft / TICKS_PER_MINUTE) * 60);
 }
 
 function finishedResult() {

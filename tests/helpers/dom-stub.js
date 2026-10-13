@@ -13,9 +13,8 @@ let canvas = null;
 function makeEl(id, rect = { left: 0, top: 0, width: 320, height: 24 }) {
   const children = [];
   const classes = new Set();
-  return {
+  const el = {
     id,
-    textContent: '',
     children,
     style: {},
     classList: {
@@ -23,9 +22,18 @@ function makeEl(id, rect = { left: 0, top: 0, width: 320, height: 24 }) {
       has: (name) => classes.has(name),
     },
     classes,
-    appendChild: (el) => { children.push(el); },
+    appendChild: (child) => { children.push(child); },
     getBoundingClientRect: () => rect,
   };
+  // Assigning textContent replaces the children, as the browser does.
+  Object.defineProperty(el, 'textContent', {
+    get: () => el.text || '',
+    set: (v) => {
+      el.text = v;
+      children.length = 0;
+    },
+  });
+  return el;
 }
 
 // In-memory localStorage stub (highscores uses it).
@@ -82,6 +90,7 @@ export function installDomStub() {
     game: canvas,
     ui: makeEl('ui'),
     score: makeEl('score'),
+    timer: makeEl('timer'),
     status: makeEl('status'),
     'menu-view': makeEl('menu-view'),
     'role-view': makeEl('role-view'),
@@ -90,6 +99,12 @@ export function installDomStub() {
     'help-view': makeEl('help-view'),
     'records-list': makeEl('records-list'),
     'records-empty': makeEl('records-empty'),
+    // The records view selects its board with its own arrow cursor, so the three
+    // items must be reachable by id for js/ui.js to paint the highlight.
+    'records-boards': makeEl('records-boards'),
+    'records-board-1': makeEl('records-board-1', { left: 0, top: 0, width: 170, height: 24 }),
+    'records-board-3': makeEl('records-board-3', { left: 0, top: 24, width: 170, height: 24 }),
+    'records-board-5': makeEl('records-board-5', { left: 0, top: 48, width: 170, height: 24 }),
     'menu-items': makeEl('menu-items'),
     'role-items': makeEl('role-items'),
     // Feedback blocks js/ui.js paints during the preparation stages. They are

@@ -6,7 +6,7 @@ const stub = installDomStub();
 const { game, resetGame, startGame } = await import(new URL('../js/state.js', import.meta.url));
 const { moveSnake, snakeTicksPerCell, consumePieceAtHead } = await import(new URL('../js/snake.js', import.meta.url));
 const { pieceTicksPerCell } = await import(new URL('../js/pieces.js', import.meta.url));
-const { MAX_SNAKE_LEN } = await import(new URL('../js/constants.js', import.meta.url));
+const { MAX_SNAKE_LEN, DURATION_MINUTES, TICKS_PER_MINUTE } = await import(new URL('../js/constants.js', import.meta.url));
 
 function freshStart() { resetGame(); startGame(); }
 
@@ -134,4 +134,17 @@ test('a piece falling onto a capped head records overflow instead of growing', (
   assert.equal(game.play.snake.length, MAX_SNAKE_LEN);
   assert.equal(game.play.overflow, 1);
   assert.equal(game.play.snakeScore, 5); // 1 cell + the whole-piece bonus
+});
+
+// ---------- The match duration does not steer the ramp ----------
+test('the snake interval is identical for all three match durations at the same completed-piece count', () => {
+  for (const minutes of DURATION_MINUTES) {
+    freshStart();
+    game.play.durationMinutes = minutes;
+    game.play.durationTicks = minutes * TICKS_PER_MINUTE;
+    game.play.completedPieces = 0;
+    assert.ok(Math.abs(snakeTicksPerCell() - 23) < 1e-9, `duration ${minutes}: interval ${snakeTicksPerCell()}`);
+    game.play.completedPieces = 123; // floor(123/3) = 41 tiers — past the 0.9 cap
+    assert.ok(Math.abs(snakeTicksPerCell() - 1) < 1e-9, `duration ${minutes} at cap: interval ${snakeTicksPerCell()}`);
+  }
 });

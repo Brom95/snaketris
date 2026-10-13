@@ -47,6 +47,7 @@
     .field { display: none; }
     .field.on { display: block; }
     #score { font-size: 16px; }
+    #timer { font-size: 16px; }
     #status { font-size: 16px; }
     #menu-title { font-size: 24px; margin: 0; }
     #menu-view.on {
@@ -77,11 +78,31 @@
     #role-items li::before { content: '\25b6 '; opacity: 0; }
     #role-items li.on { color: #a7f3a0; }
     #role-items li.on::before { opacity: 1; }
+    /* The duration screen mirrors the role screen: same marker rule, same sizes. */
+    #duration-view.on {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    #duration-title { font-size: 24px; margin: 0; }
+    #duration-items { list-style: none; margin: 0; padding: 0; min-width: 170px; }
+    #duration-items li { font-size: 20px; padding: 12px 0; }
+    #duration-items li::before { content: '\25b6 '; opacity: 0; }
+    #duration-items li.on { color: #a7f3a0; }
+    #duration-items li.on::before { opacity: 1; }
     #github-link { color: inherit; text-decoration: none; }
     #github-link svg { width: 24px; height: 24px; fill: currentColor; }
     #records-title, #help-title { font-size: 24px; margin: 0; }
     #records-list { margin: 0; padding: 0; list-style: decimal inside; }
     #records-list li { font-size: 14px; }
+    /* The board selector mirrors the duration screen: same marker rule, smaller
+       sizes, so the list under it stays the dominant block. */
+    #records-boards { list-style: none; margin: 0; padding: 0; min-width: 170px; }
+    #records-boards li { font-size: 16px; padding: 8px 0; }
+    #records-boards li::before { content: '\25b6 '; opacity: 0; }
+    #records-boards li.on { color: #a7f3a0; }
+    #records-boards li.on::before { opacity: 1; }
     #control-p1-status, #control-p2-status { font-size: 18px; color: #a7f3a0; }
     #control-key-hints { font-size: 14px; color: #8899aa; }
     #control-items li { font-size: 20px; padding: 20px 0; text-align: center; }
@@ -113,7 +134,7 @@
         justify-content: flex-end; /* column-reverse: flex-end = top edge; stack hugs the top */
         gap: 24px; /* FIELD_V_GAP_MOBILE (js/constants.js) */
       }
-      #menu-view, #role-view { min-height: 65vh; }
+      #menu-view, #duration-view, #role-view { min-height: 65vh; }
     }
   </style>
 </head>
@@ -121,6 +142,9 @@
   <canvas id="game" class="field"></canvas>
   <div id="ui">
     <p id="score" class="view">Score: 0</p>
+    <!-- The countdown is a sibling of the score readout: ui.js shows it only while
+         a match runs or has just ended, and placeScore keeps both in one flow. -->
+    <p id="timer" class="view">0</p>
     <p id="status" class="view">Game Over — press R or click for menu</p>
     <div id="menu-view" class="view">
       <h1 id="menu-title">snaketris</h1>
@@ -135,6 +159,17 @@
           <path d="M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966 -1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943"/>
         </svg>
       </a>
+    </div>
+    <!-- The duration screen sits between the menu and the role screen: every path
+         into play passes through it. -->
+    <div id="duration-view" class="view">
+      <h2 id="duration-title">Choose the match length</h2>
+      <ul id="duration-items">
+        <li id="duration-item-1" tabindex="-1">1 minute</li>
+        <li id="duration-item-3" tabindex="-1">3 minutes</li>
+        <li id="duration-item-5" tabindex="-1">5 minutes</li>
+        <li id="duration-back" tabindex="-1">Back</li>
+      </ul>
     </div>
     <div id="role-view" class="view">
       <h2 id="role-title">Choose your side</h2>
@@ -172,6 +207,13 @@
     </div>
     <div id="records-view" class="view">
       <h2 id="records-title">Records</h2>
+      <!-- The board selector sits above the list: one list, one cursor, and the
+           cursor names which duration board the list shows. -->
+      <ul id="records-boards">
+        <li id="records-board-1" tabindex="-1">1 minute</li>
+        <li id="records-board-3" tabindex="-1">3 minutes</li>
+        <li id="records-board-5" tabindex="-1">5 minutes</li>
+      </ul>
       <ol id="records-list"></ol>
       <p id="records-empty" class="view">No scores yet — play a game!</p>
       <p id="records-return" class="return">Menu</p>

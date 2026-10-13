@@ -12,7 +12,7 @@ const state = await import('../js/state.js');
 
 const page = await readFile(new URL('../snaketris.html', import.meta.url), 'utf8');
 
-const SCREEN_IDS = [C.MENU, C.SELECT_ROLE, C.SELECT_CONTROL, C.PLAYING, C.GAME_OVER, C.RECORDS, C.HELP];
+const SCREEN_IDS = [C.MENU, C.SELECT_DURATION, C.SELECT_ROLE, C.SELECT_CONTROL, C.PLAYING, C.GAME_OVER, C.RECORDS, C.HELP];
 
 test('the table has one entry per screen, in the declared order', async () => {
   assert.equal(screens.SCREENS.length, SCREEN_IDS.length);
@@ -31,6 +31,22 @@ test('menu labels equal MENU_ITEMS in page order, so no label is invented', asyn
   assert.deepEqual(screens.SCREEN_BY_ID[C.MENU].items.map((it) => it.label), C.MENU_ITEMS);
 });
 
+test('duration items equal DURATION_SCREEN_ITEMS in page order', async () => {
+  assert.deepEqual(screens.SCREEN_BY_ID[C.SELECT_DURATION].items.map((it) => it.label), C.DURATION_SCREEN_ITEMS);
+});
+
+test('duration items carry their minutes and Back leaves for the menu', async () => {
+  const row = screens.SCREEN_BY_ID[C.SELECT_DURATION];
+  assert.equal(row.view, 'duration-view');
+  assert.equal(row.field, false);
+  assert.equal(row.cursor, 'arrow');
+  assert.equal(row.selection, 'durationSelect');
+  assert.deepEqual(row.items.slice(0, 3).map((it) => it.minutes), C.DURATION_MINUTES);
+  assert.equal(row.items[0].action, screens.TRANSITIONS['pick-duration']);
+  assert.equal(row.items[3].action, screens.TRANSITIONS['back-duration']);
+  assert.equal(row.controls.length, 0);
+});
+
 test('role items equal ROLE_SCREEN_ITEMS in page order', async () => {
   assert.deepEqual(screens.SCREEN_BY_ID[C.SELECT_ROLE].items.map((it) => it.label), C.ROLE_SCREEN_ITEMS);
 });
@@ -44,16 +60,16 @@ test('every menu item names the screen it opens', async () => {
   assert.equal(menu.cursor, 'arrow');
   assert.equal(menu.selection, 'menuSelect');
   assert.equal(menu.items[0].action, screens.TRANSITIONS['select-role']);
-  assert.equal(menu.items[0].opens, C.SELECT_ROLE);
+  assert.equal(menu.items[0].opens, C.SELECT_DURATION);
   assert.equal(menu.items[1].action, screens.TRANSITIONS['two-player']);
-  assert.equal(menu.items[1].opens, C.SELECT_ROLE);
+  assert.equal(menu.items[1].opens, C.SELECT_DURATION);
   assert.equal(menu.items[2].opens, C.RECORDS);
   assert.equal(menu.items[2].action, screens.TRANSITIONS.open);
   assert.equal(menu.items[3].opens, C.HELP);
   assert.equal(menu.items[3].action, screens.TRANSITIONS.open);
 });
 
-test('the role items carry their role and Back returns to the menu', async () => {
+test('the role items carry their role and Back returns to the duration sub-menu', async () => {
   const role = screens.SCREEN_BY_ID[C.SELECT_ROLE];
   assert.equal(role.cursor, 'arrow');
   assert.equal(role.items[0].role, 'snake');
@@ -61,7 +77,7 @@ test('the role items carry their role and Back returns to the menu', async () =>
   assert.equal(role.items[1].role, 'tetris');
   assert.equal(role.items[1].marker, C.ROLE_MARKERS.tetris);
   assert.equal(role.items[0].action, screens.TRANSITIONS['pick-role']);
-  assert.equal(role.items[2].action, screens.TRANSITIONS['back-menu']);
+  assert.equal(role.items[2].action, screens.TRANSITIONS['back-role-select']);
 });
 
 test('the control items bind to the one-item-at-a-time steps', async () => {
@@ -85,7 +101,7 @@ test('back and reassign controls are declared on the control screen', async () =
 });
 
 test('the screens with no items still declare their return control', async () => {
-  for (const id of [C.RECORDS, C.HELP, C.GAME_OVER]) {
+  for (const id of [C.HELP, C.GAME_OVER]) {
     const row = screens.SCREEN_BY_ID[id];
     assert.equal(row.items.length, 0);
     assert.equal(row.cursor, 'none');
@@ -136,6 +152,9 @@ test('the screen system drives navigation from intents with no page present', as
   state.resetGame();
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
+  assert.equal(state.game.screen.state, C.SELECT_DURATION);
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, C.SELECT_ROLE);
   screens.pushIntent({ action: 'menuDown' });
   screens.drainIntents();
@@ -152,6 +171,9 @@ test('a two-player role pick hands the other role to the second player', async (
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
   assert.equal(state.game.screen.twoPlayerMode, true);
+  assert.equal(state.game.screen.state, C.SELECT_DURATION);
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, C.SELECT_ROLE);
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
@@ -198,6 +220,8 @@ test('a finished game lands on a screen the table resolves', async () => {
   screens.drainIntents();
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
   state.game.screen.p1Model = 'wasd';
   state.game.screen.p2Model = 'arrows';
   state.game.screen.gameControlStep = C.GAME_CONTROL_START;
@@ -233,4 +257,103 @@ test('a gamepad is locked by one player only', async () => {
   assert.equal(screens.lockControlModel(2, 'gamepad', 'pad-b'), true);
   assert.equal(state.game.screen.p2Pad, 'pad-b');
   assert.equal(state.game.screen.gameControlStep, C.GAME_CONTROL_START);
+});
+
+test('confirming a duration stores the match length and opens the role screen', async () => {
+  state.resetGame();
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.SELECT_DURATION);
+  assert.equal(state.game.screen.durationSelect, 0);
+  screens.pushIntent({ action: 'menuDown' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.durationSelect, 1);
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.SELECT_ROLE);
+  assert.equal(state.game.play.durationMinutes, 3);
+  assert.equal(state.game.play.durationTicks, 3 * C.TICKS_PER_MINUTE);
+});
+
+test('the duration screen returns to the menu by Escape, the Back click and the Back confirm', async () => {
+  state.resetGame();
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  screens.pushIntent({ action: 'toMenu' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.MENU);
+  assert.equal(state.game.screen.durationSelect, 0);
+
+  state.resetGame();
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  screens.pushIntent({ action: 'select', id: 'duration-back' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.MENU);
+
+  state.resetGame();
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'menuDown' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.durationSelect, 3);
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.MENU);
+  assert.equal(state.game.screen.durationSelect, 0);
+});
+
+test('leaving the control screen returns to the duration screen, not the role screen', async () => {
+  state.resetGame();
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.SELECT_CONTROL);
+  screens.pushIntent({ action: 'select', id: 'control-back' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.SELECT_DURATION);
+});
+
+test('the records row carries its own duration selector starting at the 1-minute board', async () => {
+  const row = screens.SCREEN_BY_ID[C.RECORDS];
+  assert.equal(row.view, 'records-view');
+  assert.equal(row.field, false);
+  assert.equal(row.cursor, 'arrow');
+  assert.equal(row.selection, 'recordsSelect');
+  assert.deepEqual(row.items.map((it) => it.label), C.DURATION_SCREEN_ITEMS.slice(0, 3));
+  assert.deepEqual(row.items.map((it) => it.minutes), C.DURATION_MINUTES);
+  assert.deepEqual(row.items.map((it) => it.action), C.DURATION_MINUTES.map(() => screens.TRANSITIONS['pick-board']));
+  assert.deepEqual(row.controls.map((it) => it.id), ['records-return']);
+  assert.equal(row.controls[0].action, screens.TRANSITIONS['back-menu']);
+  state.resetGame();
+  assert.equal(state.game.screen.recordsSelect, 0);
+  assert.equal(screens.selectedBoardMinutes(), C.DURATION_MINUTES[0]);
+});
+
+test('moving the records selector repaints with the selected board', async () => {
+  state.resetGame();
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.RECORDS);
+  assert.equal(state.game.screen.recordsSelect, 0);
+  screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'menuDown' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.recordsSelect, 2);
+  assert.equal(screens.selectedBoardMinutes(), C.DURATION_MINUTES[2]);
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.RECORDS);
+  assert.equal(state.game.screen.recordsSelect, 2);
+  screens.pushIntent({ action: 'toMenu' });
+  screens.drainIntents();
+  assert.equal(state.game.screen.state, C.MENU);
 });

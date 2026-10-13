@@ -11,9 +11,11 @@ installDomStub();
 const state = await import('../js/state.js');
 const records = await import('../js/highscores.js');
 const { game } = state;
-const { loadBoard } = records;
+const { loadBoard, boardKey } = records;
+const { DURATION_MINUTES, RECORDS } = await import('../js/constants.js');
 
 function clearBoard() {
+  for (const minutes of DURATION_MINUTES) localStorage.removeItem(boardKey(minutes));
   localStorage.removeItem('snaketris.highscores');
 }
 
@@ -26,7 +28,7 @@ test('the core reports the result and writes no board', () => {
   game.play.tetrisScore = 25;
   state.gameOver();
   assert.deepEqual(game.play.result, [{ score: 25, role: 'tetris' }]);
-  assert.deepEqual(loadBoard(), []);
+  assert.deepEqual(loadBoard(1), []);
 });
 
 test('a Snake-role game reports the snake side only', () => {
@@ -38,7 +40,7 @@ test('a Snake-role game reports the snake side only', () => {
   game.play.tetrisScore = 2;
   state.gameOver();
   assert.deepEqual(game.play.result, [{ score: 9, role: 'snake' }]);
-  assert.deepEqual(loadBoard(), []);
+  assert.deepEqual(loadBoard(1), []);
 });
 
 test('a two-player duel reports both sides', () => {
@@ -53,7 +55,7 @@ test('a two-player duel reports both sides', () => {
     { score: 5, role: 'snake' },
     { score: 20, role: 'tetris' },
   ]);
-  assert.deepEqual(loadBoard(), []);
+  assert.deepEqual(loadBoard(1), []);
 });
 
 test('the records owner writes one board entry per finished game', () => {
@@ -65,35 +67,39 @@ test('the records owner writes one board entry per finished game', () => {
   game.play.snakeScore = 3;
   state.gameOver();
   records.recordsSystem.update({});
-  const board = loadBoard();
+  const board = loadBoard(1);
   assert.equal(board.length, 1);
   assert.equal(board[0].score, 25);
   assert.equal(board[0].role, 'tetris');
   assert.equal(game.play.result, null);
   // The report is cleared, so a later tick writes nothing again.
   records.recordsSystem.update({});
-  assert.equal(loadBoard().length, 1);
+  assert.equal(loadBoard(1).length, 1);
 });
 
-test('a two-player report writes two entries and keeps the top ten', () => {
+test('a two-player report writes both entries into the match duration board', () => {
   clearBoard();
   localStorage.setItem(
-    'snaketris.highscores',
+    boardKey(5),
     JSON.stringify(Array.from({ length: 10 }, (_, i) => ({ score: i + 1, date: '2024-01-01T00:00:00.000Z', role: 'snake' })))
   );
   state.resetGame();
+  game.play.durationMinutes = 5;
   state.gameOver();
   game.screen.twoPlayerMode = true;
   game.play.snakeScore = 50;
   game.play.tetrisScore = 60;
   state.gameOver();
   records.recordsSystem.update({});
-  const board = loadBoard();
+  const board = loadBoard(5);
   assert.equal(board.length, 10);
   assert.equal(board[0].score, 60);
   assert.equal(board[0].role, 'tetris');
   assert.equal(board[1].score, 50);
   assert.equal(board[1].role, 'snake');
+  // The other boards never saw this match.
+  assert.deepEqual(loadBoard(1), []);
+  assert.deepEqual(loadBoard(3), []);
 });
 
 test('a failed storage write leaves navigation and gameplay unchanged', () => {
@@ -119,7 +125,7 @@ test('a failed storage write leaves navigation and gameplay unchanged', () => {
   assert.equal(game.play.snakeScore, 9);
   // A later tick does not retry the same report.
   records.recordsSystem.update({});
-  assert.deepEqual(loadBoard(), []);
+  assert.deepEqual(loadBoard(1), []);
   assert.deepEqual(game.screen, screenAfter);
 });
 
@@ -160,4 +166,45 @@ test('the three gameplay systems finish a tick with no page and no storage', asy
     globalThis.window = page.window;
     globalThis.localStorage = page.localStorage;
   }
+});
+
+test('the records list paints only the board the selector points at', async () => {
+  const ui = await import('../js/ui.js');
+  const screens = await import('../js/screens.js');
+  clearBoard();
+  localStorage.setItem(
+    boardKey(1),
+    JSON.stringify([{ score: 11, date: '2024-01-01T00:00:00.000Z', role: 'snake' }]),
+  );
+  localStorage.setItem(
+    boardKey(3),
+    JSON.stringify([
+      { score: 33, date: '2024-01-02T00:00:00.000Z', role: 'tetris' },
+      { score: 22, date: '2024-01-03T00:00:00.000Z', role: 'snake' },
+    ]),
+  );
+  ui.initUi();
+  const listEl = globalThis.document.getElementById('records-list');
+  const emptyEl = globalThis.document.getElementById('records-empty');
+  const lit = (id) => globalThis.document.getElementById(id).classList.has('on');
+
+  game.screen.state = RECORDS;
+  game.screen.recordsSelect = 1;
+  ui.syncViews(loadBoard(screens.selectedBoardMinutes()));
+  const rows = listEl.children.map((li) => li.textContent);
+  assert.equal(rows.length, 2);
+  assert.ok(rows[0].includes('33'));
+  assert.ok(rows[1].includes('22'));
+  assert.equal(emptyEl.classList.has('on'), false);
+  assert.equal(lit('records-board-3'), true);
+  assert.equal(lit('records-board-1'), false);
+  assert.equal(lit('records-board-5'), false);
+
+  // The 5-minute board was never written, so the same view shows its own empty
+  // state rather than the 3-minute rows.
+  game.screen.recordsSelect = 2;
+  ui.syncViews(loadBoard(screens.selectedBoardMinutes()));
+  assert.equal(listEl.children.length, 0);
+  assert.equal(emptyEl.classList.has('on'), true);
+  assert.equal(lit('records-board-5'), true);
 });

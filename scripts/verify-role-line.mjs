@@ -15,7 +15,9 @@ const context = await browser.newContext();
 console.log('=== Role line ===');
 const page = await freshPage(context, ROOT);
 await page.click('#menu-item-two-player');
-check(await stateIs(page, 'SELECT_ROLE'), 'clicking Two Players opens the role screen');
+check(await stateIs(page, 'SELECT_DURATION'), 'clicking Two Players opens the duration sub-menu');
+await page.click('#duration-item-1');
+check(await stateIs(page, 'SELECT_ROLE'), 'confirming 1 minute opens the role screen');
 
 // Set P1/P2 roles directly on the game object.
 await page.evaluate(() => {
