@@ -117,6 +117,7 @@ test('role items and markers are defined', () => {
 test('scoring constants', () => {
   assert.equal(C.PIECE_BONUS, 4);
   assert.equal(C.LINE_CLEAR_POINTS, 10);
+  assert.equal(C.LANDING_CELL_POINTS, 2);
 });
 
 test('snake cap and tier palette are defined', () => {

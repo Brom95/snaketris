@@ -17,7 +17,7 @@ import { chooseBotDir, choosePieceMove } from './js/bot.js';
 import { handleIntent } from './js/input.js';
 import { snakeSystem } from './js/snake.js';
 import { piecesSystem, setPieceState, requestPieceShift } from './js/pieces.js';
-import { PLAYING, LINE_CLEAR_POINTS } from './js/constants.js';
+import { PLAYING, LINE_CLEAR_POINTS, LANDING_CELL_POINTS } from './js/constants.js';
 
 // Per-run LCG (seed 20240601 family), installed as Math.random so spawnPiece
 // sees the same sequence the real game would.
@@ -108,7 +108,7 @@ function describe(g) {
   const survived = g.survived ? 'survived full minute' : `died: ${g.diedSide} at tick ${g.diedAt}`;
   const attempted = g.completedPieces * 4;
   const eaten = attempted - g.landedBlocks;
-  const rowsCleared = (g.tetrisScore - 3 * g.landedBlocks) / LINE_CLEAR_POINTS;
+  const rowsCleared = (g.tetrisScore - LANDING_CELL_POINTS * g.landedBlocks) / LINE_CLEAR_POINTS;
   return `seed ${String(g.seed).padStart(8)} | snake ${String(g.snakeScore).padStart(4)} tetris ${String(g.tetrisScore).padStart(4)} ` +
     `| ${winner.padEnd(6)} | ${survived} | snakeLen=${g.snakeLen} completed=${g.completedPieces} landed=${g.landedBlocks} ` +
     `eaten=${eaten}(${((eaten / attempted) * 100).toFixed(0)}%) rows=${rowsCleared} ticks=${g.ticksPlayed}`;

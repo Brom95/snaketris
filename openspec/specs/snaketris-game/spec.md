@@ -218,7 +218,7 @@ The system SHALL clear a row when all of its cells are solid (landed) blocks, aw
 - **THEN** every full row clears, each awards 10 points, and every solid block above each cleared row shifts down by one
 
 ### Requirement: Two scores, one per side
-The system SHALL keep two separate scores in every game: one for the snake side and one for the Tetris side. The snake score increases by 1 for each cell the snake consumes. The Tetris score increases by 3 for each cell that lands as a solid block and by 10 for each cleared row.
+The system SHALL keep two separate scores in every game: one for the snake side and one for the Tetris side. The snake score increases by 1 for each cell the snake consumes. The Tetris score increases by 2 for each cell that lands as a solid block and by 10 for each cleared row.
 
 #### Scenario: Snake eats a cell
 - **WHEN** the snake consumes one cell of a falling piece
@@ -226,7 +226,7 @@ The system SHALL keep two separate scores in every game: one for the snake side 
 
 #### Scenario: A piece lands
 - **WHEN** a falling piece lands and some number of its cells become solid blocks
-- **THEN** the Tetris score increases by 3 for each of those cells and the snake score is unchanged
+- **THEN** the Tetris score increases by 2 for each of those cells and the snake score is unchanged
 
 #### Scenario: A row clears
 - **WHEN** a full row clears

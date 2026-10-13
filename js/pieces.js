@@ -1,5 +1,5 @@
 // Piece lifecycle + difficulty ramp.
-import { COLS, ROWS, EMPTY, SOLID, TETROMINOES, PIECE_TYPES, PIECE_BOX, SRS_KICKS, BASE_FALL, MAX_FALL, SPAWN_INTERVAL, PLAYING, LINE_CLEAR_POINTS } from './constants.js';
+import { COLS, ROWS, EMPTY, SOLID, TETROMINOES, PIECE_TYPES, PIECE_BOX, SRS_KICKS, BASE_FALL, MAX_FALL, SPAWN_INTERVAL, PLAYING, LINE_CLEAR_POINTS, LANDING_CELL_POINTS } from './constants.js';
 import { game, gameOver } from './state.js';
 import { getCell, setCell } from './grid.js';
 import { consumePieceAtHead, snakeTicksPerCell } from './snake.js';
@@ -216,7 +216,7 @@ export function landPiece(p) {
     if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
       setCell(r, c, SOLID);
       game.play.landedBlocks += 1;
-      game.play.tetrisScore += 3;
+      game.play.tetrisScore += LANDING_CELL_POINTS;
       landedCells += 1;
     }
   }

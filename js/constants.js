@@ -102,8 +102,9 @@ export const MAX_SNAKE_LEN = 10;
 export const TIER_WIDTH = MAX_SNAKE_LEN - 1; // body segments one tier colours
 
 // Scoring
-export const PIECE_BONUS = 4;       // extra points for eating a whole piece
-export const LINE_CLEAR_POINTS = 10; // points for one cleared row
+export const PIECE_BONUS = 4;             // extra points for eating a whole piece
+export const LINE_CLEAR_POINTS = 10;      // points for one cleared row
+export const LANDING_CELL_POINTS = 2;     // points for one landed solid block
 
 // Native (logical) board size in CSS pixels. The buffer is never resized;
 // only the CSS display size is scaled to fit the viewport (fitCanvas).
