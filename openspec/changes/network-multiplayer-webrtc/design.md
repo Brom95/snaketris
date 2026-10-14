@@ -109,25 +109,25 @@ A network match that ends with both peers still paired returns the host page to 
 
 **Trade-off:** the host page owns the rematch decision, so the guest cannot start a match on its own. Accepted, and it matches the host-owned preparation the user chose.
 
-### One-network pairing names the host's address; the public list is the other supply
+### One-network pairing carries the supply in the secret; a raw address does not work
 
-The user accepts that on one network the host page's address is always reachable
-from the guest page. That assumption removes the reachability proof, not the
-candidate supply: a data channel still needs candidate addresses both peers can
-reach, and a public list cannot name an address on the players' own network. So
-the one-network supply is the address the guest is given — the host's own
-network address, or the endpoint a tunnel service hands out for its network —
-and the attempt offers that address alone.
+The user accepts that on one network the host page is reachable from the guest,
+and wants everything to travel by QR and link. What can travel is the **ICE
+supply**, not the SDP: the browser generates its own certificates and DTLS
+material, and a hand-made candidate is rejected. Measured (see Risks): an
+injected `a=ice-candidate 127.0.0.1:<port>` is accepted into both descriptions
+yet leaves `connectionState: "new"`, `iceConnectionState: "new"`, and the relay
+between the two ports receives **zero datagrams**. So naming the host's raw
+address cannot open a channel.
 
-The public list stays as the other supply, read from its configured source on
-every network-section open and pruned to the entries that answer. The measured
-constraint (see Risks) is why naming an address is required rather than optional:
-with no supply at all the only candidate a browser offers is its own instance,
-so a second device is unreachable.
+Chosen: the host names a **supply** reachable on its network — an ICE endpoint a
+tunnel service hands out for that network, or a public list entry — and the page
+encodes it into the pairing link, so the guest receives it without typing. The
+public list stays as the other supply, refreshed and pruned per open.
 
-**Trade-off:** the player names an address instead of the page discovering one.
-Accepted: the page starts no host of its own, and the user's assumption is what
-makes the address known.
+**Trade-off:** some ICE supply must exist for two devices to pair, and the page
+cannot pair them with none. Accepted and stated rather than hidden: with no
+supply the pairing step names that only this browser instance is reachable.
 
 ### D9. The host sends every preparation selection; the guest paints read-only mirrors
 

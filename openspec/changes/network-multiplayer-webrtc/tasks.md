@@ -146,7 +146,7 @@
 - [ ] 12.2 Read the public list from its configured source on every network-section open rather than once at page init; verify a unit test in `tests/app.test.js` counts two reads across two opens
 - [ ] 12.3 Prune the list to the entries that answer a candidate request within the attempt's wait; verify a unit test in `tests/app.test.js` asserts a never-candidate entry is dropped and an answering entry kept
 - [ ] 12.4 Bound the pruning work inside the attempt's existing wait; verify `scripts/verify-ice-preload.mjs` names the budget and the entry count it validated
-- [ ] 12.5 Let the guest name the host's network address as the supply and accept it reachable without a proof; verify a unit test asserts the attempt offers that address alone
+- [ ] 12.5 Carry the candidate supply in the pairing secret, so a supply the host names reaches the guest without typing; verify a unit test asserts the guest reads the supply from the link, and that a raw address alone is not offered as a candidate
 - [ ] 12.6 Keep the one-network address selectable when the public list yields nothing usable or cannot be read; verify the harness shows the address line rather than a dead end
 - [ ] 12.7 Document the one-network recipe in the pairing-step help view and `engine/README.md`; verify the help view renders the line in the harness
 - [ ] 12.8 Run `npm test`, `npm run verify` and ripwire `quality_delta`; verify green and no regression against the pinned baseline

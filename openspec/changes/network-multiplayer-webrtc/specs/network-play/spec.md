@@ -185,34 +185,36 @@ The system SHALL end a network match when its peer link closes, SHALL record the
 ### Requirement: A pairing completes between two devices on one network
 
 The system SHALL pair two pages on two devices that share one network — one local
-network, or one virtual network such as a tunnel service — and SHALL accept that
-the host page's address is reachable from the guest page. The system SHALL NOT
-require a public candidate list for that pairing.
+network, or one virtual network such as a tunnel service — using a candidate
+supply both devices can reach, and SHALL carry that supply in the pairing secret
+so the guest receives it without typing it. The system SHALL NOT require the
+player to run a supply of its own, and SHALL NOT require a public candidate list
+when the network offers its own endpoint.
 
-#### Scenario: The guest names the host's address
+#### Scenario: The host names its network's supply
 
-- **WHEN** the guest page is given the address of the network the host page runs on
-- **THEN** the attempt offers that address alone and pairs without consulting a public list
+- **WHEN** the host page names a candidate supply reachable on its network and paints the pairing link
+- **THEN** the guest page opened from that link uses that supply, and the guest typed nothing
 
-#### Scenario: Two devices on one local network pair
+#### Scenario: Two devices on one network pair
 
-- **WHEN** two players open the two pages of one pairing secret on two devices that share one local network, and name that network
-- **THEN** both pages reach the paired state and one match is scheduled
-
-#### Scenario: Two devices on one virtual network pair
-
-- **WHEN** two players open the two pages of one pairing secret on two devices that share one virtual network, and name that network
+- **WHEN** two players open the two pages of one pairing secret on two devices that share one network, and the secret carries a supply both can reach
 - **THEN** both pages reach the paired state and one match is scheduled
 
 #### Scenario: One-network pairing contacts no public list
 
-- **WHEN** a pairing completes with a named one-network address
+- **WHEN** a pairing completes with a supply that belongs to the players' network
 - **THEN** no request went to a public candidate list, and no server owned by the project was contacted at any point
 
-#### Scenario: An address that is not reachable is reported
+#### Scenario: No supply present pairs only this browser
 
-- **WHEN** the guest page cannot reach the address it was given
-- **THEN** the pairing step names that no channel was reached, and the pages are not left in the paired state
+- **WHEN** a network match is attempted with no candidate supply at all
+- **THEN** the pairing step names that only this browser instance can be reached, and no match is scheduled between devices
+
+#### Scenario: A supply that answers nothing is reported
+
+- **WHEN** the supply the guest received answers no candidate request
+- **THEN** the pairing step names that no channel was reached, and the guest can name another supply
 
 ### Requirement: The public candidate list is refreshed and pruned per open
 
