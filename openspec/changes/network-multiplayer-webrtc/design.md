@@ -60,14 +60,28 @@ The host page runs the simulation. The guest sends intents to the host and paint
 
 ### D3. Pairing = a pre-prepared offer blob in the link plus a QR code
 
-The host page, on entering the pairing step:
+Pairing moves exactly two blobs, each by the cheapest route available:
 
-1. constructs an `RTCPeerConnection` and calls `createDataChannel(label, { negotiated: true, negotiatedStreams: 2 })` **before** any offer/answer exchange;
-2. calls `createOffer()` and waits for ICE gathering to finish;
-3. trims the offer SDP (drops comment lines, keeps the `a/` lines the guest needs) and encodes it into the share link's URL fragment;
-4. paints a QR code of that link.
+1. **A → B, the offer**, out of band: the share link, or a QR of it.
+2. **B → A, the answer**, over the data channel the offer just opened.
 
-The guest page reads the fragment, calls `setRemoteDescription(offer)`, `createAnswer()`, and sends its answer **over the negotiated data channel** to the host, which calls `setRemoteDescription(answer)`. The negotiated channel exists before negotiation, so it carries the guest→host hop that the link cannot.
+Nothing else travels. The link carries one direction and the channel carries the
+other, which is why the channel is created with `negotiated: true` before any
+offer exists — the return hop needs something to write into.
+
+The host page produces its blob by running its own attempt first: build the
+connection, `createOffer()`, wait for ICE gathering, trim the SDP (drop comment
+lines, keep the `a/` lines the guest needs), put the result in the link's URL
+fragment, and paint a QR of that link beside the short readable code. The guest
+reads the fragment, calls `setRemoteDescription(offer)`, `createAnswer()`, and
+posts its answer back; the host calls `setRemoteDescription(answer)`.
+
+The third thing pairing needs is not a hop. It is a **precondition already baked
+into the offer**: the candidate addresses inside it decide reachability, and the
+browser picked them while gathering ICE. That is why the host runs its attempt
+before painting the link — the blob the link carries already names the addresses
+the supply resolved. See the One-network pairing decision for what that supply
+may be.
 
 **Why the negotiated channel is required:** the link carries one direction only. A `RTCDataChannel` normally becomes usable only after both peers have set a remote description, which is the chicken-and-egg this step runs into. `negotiated: true` creates the channel up-front and it is the standard SDP-over-the-channel pattern.
 
@@ -115,8 +129,10 @@ A network match that ends with both peers still paired returns the host page to 
 
 The user accepts that on one network the host page is reachable from the guest,
 and wants everything to travel by QR and link. What can travel is the **ICE
-supply**, not the SDP: the browser generates its own certificates and DTLS
-material, and a hand-made candidate is rejected. Measured (see Risks): an
+supply**, not the SDP: the article's "devices see each other's IPs" step is true
+for an implementation you control, where you can write the candidate lines
+yourself, and false for a browser, which generates its own certificates and DTLS
+material and rejects a hand-made candidate. Measured (see Risks): an
 injected `a=ice-candidate 127.0.0.1:<port>` is accepted into both descriptions
 yet leaves `connectionState: "new"`, `iceConnectionState: "new"`, and the relay
 between the two ports receives **zero datagrams**. So naming the host's raw
