@@ -1,7 +1,7 @@
 {
   "debug": false,
   "sessionFallback": true,
-  "compaction": "off",
+  "compaction": "auto",
   "compactionEngine": "blackhole",
   "compactionSummaryMode": "default",
   "skipForProviders": [],
@@ -9,7 +9,7 @@
   "showPreCompactionMessage": true,
   "retainedToolOutputMaxTokens": 20000,
   "recallResponseMaxChars": 48000,
-  "midRunCompaction": "pause",
+  "midRunCompaction": "resume",
   "observeAfterTokens": 15000,
   "reflectAfterTokens": 25000,
   "compactAfterPreset": "default",
@@ -24,7 +24,7 @@
   "observerChunkMaxTokens": 40000,
   "observerPreambleMaxTokens": 0,
   "agentMaxTurns": 16,
-  "memory": false,
+  "memory": true,
   "debugLog": false,
   "statusBar": true,
   "showWorkerNotifications": true

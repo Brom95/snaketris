@@ -375,13 +375,15 @@ for (let attempt = 0; attempt < 24 && shiftHost === 0; attempt++) {
     const sn = await import('/js/snake.js');
     if (st.game.play.pieceMoveAcc < sn.snakeTicksPerCell()) return false;
     const piece = st.game.play.pieces[0];
-    if (!piece) return false;
+    if (!piece || !piece.row) return false;
     const row = Math.floor(piece.row);
     return gd.getCell(row, piece.col + 1) === 0 && gd.getCell(row + 1, piece.col + 1) === 0;
   });
   const beforeRow = await host.evaluate(async () => {
     const st = await import('/js/state.js');
-    return st.game.play.pieces[0].row;
+    const piece = st.game.play.pieces[0];
+    if (!piece || !piece.row) return false;
+    return piece.row;
   });
   await guest.evaluate(async () => {
     const input = await import('/js/input.js');
@@ -395,12 +397,14 @@ for (let attempt = 0; attempt < 24 && shiftHost === 0; attempt++) {
   const measured = await host.evaluate(async ([seen]) => {
     const st = await import('/js/state.js');
     const np = await import('/js/netplay.js');
-    const before = st.game.play.pieces[0].col;
+    const piece = st.game.play.pieces[0];
+    if (!piece || !piece.col) return { delta: 0, applied: 0 };
+    const before = piece.col;
     for (let frame = 0; frame < 40; frame++) {
       await new Promise((next) => requestAnimationFrame(next));
       if (np.guestStreamReport().applied > seen) break;
     }
-    return { delta: st.game.play.pieces[0].col - before, applied: np.guestStreamReport().applied };
+    return { delta: piece.col - before, applied: np.guestStreamReport().applied };
   }, [appliedSeen]);
   appliedSeen = measured.applied;
   if (measured.delta === 0) continue;
