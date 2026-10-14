@@ -30,6 +30,7 @@ export const lobby = {
   prepScreen: '', // the preparation step the host page sits on
   prepIndex: -1, // the marker the host page left there, mirrored onto this page
   closed: '', // the reason the peer link closed, once it did
+  ice: '', // what the published offer carries: 'remote' reaches another device, 'local' reaches another tab in the same browser instance, 'none' reaches neither
 };
 
 // Drop every SDP comment line. libwebrtc puts a machine-dependent payload behind

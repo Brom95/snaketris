@@ -63,6 +63,12 @@ export const PAIRING_CODE_LABEL = 'Or type this code';
 export const PAIRING_WAITING = 'Waiting for the other device';
 export const PAIRING_JOIN = 'Pair';
 
+// What the pairing step says when the offer carries no remote ICE address. The
+// fallback blob reaches only another tab in the same browser instance, so the
+// step names the limit it leaves instead of painting a link that pairs nobody.
+export const PAIRING_WARN_LOCAL = 'No STUN server reached — this link pairs another tab in the same browser only';
+export const PAIRING_WARN_NONE = 'This browser cannot open a peer connection — network play is unavailable';
+
 // The guest page's read-only copies of the host's preparation sub-menus. The
 // copy names the wait beside them so the guest always knows the other device
 // is the one choosing.

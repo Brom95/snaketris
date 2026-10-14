@@ -41,9 +41,9 @@ const ICE_SERVERS = [
 // A page with no channel object at all — a headless suite, which is exactly the
 // run the contract says the engine must survive — supplies no transport, and the
 // link reports no peer rather than failing.
-function createTransport() {
+function createTransport(iceServers) {
   if (typeof RTCPeerConnection !== 'function') return null;
-  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  const pc = new RTCPeerConnection({ iceServers });
   const channel = pc.createDataChannel('snaketris-pair', { negotiated: true, negotiatedStreams: 2, id: 0 });
   // The ICE gathering the engine link holds: the candidates arrive as events,
   // so the consumer forwards them and the link keeps the list.
@@ -149,20 +149,55 @@ function networkDuties() {
   sendPreparationMirror();
 }
 
+// Whether an offer carries a remote ICE address: the only thing that can reach
+// another device. libwebrtc records the servers it applied and the addresses it
+// gathered as SDP comment lines, which `trimmedOffer` drops before the blob
+// travels, so the evidence is read here, on the raw offer.
+function remoteCandidate(sdp) {
+  return /iceServer|stun:|dtlsbootstrap/i.test(sdp);
+}
+
 // The host publishes its offer: the consumer constructs the peer connection,
 // creates the negotiated channel, and asks for the offer. The seed is a supply
 // the pairing derives from the blob, so no clock is read here.
 async function publishOffer() {
   const link = peerLink();
   const pc = link && link.transport && link.transport.connection;
-  if (!pc) return;
+  if (!pc) {
+    lobby.ice = 'none';
+    return;
+  }
+  const href = typeof location === 'object' ? location.href : '';
   try {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    publish(pc.localDescription.sdp, 0, typeof location === 'object' ? location.href : '');
+    const blob = pc.localDescription.sdp;
+    if (remoteCandidate(blob)) {
+      lobby.ice = 'remote';
+      publish(blob, 0, href);
+      return;
+    }
+    if (lobby.ice === 'local') {
+      // Second pass over the rebuilt channel: an empty ICE list leaves libwebrtc
+      // the `<uuid>.local` candidate, which reaches another connection inside
+      // the same browser instance — the one-network form the step warns about.
+      publish(blob, 0, href);
+      return;
+    }
+    // No STUN server answered the first offer, so no remote address exists to
+    // carry. Rebuild the channel with an empty ICE list; the offer it produces
+    // on the next tick carries the same-browser candidate instead.
+    lobby.ice = 'local';
+    try {
+      pc.close();
+    } catch (e) {
+      // A connection the channel already closed closes nothing.
+    }
+    registerTransport(() => createTransport([]));
   } catch (e) {
     // An offer the connection cannot produce leaves the pairing step on the
     // code form; nothing else changes.
+    lobby.ice = 'none';
   }
 }
 
@@ -199,7 +234,7 @@ export function init() {
   initInput(canvas);
   initUi();
   resetGame();
-  registerTransport(createTransport);
+  registerTransport(() => createTransport(ICE_SERVERS));
   // A closed peer link ends the match with the peer leaving and returns both
   // pages to the pairing step. The records layer writes nothing for that end
   // reason, so an abandoned match never claims a leaderboard entry.

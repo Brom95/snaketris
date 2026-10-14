@@ -7,6 +7,7 @@ import {
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
   GAME_CONTROL_PLAYER_MARKERS,
   PAIRING_TITLE, PAIRING_HINTS, PAIRING_LINK_LABEL, PAIRING_CODE_LABEL, PAIRING_WAITING,
+  PAIRING_WARN_LOCAL, PAIRING_WARN_NONE,
   DURATION_SCREEN_ITEMS, ROLE_SCREEN_ITEMS, MIRROR_TITLE, MIRROR_HINTS,
   twoPlayerOffered,
 } from './constants.js';
@@ -50,6 +51,7 @@ let pairingLinkEl = null;
 let pairingCodeEl = null;
 let pairingQrEl = null;
 let pairingWaitingEl = null;
+let pairingWarnEl = null;
 let mirrorDurationEl = null;
 let mirrorRoleEl = null;
 let mirrorTitleEl = null;
@@ -93,6 +95,7 @@ export function initUi() {
   pairingCodeEl = lookup('pairing-code');
   pairingQrEl = lookup('pairing-qr');
   pairingWaitingEl = lookup('pairing-waiting');
+  pairingWarnEl = lookup('pairing-warn');
   mirrorDurationEl = lookup('mirror-duration-items');
   mirrorRoleEl = lookup('mirror-role-items');
   mirrorTitleEl = lookup('mirror-title');
@@ -227,6 +230,12 @@ function paintPairing(pctx) {
   if (pairingCodeEl) pairingCodeEl.textContent = codeForm ? PAIRING_CODE_LABEL + ': ' + lobby.code : '';
   show(pairingWaitingEl, !lobby.paired || preparationShown());
   if (pairingWaitingEl) pairingWaitingEl.textContent = PAIRING_WAITING;
+  // The step says what the published offer carries: a blob with no remote ICE
+  // address pairs nobody outside this browser instance, and a page with no
+  // channel at all pairs nobody anywhere. The limit is on screen, not implied.
+  const warn = lobby.ice === 'none' ? PAIRING_WARN_NONE : (lobby.ice === 'local' ? PAIRING_WARN_LOCAL : '');
+  show(pairingWarnEl, warn !== '');
+  if (pairingWarnEl) pairingWarnEl.textContent = warn;
   paintMirrors();
 }
 
