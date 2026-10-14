@@ -181,3 +181,62 @@ The system SHALL end a network match when its peer link closes, SHALL record the
 
 - **WHEN** a network match ends because a peer left
 - **THEN** no leaderboard entry is written for that match
+
+### Requirement: A pairing completes between two devices on one network
+
+The system SHALL pair two pages on two devices that share one network — one local
+network, or one virtual network such as a tunnel service — and SHALL accept that
+the host page's address is reachable from the guest page. The system SHALL NOT
+require a public candidate list for that pairing.
+
+#### Scenario: The guest names the host's address
+
+- **WHEN** the guest page is given the address of the network the host page runs on
+- **THEN** the attempt offers that address alone and pairs without consulting a public list
+
+#### Scenario: Two devices on one local network pair
+
+- **WHEN** two players open the two pages of one pairing secret on two devices that share one local network, and name that network
+- **THEN** both pages reach the paired state and one match is scheduled
+
+#### Scenario: Two devices on one virtual network pair
+
+- **WHEN** two players open the two pages of one pairing secret on two devices that share one virtual network, and name that network
+- **THEN** both pages reach the paired state and one match is scheduled
+
+#### Scenario: One-network pairing contacts no public list
+
+- **WHEN** a pairing completes with a named one-network address
+- **THEN** no request went to a public candidate list, and no server owned by the project was contacted at any point
+
+#### Scenario: An address that is not reachable is reported
+
+- **WHEN** the guest page cannot reach the address it was given
+- **THEN** the pairing step names that no channel was reached, and the pages are not left in the paired state
+
+### Requirement: The public candidate list is refreshed and pruned per open
+
+The system SHALL read the public candidate list from its configured source each
+time the network section is opened, and SHALL keep only the entries that answer a
+candidate request within the attempt's wait. The system SHALL NOT offer an entry
+that did not answer.
+
+#### Scenario: The list is read again on every open
+
+- **WHEN** the network section is opened a second time in the same page session
+- **THEN** the list is read again from the configured source, not reused from the earlier open
+
+#### Scenario: A dead entry is dropped
+
+- **WHEN** an entry of the public list names no candidate within the attempt's wait
+- **THEN** that entry is not offered to the attempt
+
+#### Scenario: Every entry dead leaves the one-network address selectable
+
+- **WHEN** no entry of the public list answers
+- **THEN** the pairing step says the public list gave nothing usable, and naming a one-network address remains available
+
+#### Scenario: An unreadable list source does not close the section
+
+- **WHEN** the configured list source cannot be read
+- **THEN** the network section still opens, the public list shows nothing usable, and naming a one-network address remains available

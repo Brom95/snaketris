@@ -140,6 +140,17 @@
 - [x] 11.4 Run ripwire `quality_delta` and `--test-gate` against the git HEAD baseline and verify no failure mode regressed and the boundary gate is still green
   <!-- `quality_delta` against the pinned baseline (`9a92ef60e+dirty`): `gating=0`, seven findings all `sev=minor` and all `short-horizon-churn` (edits inside the change window), no complexity/duplication/dead-code/API-surface regression. `--test-gate` names 15 test files, all run by `npm test` (275 tests, 0 failures); its 15 `untested=` rows are browser-harness and benchmark symbols, which no unit test reaches by design. `engine/tests/boundary.test.js` stays green (3/3) and the engine tree is 44/44. -->
 
+## 12. One-network pairing and the refreshed public list
+
+- [ ] 12.1 Replace the page's broken candidate-supply code — the validator declared inside the page's own open, and the lobby reading a name it never imports; verify ripwire `grep ICE_SERVERS` reports no hit under `js/netplay.js` and `node --test tests/netplay.test.js` passes
+- [ ] 12.2 Read the public list from its configured source on every network-section open rather than once at page init; verify a unit test in `tests/app.test.js` counts two reads across two opens
+- [ ] 12.3 Prune the list to the entries that answer a candidate request within the attempt's wait; verify a unit test in `tests/app.test.js` asserts a never-candidate entry is dropped and an answering entry kept
+- [ ] 12.4 Bound the pruning work inside the attempt's existing wait; verify `scripts/verify-ice-preload.mjs` names the budget and the entry count it validated
+- [ ] 12.5 Let the guest name the host's network address as the supply and accept it reachable without a proof; verify a unit test asserts the attempt offers that address alone
+- [ ] 12.6 Keep the one-network address selectable when the public list yields nothing usable or cannot be read; verify the harness shows the address line rather than a dead end
+- [ ] 12.7 Document the one-network recipe in the pairing-step help view and `engine/README.md`; verify the help view renders the line in the harness
+- [ ] 12.8 Run `npm test`, `npm run verify` and ripwire `quality_delta`; verify green and no regression against the pinned baseline
+
 ## Workflow follow-up
 
 - Sync the `network-play`, `engine-architecture`, `engine-api`, `snaketris-game` and `start-menu` deltas into `openspec/specs/` with `/opsx-sync`.

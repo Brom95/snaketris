@@ -109,9 +109,25 @@ A network match that ends with both peers still paired returns the host page to 
 
 **Trade-off:** the host page owns the rematch decision, so the guest cannot start a match on its own. Accepted, and it matches the host-owned preparation the user chose.
 
-### Tailscale subnet support
+### One-network pairing names the host's address; the public list is the other supply
 
-The user can choose a Tailscale subnet for the pairing instead of public STUN servers. The ICE servers are configured with Tailscale IP addresses, and the pairing works over the Tailscale subnet. This allows devices on different networks to connect directly via Tailscale without needing a public STUN server. The `ICE_SERVERS` in `js/app.js` is parameterized by the chosen subnet, and the `iceAttempt()` in `js/netplay.js` uses the configured candidates. The design doc's `ICE_SERVERS` list is replaced by the subnet's peer addresses, and the pairing step paints the Tailscale IP as the offer URL.
+The user accepts that on one network the host page's address is always reachable
+from the guest page. That assumption removes the reachability proof, not the
+candidate supply: a data channel still needs candidate addresses both peers can
+reach, and a public list cannot name an address on the players' own network. So
+the one-network supply is the address the guest is given — the host's own
+network address, or the endpoint a tunnel service hands out for its network —
+and the attempt offers that address alone.
+
+The public list stays as the other supply, read from its configured source on
+every network-section open and pruned to the entries that answer. The measured
+constraint (see Risks) is why naming an address is required rather than optional:
+with no supply at all the only candidate a browser offers is its own instance,
+so a second device is unreachable.
+
+**Trade-off:** the player names an address instead of the page discovering one.
+Accepted: the page starts no host of its own, and the user's assumption is what
+makes the address known.
 
 ### D9. The host sends every preparation selection; the guest paints read-only mirrors
 

@@ -4,6 +4,20 @@ These rules constrain edits to this repo only. The ripwire obligations, verbs,
 gates and the strict ordering rule live in the global `~/.pi/agent/AGENTS.md`;
 this project copy restates the obligation and the two must stay in sync.
 
+## Work order — OpenSpec first, ripwire second
+
+1. **OpenSpec is the source of truth.** Any behaviour change starts as a change
+   under `openspec/changes/<name>/`: proposal → specs delta → design → tasks.
+   No source file is touched before its task exists in the change. Review the
+   artifacts before implementing; `openspec validate` must pass.
+2. **Code is read and changed through ripwire only** (see the section below).
+   Read verb first, then the edit verb; receipts auto-run `edit_check`.
+3. **Gates bracket the work:** `quality_baseline` at the start, `quality_delta`
+   before declaring DONE.
+4. **Plain `edit`/`write`** stay reserved for non-symbol content: import lines,
+   constant blocks, HTML, JSON/JSONC config, markdown prose, and the OpenSpec
+   artifacts themselves.
+
 ## ripwire is mandatory for code work (project copy)
 
 Use ripwire (`mcp__ripwire__<verb>`) for **every** interaction with code in this
