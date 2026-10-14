@@ -30,3 +30,14 @@ schema: spec-driven
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
+
+# Project requirements
+# This project uses OpenSpec for network play. The project supports local network play
+# without requiring a public STUN server. If a STUN server is needed, the user can supply
+# one via the transport configuration in js/app.js (ICE_SERVERS). The change
+# network-play implements local-network-only play without a server.
+
+# STUN server list
+# The project uses the hardcoded list of online STUN servers from:
+# https://raw.githubusercontent.com/pradt2/always-online-stun/master/valid_hosts.txt
+# This list is refreshed whenever a fresh list of online STUN servers is needed.

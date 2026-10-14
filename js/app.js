@@ -34,6 +34,21 @@ const ICE_SERVERS = [
   { urls: ['stun:st3043834177.stun.eporoi.com'] },
 ];
 
+// STUN server list URL — hardcoded per project requirement.
+// Use this URL to fetch a fresh list of online STUN servers whenever needed.
+const STUN_SERVERS_URL = 'https://raw.githubusercontent.com/pradt2/always-online-stun/master/valid_hosts.txt';
+
+async function fetchStunServers() {
+  try {
+    const response = await fetch(STUN_SERVERS_URL);
+    if (!response.ok) return [];
+    const text = await response.text();
+    return text.split('\n').filter((line) => line.trim());
+  } catch (e) {
+    return [];
+  }
+}
+
 // The transport supply: the consumer constructs the peer connection and the
 // negotiated data channel, and hands the engine link an object with the three
 // verbs it owns — send, onMessage, and the connection the offer/answer hop
@@ -247,12 +262,46 @@ export function openPairingLink() {
 // Full setup: create/size the canvas, register input + render, seed state,
 // start the loop. The engine canvas owner sizes the buffer when the element
 // is attached, so the entry point names no board numbers.
-export function init() {
+export async function init() {
   const canvas = document.getElementById('game');
   initRender(canvas);
   initInput(canvas);
   initUi();
   resetGame();
+  // Fetch a fresh list of online STUN servers from the project's URL.
+  const servers = await fetchStunServers();
+  ICE_SERVERS.length = 0;
+  servers.forEach((url) => {
+    ICE_SERVERS.push({ urls: [url] });
+  });
+
+// Validate which servers from the list actually work.
+// Returns the list of URLs that successfully answered an ICE offer.
+async function validateStunServers() {
+  try {
+    const response = await fetch(STUN_SERVERS_URL);
+    if (!response.ok) return [];
+    const text = await response.text();
+    const servers = text.split('\n').filter((line) => line.trim());
+    const working = [];
+    for (const url of servers) {
+      try {
+        const serverUrl = new URL(url);
+        const pc = new RTCPeerConnection({ iceServers: [{ urls: [serverUrl.toString()] }] });
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        // Если сервер ответил — он работает
+        working.push(serverUrl.toString());
+        pc.close();
+      } catch (e) {
+        // Сервер не работает
+      }
+    }
+    return working;
+  } catch (e) {
+    return [];
+  }
+}
   // The transport is the page's: the consumer constructs the peer connection and
   // the negotiated datachannel, and hands the engine link an object with the two
   // verbs it owns. The engine never names the channel class.

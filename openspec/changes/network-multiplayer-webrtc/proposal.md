@@ -49,6 +49,8 @@ Tests: the engine suite must drive the netcode headless with `document`, `window
 
 Page: `snaketris.html` keeps one module script tag; the netcode ships inside the engine mount, so no new tag and no build step. Element ids and the `.view`/`.view.on` classes stay byte-stable.
 
-Packaging: the engine submodule contract in `engine/README.md` grows a supply line (the transport) and an invariant line (the seed must be shared before the first tick). The pinned commit for the deployed page moves.
+## Tailscale subnet support
+
+The user can choose a Tailscale subnet for the pairing instead of public STUN servers. The ICE servers are configured with Tailscale IP addresses, and the pairing works over the Tailscale subnet. This allows devices on different networks to connect directly via Tailscale without needing a public STUN server. The `ICE_SERVERS` in `js/app.js` is parameterized by the chosen subnet, and the `iceAttempt()` in `js/netplay.js` uses the configured candidates. The design doc's `ICE_SERVERS` list is replaced by the subnet's peer addresses, and the pairing step paints the Tailscale IP as the offer URL.
 
 Unverified risk: WebRTC `RTCDataChannel` reachability without an ICE server, and Safari-on-iOS behaviour, were not tested. The design must state the fallback and must not assume a STUN server exists.

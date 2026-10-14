@@ -62,3 +62,7 @@ The documentation SHALL state the invariants a consumer must not break, and SHAL
 
 - **WHEN** the invariant is read from the engine documentation
 - **THEN** it is stated in engine symbols only and needs no game file to understand
+
+### Requirement: Tailscale subnet support
+
+The consumer can supply a Tailscale subnet for the pairing instead of public STUN servers. The ICE servers are configured with Tailscale IP addresses, and the pairing works over the Tailscale subnet. The `ICE_SERVERS` in `js/app.js` is parameterized by the chosen subnet, and the `iceAttempt()` in `js/netplay.js` uses the configured candidates. The design doc's `ICE_SERVERS` list is replaced by the subnet's peer addresses, and the pairing step paints the Tailscale IP as the offer URL.

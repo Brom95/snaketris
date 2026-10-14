@@ -57,6 +57,10 @@ The netcode layer SHALL be drivable with no page object, no browser storage, and
 - **WHEN** the engine suite feeds two intent streams into one simulation with no browser objects present
 - **THEN** the simulation finishes and both streams report their applied and dropped intents
 
+### Requirement: Tailscale subnet support
+
+The consumer can supply a Tailscale subnet for the pairing instead of public STUN servers. The ICE servers are configured with Tailscale IP addresses, and the pairing works over the Tailscale subnet. The `ICE_SERVERS` in `js/app.js` is parameterized by the chosen subnet, and the `iceAttempt()` in `js/netplay.js` uses the configured candidates. The design doc's `ICE_SERVERS` list is replaced by the subnet's peer addresses, and the pairing step paints the Tailscale IP as the offer URL.
+
 ### Requirement: The netcode mechanism keeps the boundary gate green
 
 The netcode modules SHALL live inside the engine package, SHALL import nothing outside it, and SHALL name no game noun. The boundary check SHALL reject a netcode module that imports a game file or names a role, a screen state, a score field, or a piece.

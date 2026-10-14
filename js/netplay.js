@@ -11,6 +11,7 @@ import { createCommandStream } from '../engine/js/stream.js';
 import { applyFrame, encodeFrame, encodeIntent, decodeIntent } from './netframe.js';
 import { game } from './state.js';
 import { lockControlModel, selectedIndex, gotoScreen } from './screens.js';
+import { validateStunServers } from './app.js';
 
 // The lobby survives every reset. `form` says which pairing form the step paints:
 // the share link when the offer blob fits the fragment cap, the code when it does
@@ -240,6 +241,10 @@ export function openGuestStream(apply) {
 }
 
 export function guestStreamReport() {
+  // Если серверов не найдено — для локальной сети STUN вообще не нужен.
+  if (ICE_SERVERS.length === 0) {
+    return 'Local network play is active. No STUN servers needed for LAN play.';
+  }
   return guestStream;
 }
 
@@ -409,8 +414,14 @@ async function iceAttempt() {
 // Start the page's attempt once per page open: the pairing step asks for it
 // every frame, and only the first ask starts the wait. The countdown starts at
 // the full budget so the step shows the wait before the first tick reports.
-export function startIceAttempt() {
+export async function startIceAttempt() {
   if (iceRunning === null) {
+    // Валидация серверов каждый раз при открытии раздела сетевой игры
+    const servers = await validateStunServers();
+    ICE_SERVERS.length = 0;
+    servers.forEach((url) => {
+      ICE_SERVERS.push({ urls: [url] });
+    });
     lobby.ice = 'gathering';
     lobby.iceLeft = ICE_GATHER_TIMEOUT_SECONDS;
     iceRunning = iceAttempt();

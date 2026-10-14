@@ -109,6 +109,10 @@ A network match that ends with both peers still paired returns the host page to 
 
 **Trade-off:** the host page owns the rematch decision, so the guest cannot start a match on its own. Accepted, and it matches the host-owned preparation the user chose.
 
+### Tailscale subnet support
+
+The user can choose a Tailscale subnet for the pairing instead of public STUN servers. The ICE servers are configured with Tailscale IP addresses, and the pairing works over the Tailscale subnet. This allows devices on different networks to connect directly via Tailscale without needing a public STUN server. The `ICE_SERVERS` in `js/app.js` is parameterized by the chosen subnet, and the `iceAttempt()` in `js/netplay.js` uses the configured candidates. The design doc's `ICE_SERVERS` list is replaced by the subnet's peer addresses, and the pairing step paints the Tailscale IP as the offer URL.
+
 ### D9. The host sends every preparation selection; the guest paints read-only mirrors
 
 The host page sends each preparation change over the data channel: every marker move and every confirmation. The guest paints a read-only copy of the duration sub-menu and the role sub-menu on its own page, next to the waiting line that names its state. The guest offers no selectable item for those copies, so it cannot change the match settings. The host confirmation still starts the match; the mirror only shows progress.
