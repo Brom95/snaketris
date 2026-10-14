@@ -174,7 +174,30 @@
         justify-content: flex-end; /* column-reverse: flex-end = top edge; stack hugs the top */
         gap: 24px; /* FIELD_V_GAP_MOBILE (js/constants.js) */
       }
-      #menu-view, #duration-view, #role-view { min-height: 65vh; }
+      /* The stacked layout reserves a 65vh track for the menu and its sub-menus;
+         letting that track grow — four items at 20px with 20px of padding each —
+         pushes the field out of the viewport and body clips the result. The track
+         is capped at the same height instead, so a menu whose items do not fit
+         gets its own scrollbar and the field keeps its place. */
+      #menu-view, #duration-view, #role-view, #way-view, #control-view {
+        min-height: 65vh;
+        max-height: 65vh;
+        overflow-y: auto;
+      }
+      /* The views that carry page text — the help view, the leaderboard, the
+         pairing step — can run taller than the viewport, and body clips the rest
+         with no way to read it. Each gets its own scroll track capped to the
+         viewport instead: a scrollbar appears only while the text overflows. The
+         canvas is deliberately absent from both lists — the field keeps its own
+         scaled box and never scrolls. */
+      #help-view, #records-view, #pairing-view {
+        max-height: 100vh;
+        overflow-y: auto;
+      }
+      /* The pairing step centres its column, which pushes the first line above a
+         scroll track once the text overflows; the track starts at the top instead
+         so the title is always on screen. */
+      #pairing-view.on { justify-content: flex-start; }
     }
   </style>
 </head>
@@ -324,6 +347,7 @@
         <ul>
           <li>The bot plays the side you did not choose.</li>
           <li>Network: each device plays its own side, and no bot fills either.</li>
+        <li>No pairing server reached: only two tabs of one browser — both pages can name their own with ?ice=stun:... in the address.</li>
           <li>Snake: eat falling pieces, +1 per cell, +4 for a whole piece.</li>
           <li>The snake stops at 8 segments; later eaten cells recolour its body blue, then purple, then gold.</li>
           <li>Tetris: +2 per landed block, +10 per full row cleared.</li>

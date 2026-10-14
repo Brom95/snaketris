@@ -41,6 +41,19 @@ const ICE_SERVERS = [
 // A page with no channel object at all — a headless suite, which is exactly the
 // run the contract says the engine must survive — supplies no transport, and the
 // link reports no peer rather than failing.
+// The ICE list a page gathers with. A page can name its own servers from its own
+// address — `?ice=stun:...`, repeated — so two devices on one network that run
+// their own ICE server can point both pages at it. A browser page has no other
+// way to obtain an address to connect to: STUN is what supplies addresses, and
+// without one no peer, on any network, can be reached.
+function iceServersFromUrl(fallback) {
+  const href = typeof location === 'object' ? location.href : '';
+  if (href === '') return fallback;
+  const urls = new URL(href).searchParams.getAll('ice');
+  if (urls.length === 0) return fallback;
+  return urls.map((url) => ({ urls: [url] }));
+}
+
 function createTransport(iceServers) {
   if (typeof RTCPeerConnection !== 'function') return null;
   const pc = new RTCPeerConnection({ iceServers });
@@ -234,7 +247,7 @@ export function init() {
   initInput(canvas);
   initUi();
   resetGame();
-  registerTransport(() => createTransport(ICE_SERVERS));
+  registerTransport(() => createTransport(iceServersFromUrl(ICE_SERVERS)));
   // A closed peer link ends the match with the peer leaving and returns both
   // pages to the pairing step. The records layer writes nothing for that end
   // reason, so an abandoned match never claims a leaderboard entry.
