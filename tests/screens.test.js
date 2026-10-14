@@ -12,7 +12,7 @@ const state = await import('../js/state.js');
 
 const page = await readFile(new URL('../snaketris.html', import.meta.url), 'utf8');
 
-const SCREEN_IDS = [C.MENU, C.SELECT_DURATION, C.SELECT_ROLE, C.SELECT_CONTROL, C.PLAYING, C.GAME_OVER, C.RECORDS, C.HELP];
+const SCREEN_IDS = [C.MENU, C.SELECT_WAY, C.SELECT_DURATION, C.SELECT_ROLE, C.SELECT_CONTROL, C.PLAYING, C.GAME_OVER, C.RECORDS, C.HELP, C.PAIRING];
 
 test('the table has one entry per screen, in the declared order', async () => {
   assert.equal(screens.SCREENS.length, SCREEN_IDS.length);
@@ -47,6 +47,25 @@ test('duration items carry their minutes and Back leaves for the menu', async ()
   assert.equal(row.controls.length, 0);
 });
 
+test('way items equal WAY_SCREEN_ITEMS in page order', async () => {
+  assert.deepEqual(screens.SCREEN_BY_ID[C.SELECT_WAY].items.map((it) => it.label), C.WAY_SCREEN_ITEMS);
+});
+
+test('the way screen splits the two-player entry and gates the shared-page way', async () => {
+  const way = screens.SCREEN_BY_ID[C.SELECT_WAY];
+  assert.equal(way.view, 'way-view');
+  assert.equal(way.field, false);
+  assert.equal(way.cursor, 'arrow');
+  assert.equal(way.selection, 'waySelect');
+  assert.equal(way.items[0].requiresWide, true);
+  assert.equal(way.items[0].opens, C.SELECT_DURATION);
+  assert.equal(way.items[1].opens, C.PAIRING);
+  assert.equal(way.items[0].action, screens.TRANSITIONS['pick-way']);
+  assert.equal(way.items[1].action, screens.TRANSITIONS['pick-way']);
+  assert.equal(way.items[2].action, screens.TRANSITIONS['back-menu']);
+  assert.equal(way.controls.length, 0);
+});
+
 test('role items equal ROLE_SCREEN_ITEMS in page order', async () => {
   assert.deepEqual(screens.SCREEN_BY_ID[C.SELECT_ROLE].items.map((it) => it.label), C.ROLE_SCREEN_ITEMS);
 });
@@ -62,7 +81,7 @@ test('every menu item names the screen it opens', async () => {
   assert.equal(menu.items[0].action, screens.TRANSITIONS['select-role']);
   assert.equal(menu.items[0].opens, C.SELECT_DURATION);
   assert.equal(menu.items[1].action, screens.TRANSITIONS['two-player']);
-  assert.equal(menu.items[1].opens, C.SELECT_DURATION);
+  assert.equal(menu.items[1].opens, C.SELECT_WAY);
   assert.equal(menu.items[2].opens, C.RECORDS);
   assert.equal(menu.items[2].action, screens.TRANSITIONS.open);
   assert.equal(menu.items[3].opens, C.HELP);
@@ -171,6 +190,12 @@ test('a two-player role pick hands the other role to the second player', async (
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
   assert.equal(state.game.screen.twoPlayerMode, true);
+  assert.equal(state.game.screen.state, C.SELECT_WAY);
+  assert.equal(state.game.screen.waySelect, 0);
+  // The wide viewport offers the way sub-menu, and the shared-page way is the
+  // first item: confirming it continues the classic two-player preparation.
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
   assert.equal(state.game.screen.state, C.SELECT_DURATION);
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
@@ -216,6 +241,8 @@ test('a finished game lands on a screen the table resolves', async () => {
 
   state.resetGame();
   screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
   screens.pushIntent({ action: 'confirm' });
@@ -308,6 +335,8 @@ test('the duration screen returns to the menu by Escape, the Back click and the 
 test('leaving the control screen returns to the duration screen, not the role screen', async () => {
   state.resetGame();
   screens.pushIntent({ action: 'menuDown' });
+  screens.pushIntent({ action: 'confirm' });
+  screens.drainIntents();
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
   screens.pushIntent({ action: 'confirm' });

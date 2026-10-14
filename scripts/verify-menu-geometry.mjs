@@ -11,7 +11,7 @@
 // Run: node scripts/verify-menu-geometry.mjs
 
 import { check, makeCanvas, report, stubDom } from './harness.mjs';
-import { MENU_ITEMS, MENU, SELECT_DURATION, SELECT_ROLE, RECORDS, HELP, DURATION_SCREEN_ITEMS } from '../js/constants.js';
+import { MENU_ITEMS, MENU, SELECT_DURATION, SELECT_ROLE, SELECT_WAY, PAIRING, RECORDS, HELP, DURATION_SCREEN_ITEMS, WAY_SCREEN_ITEMS } from '../js/constants.js';
 import { game } from '../js/state.js';
 import { drainIntents, toMenu } from '../js/screens.js';
 import { initInput, onKey } from '../js/input.js';
@@ -46,7 +46,7 @@ const highlightCss = /#menu-items li\.on\b/.test(page) || /li\.on\s*\{/.test(pag
 // Rich enough DOM for ui.js: classList.toggle drives the view/highlight
 // visibility, getBoundingClientRect feeds the interface hit test.
 const dom = stubDom({
-  elements: ['ui', 'score', 'status', 'menu-view', 'duration-view', 'role-view', 'records-view', 'help-view',
+  elements: ['ui', 'score', 'status', 'menu-view', 'duration-view', 'role-view', 'way-view', 'records-view', 'help-view',
     'records-list', 'records-empty'],
   lists: { '#menu-items > li': ['menu-item-play', 'menu-item-two-player', 'menu-item-records', 'menu-item-help'] },
   rects: {
@@ -131,6 +131,36 @@ for (let sel = 0; sel < DURATION_SCREEN_ITEMS.length; sel++) {
 game.screen.state = MENU;
 game.screen.durationSelect = 0;
 
+// ---------- The way sub-menu markup and highlight ----------
+
+console.log('=== The way sub-menu is page markup with its own highlight ===');
+
+const wayList = /<ul id="way-items">([\s\S]*?)<\/ul>/.exec(page);
+check(wayList !== null, 'snaketris.html has <ul id="way-items">');
+const wayItems = [];
+const wayTagRe = /<li id="(way-[a-z0-9\-]+)"([^>]*)>([^<]*)<\/li>/g;
+let w;
+while ((w = wayTagRe.exec(wayList ? wayList[1] : '')) !== null) {
+  wayItems.push({ id: w[1], attrs: w[2], label: w[3] });
+}
+check(wayItems.length === WAY_SCREEN_ITEMS.length &&
+  wayItems.every((it, i) => it.label === WAY_SCREEN_ITEMS[i]),
+  'the way items carry WAY_SCREEN_ITEMS in order: ' + wayItems.map((it) => it.label).join(', '));
+check(wayItems.every((it) => /tabindex="-1"/.test(it.attrs)),
+  'every way item carries tabindex="-1" so the browser never activates it natively');
+
+// The highlight follows game.screen.waySelect, the same rule the duration and
+// role sub-menus use.
+toMenu();
+game.screen.state = SELECT_WAY;
+for (let sel = 0; sel < WAY_SCREEN_ITEMS.length; sel++) {
+  game.screen.waySelect = sel;
+  syncViews(null);
+  const on = wayItems.filter((it) => dom.classes(it.id).has('on')).map((it) => it.id);
+  check(on.length === 1 && on[0] === wayItems[sel].id,
+    'waySelect=' + sel + ' highlights only ' + wayItems[sel].id);
+}
+
 // ---------- Keyboard cycle ----------
 
 console.log('=== Keyboard cycle performs one action per press ===');
@@ -150,10 +180,28 @@ check(game.screen.menuSelect === 3 && game.screen.state === MENU, 'ArrowUp: 0 ->
 press('arrowup');
 check(game.screen.menuSelect === 2 && game.screen.state === MENU, 'ArrowUp: 3 -> 2');
 
+// One entry, two ways: confirming "Two Players" opens the way sub-menu, and
+// the same-computer way is what opens the duration sub-menu after it.
 toMenu();
 game.screen.menuSelect = 1;
 press('enter');
-check(game.screen.twoPlayerMode && game.screen.state === SELECT_DURATION, 'Enter on "Two Players" opens the duration sub-menu');
+check(game.screen.state === SELECT_WAY && game.screen.waySelect === 0,
+  'Enter on "Two Players" opens the way sub-menu at "Same computer"');
+press('arrowdown');
+check(game.screen.waySelect === 1 && game.screen.state === SELECT_WAY, 'ArrowDown in the way sub-menu: Same computer -> Network');
+press('enter');
+check(game.screen.networkMode && game.screen.state === PAIRING, 'Enter on "Network" opens the pairing step');
+press('escape');
+check(game.screen.state === MENU, 'Escape in the pairing step returns to the menu');
+
+toMenu();
+game.screen.menuSelect = 1;
+press('enter');
+press('enter');
+check(game.screen.twoPlayerMode && !game.screen.networkMode && game.screen.state === SELECT_DURATION,
+  'Enter on "Same computer" starts the same-computer way at the duration sub-menu');
+press('escape');
+check(game.screen.state === MENU, 'Escape in the duration sub-menu returns to the menu');
 
 toMenu();
 game.screen.menuSelect = 2;

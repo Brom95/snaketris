@@ -69,8 +69,11 @@ test('engine order: the bot does not steer the snake in Snake role', async () =>
   assert.deepEqual(state.game.play.nextDir, before);
 });
 
+// The guest-intent system sits first: a control action the other peer sent
+// travels through the engine's command stream and lands on the same tick a
+// local key would act on, before the snake steps and the pieces fall.
 test('the registry holds the systems in tick order and no painting step', async () => {
-  assert.deepEqual(app.systems.map((s) => s.name), ['bot', 'snake', 'pieces', 'countdown', 'records', 'screen']);
+  assert.deepEqual(app.systems.map((s) => s.name), ['guest-intents', 'bot', 'snake', 'pieces', 'countdown', 'records', 'screen']);
   for (const s of app.systems) {
     assert.equal(typeof s.name, 'string');
     // A system may declare update, endTick, or both. The countdown declares

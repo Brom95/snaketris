@@ -1,35 +1,45 @@
-# Project instructions — ripwire MCP (MANDATORY)
+# Project notes — snaketris
 
-This repo is configured with the **ripwire** MCP server (global, `C:\Users\wasal\.config\opencode\opencode.jsonc` → `mcp.servers.ripwire`, stdio, cached at `C:/Users/wasal/AppData/Local/Temp/opencode/ripwire`). **Ripwire is required for every interaction with code** — navigation, symbol lookup, contract checks, and edits. No ad-hoc grep, read, or edit bypasses ripwire when a ripwire verb covers the operation. This is an obligation, not a preference.
+These rules constrain edits to this repo only. The ripwire obligations, verbs,
+gates and the strict ordering rule live in the global `~/.pi/agent/AGENTS.md`;
+this project copy restates the obligation and the two must stay in sync.
 
-## Navigation (before reading or editing)
-- `tools.ripwire.batch` — one sweep for several read verbs: `analyze` (architecture map), `find_symbol` (handle + line), `uses`/`called_by` (1-hop edges), `lego` (impls of an interface/base).
-- `tools.ripwire.fetch_body` — full definition of a symbol by handle; fetch bodies only for symbols you are actually touching.
-- `tools.ripwire.from_trace` — land on an error/stack; `tools.ripwire.impact` + `uses` — blast radius before changing a symbol.
+## ripwire is mandatory for code work (project copy)
 
-## Edits
-Prefer ripwire's edit verbs for symbol-level changes; their receipts auto-run `edit_check`:
-- `replace_symbol_body` — replace a symbol's ENTIRE definition (signature through closing brace).
-- `insert_after_symbol` / `insert_before_symbol` — splice a new definition next to an existing one.
+Use ripwire (`mcp__ripwire__<verb>`) for **every** interaction with code in this
+repo — navigation, symbol lookup, contract checks, search, and edits. Start with
+a ripwire read verb (`batch` / `find_symbol` / `fetch_body` / `analyze`) before
+opening a file, and change a definition with a ripwire edit verb
+(`replace_symbol_body` / `insert_after_symbol` / `insert_before_symbol`). Do not
+bypass a ripwire verb with ad-hoc `grep` / `read` / `edit` — this is an
+obligation, not a preference. Plain `edit` / `write` stay reserved for non-symbol
+content only: import lines, constant blocks, HTML, JSON/JSONC config, markdown
+prose. Harness scripts under `scripts/` are code and obey this rule too; where a
+range carries no definition to splice (a statement-level block), plain `edit` is
+the fallback because no ripwire edit verb can address it — say so when you use it.
 
-Rules:
-1. `new_body` must be a complete, well-formed definition.
-2. For **exported** symbols, do **NOT** include the leading `export` keyword — the span starts at the `function`/`class` keyword and the preceding `export` is preserved; including it produces a double `export`.
-3. If a receipt reports `stale_index` (or the call refuses with a stale index), call a read verb on the same file first (`find_symbol`/`fetch_body`/`analyze`) and retry.
-4. Plain `edit`/`write` remain for non-symbol content: import lines, constant blocks, HTML/JSONC config.
+This repo is a git repo, so the quality gates work: pin `quality_baseline` before
+non-trivial work, and run `quality_delta` before declaring any change DONE.
 
-## Safety checks
-- `edit_check` — contract diff (param count + publicness) plus 1-hop callers that are now arity-incompatible; run before changing a signature.
-- `quality_delta` — the PR self-check; **run it before declaring any change done** (pairs with the git HEAD baseline).
-- `edit_check`'s caller list is a starting point, not a proof — verify flagged call sites by opening them.
+## Code invariants
 
-## Testing
-- **Unit tests** — run `node --test "tests/**/*.test.js"` for every change.
-- **Browser checks are allowed** — the earlier ban on automated e2e runs is lifted. Playwright (`@playwright/test`) drives the real page headless; `scripts/verify-role-duel.mjs` serves the repo over `http://duel.test/` through `page.route`, so no local server is needed. Run it after a change to the role flow, piece control, scoring, or the help view.
+- Vanilla ES modules, no build step: `snaketris.html` loads `js/app.js`; every
+  `js/*.js` is ESM.
+- The board is 240×480 px (`COLS=10`, `ROWS=20`, `CELL=24`). The canvas buffer is
+  never resized; only CSS scales it.
+- Layout constants (declared in `js/config.js`, re-exported by `js/constants.js`)
+  are the single source of truth shared by `js/render.js` (drawing) and `js/input.js`
+  (pointer hit-testing). Change them in one place.
+- `js/input.js` `setDirection` is the shared steering path (PLAYING gate + no-reverse
+  rule). Keep the in-game steering branch byte-for-byte stable when you add branches
+  for other states.
+- `js/bot.js` drives the side the player did not choose. Its snake direction goes
+  through `handleIntent`, so it obeys the same steering rules as the player.
 
-## Project notes (snaketris)
-- Vanilla ES modules, no build step: `snaketris.html` loads `js/app.js`; all `js/*.js` are ESM.
-- Logical board is 240×480 px (`COLS=10`, `ROWS=20`, `CELL=24` in `js/constants.js`); the canvas buffer is never resized, only CSS-scaled.
-- Layout constants in `js/constants.js` are the single source of truth shared by `render.js` (drawing) and `input.js` (pointer hit-testing).
-- `js/input.js` `setDirection` is the shared steering path (PLAYING gate + no-reverse rule); keep the in-game steering branch byte-for-byte stable when adding branches for other states.
-- `js/bot.js` drives the side the player did not choose. Its snake direction goes through `handleIntent`, so it obeys the same steering rules as the player.
+## Checks after a change
+
+- Unit, game tree: `node --test "tests/**/*.test.js"`. Both trees: `npm test`.
+- Browser checks are allowed. Playwright (`@playwright/test`) drives the real page
+  headless. Run the matching `scripts/verify-*.mjs` after a change to the role flow,
+  piece control, scoring, the help view, or two-player gating. They route the repo
+  over `http://duel.test/` through `page.route`, so no local server is needed.

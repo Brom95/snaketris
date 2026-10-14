@@ -45,6 +45,9 @@ import {
   clearDeviceEdges,
 } from '../js/devices.js';
 import { registerReport, recordsSystem } from '../js/records.js';
+import { nextValue, nextInRange } from '../js/source.js';
+import { createCommandStream } from '../js/stream.js';
+import { createLink } from '../js/link.js';
 
 const exports = {
   createClock,
@@ -85,6 +88,10 @@ const exports = {
   clearDeviceEdges,
   registerReport,
   recordsSystem,
+  nextValue,
+  nextInRange,
+  createCommandStream,
+  createLink,
 };
 
 const objectExports = ['state', 'screenSystem', 'recordsSystem'];
@@ -131,5 +138,5 @@ test('api.md headings name exactly these exports', async () => {
 });
 
 test('the export count matches the documented surface', async () => {
-  assert.equal(Object.keys(exports).length, 38);
+  assert.equal(Object.keys(exports).length, 42);
 });

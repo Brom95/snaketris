@@ -1,6 +1,6 @@
 # Engine recipes
 
-Five extension points. Each recipe names only engine symbols and states which
+Seven extension points. Each recipe names only engine symbols and states which
 contract line from `api.md` the consumer must satisfy. Copy the shape, supply the
 consumer's own names.
 
@@ -198,3 +198,72 @@ Rules:
 - `pollDevices()` returns the first shape from any connected device, and edge
   state is per device, so a held button yields once. `clearDeviceEdges()` clears
   that state; call it on the consumer's own connection events.
+
+---
+
+## Add a transport
+
+**Contract line:** `createLink(transport)` — "the transport object that carries
+the channel. A consumer that omits one must satisfy this line: the link reports
+no peer (`link.peer === null`) and no match may start until `link.pair(peer)`
+runs."
+
+```js
+export const transport = {
+  offer: () => descriptionThisPeerSendsFirst(),
+  answer: (description) => acceptTheOtherPeerDescription(description),
+  send: (message) => handTheMessageOver(),
+  receive: (message) => takeTheMessageIn(message),
+  close: () => endTheConnection(),
+};
+
+createLink(transport);
+```
+
+Rules:
+
+- The engine calls nothing on the transport. It holds the object and hands it
+  back. Every verb belongs to the consumer, so the engine names no channel class
+  and no engine file changes to carry a new one.
+- Report each state the connection answers through `link.report(name, value)`.
+  The link keeps the record, and `link.open` follows a `connected` value.
+- Pair an identity with `link.pair(peer)`. Until that call runs the link reports
+  no peer, and a consumer that starts a match before pairing breaks the line.
+- Supply the seed on the same path. `nextValue(seed, callCount)` and
+  `nextInRange(seed, callCount, bound)` read no entropy of their own, so the
+  consumer fixes the seed before the first tick and sends the same value to every
+  peer.
+
+---
+
+## Add a peer link
+
+**Contract line:** `createLink(transport)` — "the state a peer connection has and
+the close event", and `attachStream(stream, label)` / `counts()` / `resync(state)`
+— "the resync policy: one simulation stays authoritative, so a resync re-sends
+state instead of replaying inputs".
+
+```js
+const link = createLink(transport);
+link.onClose((reason) => endMatchBecausePeerLeft(reason));
+link.pair(peerId);
+link.attachStream(createCommandStream(applyIntent), 'host');
+link.attachStream(createCommandStream(applyIntent), 'guest');
+
+const sent = link.resync(snapshotOfTheSimulation());
+link.counts(); // { host: { applied, dropped }, guest: { applied, dropped } }
+```
+
+Rules:
+
+- One simulation stays authoritative. Only one peer advances it; the other paints
+  the frames it receives. Two simulations of one match cannot be reconciled.
+- Advance intents through `queue(intent, tick)` and `drain(ctx)` inside a system,
+  so the tick the stream reads is the slot `createEngine` bumps.
+- A resync re-sends state. It never replays inputs: `dropAll()` clears each
+  buffer and counts what it cleared, so a buffered intent cannot apply twice.
+- `close(reason)` fires once, runs every registered handler in registration
+  order, and a second call does nothing. Register the handlers before it fires.
+- No engine file changes. `createLink`, `createCommandStream`, `nextValue` and
+  `nextInRange` are the whole netcode surface a consumer composes; every noun —
+  the match, the peers, the messages — stays in the consumer's own files.

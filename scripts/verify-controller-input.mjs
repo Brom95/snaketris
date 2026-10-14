@@ -29,7 +29,7 @@ import { pollController, keyToDir, tapToDir, swipeToDir, clearControllerPrev } f
 import { initInput, handleIntent, setDirection } from '../js/input.js';
 import { game, startGame, gameOver } from '../js/state.js';
 import { drainIntents, toMenu, SCREEN_BY_ID } from '../js/screens.js';
-import { PLAYING, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL, MENU, GAME_OVER, RECORDS, HELP, MENU_ITEMS, DURATION_MINUTES, GAME_CONTROL_P1 } from '../js/constants.js';
+import { PLAYING, SELECT_WAY, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL, MENU, GAME_OVER, RECORDS, HELP, MENU_ITEMS, DURATION_MINUTES, GAME_CONTROL_P1 } from '../js/constants.js';
 
 // DPAD_UP=12, DPAD_DOWN=13, DPAD_LEFT=14, DPAD_RIGHT=15, A=0, B=1.
 const A = 0;
@@ -233,7 +233,9 @@ resetController();
 toMenu();
 game.screen.menuSelect = 1;
 frames([makePad([A])]);
-check(game.screen.twoPlayerMode && game.screen.state === SELECT_DURATION, 'A on "Two Players" opens the duration sub-menu');
+check(game.screen.state === SELECT_WAY, 'A on "Two Players" opens the way sub-menu');
+frames([makePad(), makePad([A])]);
+check(game.screen.twoPlayerMode && game.screen.state === SELECT_DURATION, 'A on "Same computer" opens the duration sub-menu');
 
 resetController();
 toMenu();
@@ -255,8 +257,11 @@ resetController();
 toMenu();
 game.screen.menuSelect = 1;
 frames([makePad([A])]);
+check(game.screen.state === SELECT_WAY,
+  'A on "Two Players" opens the way sub-menu, not the duration, role or control screen');
+frames([makePad(), makePad([A])]);
 check(game.screen.twoPlayerMode === true && game.screen.state === SELECT_DURATION,
-  'A on "Two Players" opens the duration sub-menu, not the role or the control screen');
+  'A on "Same computer" opens the duration sub-menu, not the role or the control screen');
 check(SCREEN_BY_ID[SELECT_DURATION].field === false,
   'the duration screen declares no field, so the canvas stays off screen');
 

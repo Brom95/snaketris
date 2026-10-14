@@ -16,10 +16,26 @@ export const MENU = 'MENU';
 export const SELECT_DURATION = 'SELECT_DURATION';
 export const SELECT_ROLE = 'SELECT_ROLE';
 export const SELECT_CONTROL = 'SELECT_CONTROL';
+export const SELECT_WAY = 'SELECT_WAY';
 export const PLAYING = 'PLAYING';
 export const GAME_OVER = 'GAME_OVER';
 export const RECORDS = 'RECORDS';
 export const HELP = 'HELP';
+export const PAIRING = 'PAIRING';
+
+// The end reason a network match carries when its peer link closed. The
+// records layer writes nothing for it: an abandoned match is not a finished
+// game.
+export const PEER_LEFT = 'peer-left';
+
+// The share link carries the trimmed offer blob in its URL fragment. A blob
+// longer than this cap cannot travel in a link, so the step falls back to the
+// short readable code. The cap must stay within the QR encoder's version-40
+// byte capacity, or painting the link throws.
+export const PAIRING_FRAGMENT_CAP = 1024;
+
+// How many characters the short readable pairing code has.
+export const PAIRING_CODE_LENGTH = 6;
 
 // The one-item-at-a-time control flow steps. The game enters GAME_CONTROL_P1
 // when two-player mode starts, moves to GAME_CONTROL_P2 once P1 locks a model,

@@ -280,17 +280,21 @@ test('a pad no player owns drives no character', () => {
   assert.equal(devices.pollController(), null);
 });
 
-test('a narrow viewport never reaches two-player mode', () => {
+test('a narrow viewport opens the network way without the way sub-menu', () => {
   screens.resetScreen();
   stub.window.innerWidth = 300; // at or below UI_STACK_MAX_WIDTH: a phone
   screens.pushIntent({ action: 'menuDown' });
   screens.drainIntents();
-  // The cursor jumps over the hidden two-player item onto Records.
-  assert.equal(game.screen.menuSelect, 2);
+  // The item is listed at every width, so the cursor stops on it.
+  assert.equal(game.screen.menuSelect, 1);
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
-  assert.equal(game.screen.state, 'RECORDS');
-  assert.equal(game.screen.twoPlayerMode, false);
+  // A phone has no second pad: the network way is selected and the pairing
+  // step opens direct, skipping the way sub-menu that offers the shared-page
+  // way.
+  assert.equal(game.screen.state, 'PAIRING');
+  assert.equal(game.screen.networkMode, true);
+  assert.equal(game.screen.twoPlayerMode, true);
 
   screens.pushIntent({ action: 'toMenu' });
   screens.drainIntents();
@@ -305,14 +309,16 @@ test('a narrow viewport never reaches two-player mode', () => {
   assert.equal(game.screen.menuSelect, 2); // Records
   screens.pushIntent({ action: 'menuUp' });
   screens.drainIntents();
-  assert.equal(game.screen.menuSelect, 0); // Play: the hidden item is skipped
+  assert.equal(game.screen.menuSelect, 1); // Two Players: listed at every width
 
-  // Even a pointer that names the hidden item cannot arm two-player mode.
-  screens.pushIntent({ action: 'select', id: 'menu-item-two-player' });
+  // The shared-page way stays off a stacked layout even for a pointer that
+  // names it: the item is not offered there, so the way sub-menu never opens
+  // and no same-computer duel is armed.
+  screens.pushIntent({ action: 'select', id: 'way-item-local' });
   screens.drainIntents();
   assert.equal(game.screen.state, 'MENU');
-  assert.equal(game.screen.menuSelect, 0);
-  assert.equal(game.screen.twoPlayerMode, false);
+  assert.equal(game.screen.menuSelect, 1);
+  assert.equal(game.screen.networkMode, true); // the network way from above, unchanged
 
   screens.resetScreen();
   stub.window.innerWidth = 1920;

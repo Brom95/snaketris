@@ -8,14 +8,16 @@
 // drift apart silently (tests/screens.test.js checks every id against the page).
 
 import {
-  MENU, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL, PLAYING, GAME_OVER, RECORDS, HELP,
-  MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS, CONTROL_SCREEN_ITEMS,
+  MENU, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL, PLAYING, GAME_OVER, RECORDS, HELP, PAIRING, SELECT_WAY,
+  MENU_ITEMS, ROLE_ITEMS, ROLE_SCREEN_ITEMS, CONTROL_SCREEN_ITEMS, WAY_SCREEN_ITEMS,
   DURATION_MINUTES, DURATION_SCREEN_ITEMS, TICKS_PER_MINUTE,
   ROLE_MARKERS,
   GAME_CONTROL_P1, GAME_CONTROL_P2, GAME_CONTROL_START,
   GAME_CONTROL_PLAYER_MARKERS,
+  PAIRING_TITLE, PAIRING_HINTS, PAIRING_JOIN, PAIRING_WAITING,
   twoPlayerOffered,
 } from './constants.js';
+import { attemptPair, guestPage } from './netplay.js';
 
 // The transitions an item can ask for. The screen system is the only module
 // that interprets them; no input module branches on a screen.
@@ -33,6 +35,8 @@ export const TRANSITIONS = {
   reassign: 'reassign', // clear one player's selection and model
   'start-game': 'start-game', // start when the flow allows it
   'start-bare': 'start-bare', // the start key with no item on screen: start whatever the flow allows
+  pair: 'pair', // confirm the pairing secret and continue the network flow
+  'pick-way': 'pick-way', // arm the way the "Two Players" entry offers, then continue the flow
 };
 
 // cursor: 'arrow' — one item is highlighted and the arrow cycles over `items`.
@@ -60,8 +64,7 @@ export const SCREENS = [
         marker: null,
         hints: null,
         action: TRANSITIONS['two-player'],
-        opens: SELECT_DURATION,
-        requiresWide: true,
+        opens: SELECT_WAY,
       },
       {
         id: 'menu-item-records',
@@ -78,6 +81,41 @@ export const SCREENS = [
         hints: null,
         action: TRANSITIONS.open,
         opens: HELP,
+      },
+    ],
+    controls: [],
+  },
+  {
+    id: SELECT_WAY,
+    view: 'way-view',
+    field: false,
+    cursor: 'arrow',
+    selection: 'waySelect',
+    startAction: null,
+    items: [
+      {
+        id: 'way-item-local',
+        label: WAY_SCREEN_ITEMS[0],
+        marker: null,
+        hints: null,
+        action: TRANSITIONS['pick-way'],
+        opens: SELECT_DURATION,
+        requiresWide: true,
+      },
+      {
+        id: 'way-item-network',
+        label: WAY_SCREEN_ITEMS[1],
+        marker: null,
+        hints: null,
+        action: TRANSITIONS['pick-way'],
+        opens: PAIRING,
+      },
+      {
+        id: 'way-back',
+        label: WAY_SCREEN_ITEMS[2],
+        marker: null,
+        hints: null,
+        action: TRANSITIONS['back-menu'],
       },
     ],
     controls: [],
@@ -289,6 +327,20 @@ export const SCREENS = [
       { id: 'help-return', label: 'Menu', marker: null, action: TRANSITIONS['back-menu'] },
     ],
   },
+  {
+    id: PAIRING,
+    view: 'pairing-view',
+    field: false,
+    cursor: 'none',
+    selection: null,
+    startAction: null, // the start key starts nothing here: no match exists before a peer is paired
+    items: [
+      { id: 'pairing-join', label: PAIRING_JOIN, marker: null, action: TRANSITIONS.pair },
+    ],
+    controls: [
+      { id: 'pairing-back', label: 'Back', marker: null, action: TRANSITIONS['back-menu'] },
+    ],
+  },
 ];
 
 // One screen entry per id, so the screen system can look a screen up by the
@@ -297,6 +349,15 @@ export const SCREEN_BY_ID = SCREENS.reduce((acc, row) => {
   acc[row.id] = row;
   return acc;
 }, {});
+
+// The index the arrow cursor of the named screen rests on, for the guest page's
+// read-only mirror of the host page's preparation. -1 for a screen with no
+// arrow cursor.
+export function selectedIndex(screenId) {
+  const row = SCREEN_BY_ID[screenId];
+  if (!row || row.cursor !== 'arrow') return -1;
+  return game.screen[row.selection] ?? -1;
+}
 
 // The match duration whose leaderboard the records view shows right now: the
 // board the arrow cursor selects. app.js hands this to the page painter, so the
@@ -326,9 +387,17 @@ export function screenFields() {
     ['durationSelect', 0],
     ['controlSelect', 0],
     ['recordsSelect', 0],
+    ['waySelect', 0],
     ['p1Role', null],
     ['p2Role', null],
     ['twoPlayerMode', false],
+    // This page plays in a network duel: each peer drives one side on its own
+    // device, the host page runs the simulation and the guest page paints the
+    // frames it receives.
+    ['networkMode', false],
+    // Which seat this page drives: 1 for the page that published the pairing
+    // offer, 2 for the page that adopted one, 0 for a page in no duel.
+    ['seat', 0],
     ['p1Selection', null],
     ['p2Selection', null],
     ['p1Model', null],
@@ -348,9 +417,17 @@ export function screenFields() {
 export { resetScreen } from '../engine/js/state.js';
 
 // The screen the interface shows once a game ends: the shared Start step in
-// two-player mode, the game-over overlay otherwise. The game reports the screen and the engine
-// navigates to it; a bare step constant hides every view.
+// two-player mode, the duration sub-menu in a network duel (the host
+// re-prepares for the next match without re-pairing), the game-over overlay
+// otherwise. The game reports the screen and the engine navigates to it; a bare
+// step constant hides every view.
 export function applyGameOverScreen() {
+  if (game.screen.networkMode) {
+    // The host re-prepares for the next match; the guest keeps its pairing step
+    // and its read-only mirrors.
+    gotoScreen(guestPage() ? PAIRING : SELECT_DURATION);
+    return;
+  }
   if (!game.screen.twoPlayerMode) {
     gotoScreen(GAME_OVER);
     return;
@@ -447,12 +524,22 @@ export function toMenu() {
   game.screen.menuSelect = 0;
   game.screen.durationSelect = 0;
   game.screen.roleSelect = 0;
+  game.screen.waySelect = 0;
 }
 
 // Back from SELECT_CONTROL returns to the duration screen, the stage before the
 // role screen. A player who leaves the control screen re-asks the match length.
 export function backToRoleSelect() {
   gotoScreen(SELECT_DURATION);
+}
+
+// The pairing step a page opens when it already holds a secret for the other
+// device: the second player opened a pairing link, so the step is on screen and
+// no match has started. Opening it is what puts this page in a network duel.
+export function enterPairing() {
+  game.screen.networkMode = true;
+  game.screen.twoPlayerMode = true;
+  gotoScreen(PAIRING);
 }
 
 // Lock the role the player chose. In a two-player game the other role goes to
@@ -483,12 +570,36 @@ const HANDLERS = {
     return true;
   },
   [TRANSITIONS['select-role']]: (item, intent) => {
+    // "Play" is a single-player match: this page drives one side and the bot
+    // drives the other.
+    game.screen.networkMode = false;
     gotoScreen(item.opens);
     return true;
   },
   [TRANSITIONS['two-player']]: (item, intent) => {
-    if (!offersItem(item)) return false;
+    // The entry is offered at every viewport width. A wide viewport asks which
+    // of the two ways the match runs; a narrow one has no second pad on this
+    // device, so the network way is selected and the pairing step opens direct.
+    if (!twoPlayerOffered()) {
+      game.screen.networkMode = true;
+      game.screen.twoPlayerMode = true;
+      gotoScreen(PAIRING);
+      return true;
+    }
+    // The entry arms the duel; the way sub-menu decides which way runs it.
     game.screen.twoPlayerMode = true;
+    gotoScreen(SELECT_WAY);
+    return true;
+  },
+  [TRANSITIONS['pick-way']]: (item, intent) => {
+    if (!offersItem(item)) return false;
+    if (item.opens === PAIRING) {
+      game.screen.networkMode = true;
+      game.screen.twoPlayerMode = true;
+    } else {
+      game.screen.networkMode = false;
+      game.screen.twoPlayerMode = true;
+    }
     gotoScreen(item.opens);
     return true;
   },
@@ -520,6 +631,9 @@ const HANDLERS = {
   },
   [TRANSITIONS['lock-model']]: (item, intent) => {
     if (!intent.model || !item.player) return false;
+    // In a network duel the other peer confirms its model on its own device;
+    // the message it sends locks that seat here.
+    if (game.screen.networkMode && item.player === 2) return false;
     return lockControlModel(item.player, intent.model);
   },
   [TRANSITIONS.reassign]: (item, intent) => {
@@ -535,6 +649,15 @@ const HANDLERS = {
   // The start key away from the main menu starts with no item guard, unlike the Start item.
   [TRANSITIONS['start-bare']]: (item, intent) => {
     startGame();
+    return true;
+  },
+  // Pairing advances only when this page holds a secret. The host opens the
+  // duration sub-menu; the guest keeps the pairing step open, because the host
+  // page owns the preparation and the guest only mirrors it.
+  [TRANSITIONS.pair]: (item, intent) => {
+    if (!attemptPair()) return false;
+    if (guestPage()) return true;
+    gotoScreen(SELECT_DURATION);
     return true;
   },
 };
@@ -560,6 +683,6 @@ registerNavigation({
 
 // The engine owns the queue, the cursor mechanics and the screen system. The game re-exports the
 // names so every existing caller keeps its import line.
-export { pushIntent, drainIntents, screenSystem, itemForStep, opensScreen, currentItem } from '../engine/js/navigation.js';
+export { pushIntent, drainIntents, screenSystem, itemForStep, opensScreen, currentItem, gotoScreen } from '../engine/js/navigation.js';
 
 

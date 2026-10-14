@@ -329,3 +329,16 @@ test('a crash on the final tick keeps its own reason over the countdown', () => 
   state.gameOver('time-up');
   assert.equal(state.game.play.gameOverReason, 'snake-death');
 });
+
+test('the seed is a match property, fixed before the first tick and never chosen by the player', () => {
+  fresh();
+  state.startGame();
+  assert.equal(state.game.play.tick, 0, 'the seed was read after the match had ticked');
+  assert.notEqual(state.game.play.seed, 0, 'the match kept the table seed instead of a match seed');
+  const first = state.game.play.seed;
+  state.gameOver('snake-death');
+  state.startGame();
+  const second = state.game.play.seed;
+  assert.notEqual(second, first, 'the rematch replayed the finished match seed');
+  assert.equal(state.game.play.pieceDraws, 0, 'the rematch inherited the finished match draw count');
+});

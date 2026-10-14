@@ -54,8 +54,10 @@ const helpLines = [
   'Controller: A — confirm, B — back',
   'Back or Escape — return to the menu',
   'R or click — start',
+  'Network: the second player opens the link the pairing paints, or types the code beside it',
 ];
 const helpLinesPresent = helpLines.every((line) => page.includes('<li>' + line + '</li>'));
+const networkRule = page.includes('<li>Network: each device plays its own side, and no bot fills either.</li>');
 
 // ---------- Static js/ assertions (the canvas views and their constants are gone) ----------
 
@@ -108,6 +110,7 @@ check(controlsSection, 'the controls block is <section id="help-controls"> with 
 check(rulesSection, 'the rules block is <section id="help-rules"> with an <h3>Rules</h3>');
 check(snakeTierLine, 'the snake tier line states the 8-segment cap and the blue, purple, gold recolour');
 check(helpLinesPresent, 'all ' + helpLines.length + ' control lines are selectable page text');
+check(networkRule, 'the help copy names the network way and the pairing action the second player performs');
 check(helpReturn, 'the return control is a page element');
 
 console.log('=== Canvas view layer retired ===');

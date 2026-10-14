@@ -1,0 +1,407 @@
+// Network play: the lobby that lives above every per-match reset.
+// One match resets js/state.js; the pairing between matches must survive that
+// reset, so the lobby is module state, not a play or screen field. The engine
+// owns the peer link and the command stream; this module owns the pairing
+// secret, the share link, the short readable code and the match count.
+
+import { PAIRING_CODE_LENGTH, PAIRING_FRAGMENT_CAP, PLAYING, GAME_OVER, PAIRING, PEER_LEFT, SELECT_DURATION, SELECT_ROLE, SELECT_CONTROL } from './rules.js';
+import { PAIRING_CODE_ALPHABET } from './copy.js';
+import { createLink } from '../engine/js/link.js';
+import { createCommandStream } from '../engine/js/stream.js';
+import { applyFrame, encodeFrame, encodeIntent, decodeIntent } from './netframe.js';
+import { game } from './state.js';
+import { lockControlModel, selectedIndex, gotoScreen } from './screens.js';
+
+// The lobby survives every reset. `form` says which pairing form the step paints:
+// the share link when the offer blob fits the fragment cap, the code when it does
+// not. `secret` is what the second player must supply, in the form this page paints.
+export const lobby = {
+  offer: '',
+  secret: '',
+  link: '',
+  code: '',
+  form: '',
+  seed: 0,
+  typed: '',
+  joined: false,
+  paired: false,
+  matches: 0,
+  side: '', // 'host' publishes an offer, 'guest' adopted one from a link fragment
+  prepScreen: '', // the preparation step the host page sits on
+  prepIndex: -1, // the marker the host page left there, mirrored onto this page
+  closed: '', // the reason the peer link closed, once it did
+};
+
+// Drop every SDP comment line. libwebrtc puts a machine-dependent payload behind
+// each one, so the trimmed blob is what stays stable enough to travel in a link.
+export function trimmedOffer(sdp) {
+  return sdp.split('\r\n').filter((line) => !line.startsWith('#')).join('\r\n');
+}
+
+// The short readable code the second player types. Both pages derive it from the
+// same offer blob, so neither page has to send it.
+export function codeOf(blob, length = PAIRING_CODE_LENGTH) {
+  // 32-bit multiply split into halves: h * 0x01000193 passes 2^53, so a plain
+  // JS multiply rounds to a float and collapses every blob to one token.
+  const mix = (h, factor) =>
+    (((h & 0xffff) * factor) + (((h >>> 16) * factor) << 16)) >>> 0;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < blob.length; i++) {
+    h ^= blob.charCodeAt(i);
+    h = mix(h, 0x01000193);
+  }
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    h = (mix(h, 0x6c078965) + 1) >>> 0;
+    out += PAIRING_CODE_ALPHABET[h % PAIRING_CODE_ALPHABET.length];
+  }
+  return out;
+}
+
+// The host publishes its offer before the peer link exists, so the share link can
+// carry the secret the second page needs to answer. The page url is a supply: this
+// module never reads `location`.
+export function publish(offerSdp, seed, pageUrl) {
+  const blob = trimmedOffer(offerSdp);
+  lobby.offer = blob;
+  lobby.seed = seed === 0 ? seedOf(blob) : seed;
+  lobby.code = codeOf(blob, PAIRING_CODE_LENGTH);
+  if (lobby.side !== 'guest') lobby.side = 'host';
+  game.screen.seat = 1;
+  if (blob.length <= PAIRING_FRAGMENT_CAP) {
+    lobby.form = 'link';
+    lobby.secret = blob;
+    // The fragment must be escapable: an SDP carries CRLF, spaces and `=`, so
+    // the bytes that travel in a link are the escaped form and `adopt` decodes
+    // them back. The secret itself stays unescaped.
+    lobby.link = pageUrl.split('#')[0] + '#' + encodeURIComponent(blob);
+  } else {
+    lobby.form = 'code';
+    lobby.secret = lobby.code;
+    lobby.link = '';
+  }
+  return lobby.form;
+}
+
+// The second page adopts the secret its page url carries. A page with no fragment
+// carries no secret and adopts nothing.
+export function adopt(fragment) {
+  if (!fragment) return false;
+  const blob = decodeURIComponent(fragment);
+  if (blob.length === 0) return false;
+  lobby.secret = blob;
+  lobby.code = codeOf(blob, PAIRING_CODE_LENGTH);
+  lobby.seed = seedOf(blob);
+  lobby.form = 'link';
+  lobby.side = 'guest';
+  game.screen.seat = 2;
+  return true;
+}
+
+// The step's Pair action. A page with no secret pairs nobody, so the pairing
+// secret gates it before any match can start. Pairing counts one scheduled
+// match once: a page that pairs twice (its peer confirming the same join) does
+// not schedule a second match behind the first.
+export function attemptPair() {
+  if (!lobby.secret) return false;
+  if (!lobby.joined) {
+    lobby.joined = true;
+    lobby.matches += 1;
+  }
+  lobby.paired = true;
+  return true;
+}
+
+// ---------- The peer link and the traffic that moves over it ----------
+// The engine owns the link, the streams and the resync policy; this module owns
+// the secret, the messages that travel, and which page is the host. The
+// transport object is a consumer supply: `registerTransport` hands over a
+// factory that returns one, and the lobby calls it the first time a page needs
+// a link. A headless check registers its own factory here, which is the whole
+// point of the supply line: no engine file changes to carry a different channel.
+let transportFactory = null;
+let linkInstance = null;
+// The command stream the guest's control actions run through on the host page.
+let guestStream = null;
+
+function bindLink(link) {
+  if (link.transport && link.transport.onMessage) link.transport.onMessage((message) => receive(message));
+  // The lobby records the close, tells its peer, and stops counting the pair.
+  link.onClose((reason) => {
+    lobby.closed = reason;
+    lobby.paired = false;
+    post('C', reason);
+  });
+  for (const handler of closeHandlers) link.onClose(handler);
+  return link;
+}
+
+export function registerTransport(factory) {
+  transportFactory = factory;
+  if (linkInstance) linkInstance = bindLink(createLink(factory()));
+  return linkInstance;
+}
+
+export function openLink() {
+  if (!linkInstance && transportFactory) linkInstance = bindLink(createLink(transportFactory()));
+  return linkInstance;
+}
+
+export function peerLink() {
+  return linkInstance;
+}
+
+// The transport carries bytes one way; the game reads its two verbs and never
+// names the channel class behind them.
+export function post(kind, payload) {
+  const transport = linkInstance && linkInstance.transport;
+  if (!transport) return false;
+  return transport.send(kind + payload);
+}
+
+export function peerMessage(handler) {
+  const transport = linkInstance && linkInstance.transport;
+  if (!transport) return false;
+  return transport.onMessage((message) => receive(message));
+}
+
+const inbound = { answer: '', frames: 0, intents: 0, prep: 0, closed: '' };
+
+// The guest follows the match the host simulates: it shows the field while a
+// frame says a match is running, and the result once a frame says it ended.
+function followSimulation() {
+  if (game.screen.state === PAIRING) gotoScreen(PLAYING);
+  else if (game.screen.state === PLAYING && game.play.gameOverReason) gotoScreen(GAME_OVER);
+}
+
+export function inboundReport() {
+  return inbound;
+}
+
+function receive(message) {
+  if (typeof message !== 'string' || message.length < 2) return;
+  const kind = message[0];
+  const payload = message.slice(1);
+  if (kind === 'A') inbound.answer = payload;
+  else if (kind === 'F') {
+    inbound.frames += 1;
+    // A frame paints only while this page still holds a peer: once the peer
+    // leaves, the pages sit on their pairing step and a late frame would start
+    // a match nobody is simulating any more.
+    if (duelOpen() && applyFrame(payload)) followSimulation();
+  } else if (kind === 'I') {
+    inbound.intents += 1;
+    const sent = decodeIntent(payload);
+    if (sent && guestStream) guestStream.queue(sent.intent, sent.tick);
+  } else if (kind === 'P') {
+    inbound.prep += 1;
+    mirrorPreparation(payload);
+  } else if (kind === 'C') {
+    inbound.closed = payload;
+    peerClosed(payload);
+  } else if (kind === 'M') lockControlModel(2, payload);
+}
+
+// The seed the pairing carries: both pages hold the same blob, so hashing it
+// gives both pages the same starting seed without either one reading a clock.
+export function seedOf(blob) {
+  let h = 2166136261;
+  for (let i = 0; i < blob.length; i++) {
+    h = (h * 16777619 + blob.charCodeAt(i)) & 0x7fffffff;
+  }
+  return h === 0 ? 1 : h;
+}
+
+// The engine owns the alignment; the consumer supplies what an intent means, so
+// a guest's control action runs through the same steering path the host's own
+// intents take.
+export function openGuestStream(apply) {
+  const link = openLink();
+  guestStream = createCommandStream(apply);
+  if (link) link.attachStream(guestStream, 'guest');
+  return guestStream;
+}
+
+export function guestStreamReport() {
+  return guestStream;
+}
+
+// Which page this one is: the page that published an offer runs the simulation,
+// the page that adopted one from a link fragment paints the frames it receives.
+export function hostPage() {
+  return lobby.side === 'host';
+}
+
+export function guestPage() {
+  return lobby.side === 'guest';
+}
+
+export function duelOpen() {
+  const link = linkInstance;
+  return lobby.paired && link !== null && link.open;
+}
+
+// Which seat this page drives: the host page is seat 1, the guest page seat 2,
+// and a page in no duel is seat 0. A page accepts only the input of its own
+// seat, so a key that belongs to the other peer's model does nothing here.
+export function localSeat() {
+  if (lobby.side === 'host') return 1;
+  if (lobby.side === 'guest') return 2;
+  return 0;
+}
+
+// A peer confirms one control model on its own device. The guest's model
+// travels to the host, which locks that seat so a later input resolves to the
+// player who confirmed the model that produced it.
+export function confirmModel(model) {
+  if (lobby.side !== 'guest') return false;
+  game.screen.p2Model = model;
+  return post('M', model);
+}
+
+// The guest's control action travels to the host. It names the tick after the
+// tick of the frame this page last painted: the host applies it on the next
+// tick it runs, and a tick that already passed is a drop the stream counts.
+export function sendIntent(intent) {
+  return post('I', encodeIntent(intent, game.play.tick + 1));
+}
+
+// The preparation the host page chose travels as a mirror: the guest page paints
+// it and selects nothing of its own. The mirror carries the models and roles too,
+// so the guest resolves its own keys against the same seats the host does.
+export function sendPreparationMirror() {
+  if (lobby.side !== 'host') return false;
+  const screen = game.screen.state;
+  if (screen !== SELECT_DURATION && screen !== SELECT_ROLE && screen !== SELECT_CONTROL) return false;
+  return post('P', JSON.stringify([
+    screen,
+    selectedIndex(screen),
+    game.screen.p1Model,
+    game.screen.p2Model,
+    game.screen.p1Role,
+    game.screen.p2Role,
+    game.screen.gameControlStep,
+  ]));
+}
+
+function mirrorPreparation(payload) {
+  let mirror;
+  try {
+    mirror = JSON.parse(payload);
+  } catch (e) {
+    return;
+  }
+  if (!Array.isArray(mirror) || mirror.length !== 7) return;
+  const [screen, index, p1Model, p2Model, p1Role, p2Role, step] = mirror;
+  lobby.prepScreen = screen;
+  lobby.prepIndex = index;
+  game.screen.p1Model = p1Model;
+  game.screen.p2Model = p2Model;
+  game.screen.p1Role = p1Role;
+  game.screen.p2Role = p2Role;
+  game.screen.gameControlStep = step;
+  // The guest stays on its pairing step through the host's preparation: it
+  // paints read-only mirrors there. It follows the page back only when the
+  // match it was watching has ended.
+  if (game.screen.state === GAME_OVER || game.screen.state === PLAYING) gotoScreen(PAIRING);
+}
+
+// The host hands the frame its simulation just produced to its peer.
+export function sendFrame() {
+  return post('F', encodeFrame());
+}
+
+// The guest answers the offer its page url carries. The answer hop needs the
+// peer connection the transport carries; a channel object with no peer
+// connection behind it (a headless check's stand-in) carries the answer as
+// bytes only, which is all the link's pair call needs.
+export async function answerOffer() {
+  const link = openLink();
+  if (!link || !lobby.secret) return false;
+  const pc = link.transport && link.transport.connection;
+  if (!pc) {
+    post('A', lobby.secret);
+    if (!link.open) link.pair({ side: 'host', secret: lobby.secret });
+    lobby.paired = true;
+    return true;
+  }
+  try {
+    await pc.setRemoteDescription({ type: 'offer', sdp: lobby.secret });
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    post('A', answer.sdp);
+    if (!link.open) link.pair({ side: 'host', secret: lobby.secret });
+    lobby.paired = true;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// The host reads the answer its peer sent and completes the negotiation, then
+// opens the link on the peer it now holds.
+export async function acceptAnswer() {
+  const link = openLink();
+  if (!link || inbound.answer === '') return false;
+  const pc = link.transport && link.transport.connection;
+  if (pc) {
+    try {
+      await pc.setRemoteDescription({ type: 'answer', sdp: inbound.answer });
+    } catch (e) {
+      return false;
+    }
+    link.report('connection', pc.connectionState);
+  }
+  if (!link.open) link.pair({ side: 'guest', secret: lobby.secret });
+  lobby.paired = true;
+  return true;
+}
+
+// The state a peer connection reports, held by the engine link. The consumer
+// forwards the events its channel raises; the link keeps the list.
+export function reportPeerState(name, value) {
+  const link = linkInstance;
+  if (!link) return false;
+  link.states[name] = value;
+  return true;
+}
+
+// The state a peer connection reports, held by the engine link.
+export function peerState(name) {
+  const link = linkInstance;
+  return link ? link.states[name] : '';
+}
+
+// The close event: the game registers what a closed link does to the match. A
+// handler registered before the link exists is attached when the link opens.
+const closeHandlers = [];
+
+export function onPeerClose(handler) {
+  if (linkInstance) return linkInstance.onClose(handler);
+  closeHandlers.push(handler);
+  return true;
+}
+
+// The consumer reports that its channel closed, and the link fires once.
+export function peerClosed(reason) {
+  const link = openLink();
+  if (!link) return false;
+  return link.close(reason === undefined ? 'peer-left' : reason);
+}
+
+// The reason the peer link closed, once it did: the match ends with the peer
+// leaving rather than with a crash or the countdown.
+export function peerLeft() {
+  return lobby.closed;
+}
+
+// The second page types the short readable code on its own page. Each character
+// appends; a full match pairs the two pages and schedules one match, exactly as
+// confirming the step's Pair item does. A wrong run restarts the run.
+export function typeChar(ch) {
+  if (!lobby.code) return false;
+  lobby.typed += ch;
+  if (lobby.typed.length > lobby.code.length) lobby.typed = '';
+  if (lobby.typed !== lobby.code) return false;
+  return attemptPair();
+}

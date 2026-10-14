@@ -3,14 +3,18 @@
 // step with `game.screen.state`, the single view authority. Imports only constants.js
 // and state.js, so the module graph stays one-way (app -> ui).
 import {
-  SELECT_ROLE, SELECT_DURATION, SELECT_CONTROL, PLAYING, RECORDS, GAME_OVER,
+  SELECT_ROLE, SELECT_DURATION, SELECT_CONTROL, PLAYING, RECORDS, GAME_OVER, PAIRING,
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
   GAME_CONTROL_PLAYER_MARKERS,
+  PAIRING_TITLE, PAIRING_HINTS, PAIRING_LINK_LABEL, PAIRING_CODE_LABEL, PAIRING_WAITING,
+  DURATION_SCREEN_ITEMS, ROLE_SCREEN_ITEMS, MIRROR_TITLE, MIRROR_HINTS,
   twoPlayerOffered,
 } from './constants.js';
 import { game, remainingSeconds } from './state.js';
 import { recordLines } from './highscores.js';
 import { SCREENS, SCREEN_BY_ID, itemForStep, controlModelAssigned } from './screens.js';
+import { lobby, guestPage } from './netplay.js';
+import { paintQr } from './qr.js';
 import { createLayout } from '../engine/js/layout.js';
 import { createInterface } from '../engine/js/interface.js';
 import { paintPage, registerPagePainter } from '../engine/js/present.js';
@@ -40,6 +44,16 @@ let controlKeyHintsEl = null;
 let controlSummaryEl = null;
 let roleTitleEl = null;
 let controlTitleEl = null;
+let pairingTitleEl = null;
+let pairingHintsEl = null;
+let pairingLinkEl = null;
+let pairingCodeEl = null;
+let pairingQrEl = null;
+let pairingWaitingEl = null;
+let mirrorDurationEl = null;
+let mirrorRoleEl = null;
+let mirrorTitleEl = null;
+let mirrorHintsEl = null;
 
 // One element owner lives in the engine: every id the screen table names is looked
 // up there, once, and handed out to whoever paints or hit-tests it. js/input.js
@@ -73,6 +87,16 @@ export function initUi() {
   controlSummaryEl = lookup('control-summary');
   roleTitleEl = lookup('role-title');
   controlTitleEl = lookup('control-title');
+  pairingTitleEl = lookup('pairing-title');
+  pairingHintsEl = lookup('pairing-hints');
+  pairingLinkEl = lookup('pairing-link');
+  pairingCodeEl = lookup('pairing-code');
+  pairingQrEl = lookup('pairing-qr');
+  pairingWaitingEl = lookup('pairing-waiting');
+  mirrorDurationEl = lookup('mirror-duration-items');
+  mirrorRoleEl = lookup('mirror-role-items');
+  mirrorTitleEl = lookup('mirror-title');
+  mirrorHintsEl = lookup('mirror-hints');
   statusElsByPlayer.set(1, lookup('control-p1-status'));
   statusElsByPlayer.set(2, lookup('control-p2-status'));
   summaryElsByPlayer.set(1, lookup('summary-line-1'));
@@ -81,6 +105,7 @@ export function initUi() {
   // The engine page pass: each painter runs once per rendered frame, in this
   // order. Registration is name-keyed, so a second initUi cannot paint twice.
   registerPagePainter('views', paintViews);
+  registerPagePainter('pairing', paintPairing);
   registerPagePainter('score', paintScore);
   registerPagePainter('status', paintStatus);
   registerPagePainter('placeScore', placeScore);
@@ -162,10 +187,10 @@ function paintViews(pctx) {
     timerEl.textContent = String(remainingSeconds());
     show(timerEl, state === PLAYING || state === GAME_OVER);
   }
-  // Two-player menu item: shown when the viewport is wide enough, hidden at or
-  // below UI_STACK_MAX_WIDTH.
+  // The "Two Players" entry is offered at every viewport width: the way it
+  // takes is chosen after the entry, not by hiding the entry.
   const twoPlayerItem = iface.element('menu-item-two-player');
-  if (twoPlayerItem) twoPlayerItem.style.display = twoPlayerOffered() ? '' : 'none';
+  if (twoPlayerItem) twoPlayerItem.style.display = '';
   paintHighlights(state);
   paintStageTitle(state, row);
   if (row !== undefined && row.cursor === 'step') paintControlFeedback(row);
@@ -174,6 +199,66 @@ function paintViews(pctx) {
 
 function paintScore(pctx) {
   if (scoreEl) scoreEl.textContent = scoreText();
+}
+
+// The pairing step: the secret this page holds for the other device, in the
+// form that device can use it. The link carries the trimmed offer blob in the
+// URL fragment, so opening it carries the secret out of band; the QR paints the
+// same link for a device that cannot copy text. The waiting line names what the
+// other device still has to do. This step paints no play field: its row declares
+// none, so the field stays hidden and no match can exist before a peer is paired.
+function paintPairing(pctx) {
+  if (game.screen.state !== PAIRING) return;
+  if (pairingTitleEl) pairingTitleEl.textContent = PAIRING_TITLE;
+  show(pairingHintsEl, true);
+  if (pairingHintsEl) pairingHintsEl.textContent = PAIRING_HINTS;
+  const published = lobby.secret !== '';
+  const linkForm = published && lobby.form === 'link';
+  show(pairingLinkEl, linkForm);
+  if (pairingLinkEl) pairingLinkEl.textContent = linkForm ? lobby.link : '';
+  show(pairingQrEl, linkForm);
+  if (pairingQrEl && !linkForm) pairingQrEl.width = 0;
+  if (linkForm && pairingQrEl) paintQr(pairingQrEl, lobby.link);
+  // The short readable code is painted beside the link and the QR in every form,
+  // so a device that can neither scan nor open a link still holds a secret it can
+  // type on its own page.
+  const codeForm = published && lobby.code !== '';
+  show(pairingCodeEl, codeForm);
+  if (pairingCodeEl) pairingCodeEl.textContent = codeForm ? PAIRING_CODE_LABEL + ': ' + lobby.code : '';
+  show(pairingWaitingEl, !lobby.paired || preparationShown());
+  if (pairingWaitingEl) pairingWaitingEl.textContent = PAIRING_WAITING;
+  paintMirrors();
+}
+
+// The guest page's read-only copies of the host page's preparation sub-menus:
+// the copies carry no selectable item, and the marker sits where the host page's
+// cursor rests. The guest selects nothing of its own.
+function paintMirrors() {
+  const preparing = preparationShown();
+  show(mirrorTitleEl, preparing);
+  show(mirrorHintsEl, preparing);
+  if (mirrorTitleEl) mirrorTitleEl.textContent = MIRROR_TITLE;
+  if (mirrorHintsEl) mirrorHintsEl.textContent = MIRROR_HINTS;
+  show(mirrorDurationEl, preparing && lobby.prepScreen === SELECT_DURATION);
+  show(mirrorRoleEl, preparing && lobby.prepScreen === SELECT_ROLE);
+  if (mirrorDurationEl) paintMirror(mirrorDurationEl, DURATION_SCREEN_ITEMS, lobby.prepIndex);
+  if (mirrorRoleEl) paintMirror(mirrorRoleEl, ROLE_SCREEN_ITEMS, lobby.prepIndex);
+}
+
+function preparationShown() {
+  return guestPage() && (lobby.prepScreen === SELECT_DURATION ||
+    lobby.prepScreen === SELECT_ROLE || lobby.prepScreen === SELECT_CONTROL);
+}
+
+function paintMirror(list, labels, index) {
+  if (!list) return;
+  const items = list.querySelectorAll(':scope > li');
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    item.textContent = labels[i];
+    item.className = i === index ? 'on' : '';
+    item.removeAttribute('tabindex');
+  }
 }
 
 function paintStatus(pctx) {

@@ -373,3 +373,29 @@ test('fall speed is identical for all three match durations at the same complete
   assert.deepEqual(byDuration[DURATION_MINUTES[0]], byDuration[DURATION_MINUTES[1]]);
   assert.deepEqual(byDuration[DURATION_MINUTES[0]], byDuration[DURATION_MINUTES[2]]);
 });
+
+// ---------- The seeded piece draw ----------
+test('one seed replays the same piece types and the same columns in match order', () => {
+  const SEED = 20240601;
+  const runs = [];
+  for (let match = 0; match < 2; match++) {
+    freshStart();
+    game.play.seed = SEED;
+    game.play.durationMinutes = DURATION_MINUTES[DURATION_MINUTES.length - 1];
+    game.play.durationTicks = game.play.durationMinutes * TICKS_PER_MINUTE;
+    const drawn = [];
+    let last = null;
+    for (let t = 0; t < 6000 && drawn.length < 4; t++) {
+      app.update();
+      const p = game.play.pieces[0];
+      if (p !== last && p !== undefined) {
+        last = p;
+        drawn.push([p.type, p.col]);
+      }
+      if (game.screen.state === 'GAME_OVER') break;
+    }
+    runs.push(drawn);
+  }
+  assert.ok(runs[0].length === 4, `drew ${runs[0].length} pieces, expected 4`);
+  assert.deepEqual(runs[0], runs[1], 'one seed drew a different sequence');
+});

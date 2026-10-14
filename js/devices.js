@@ -7,7 +7,7 @@
 
 import { game } from './state.js';
 import { currentControlPlayer } from './screens.js';
-import { BOARD_W, BOARD_H } from './constants.js';
+import { BOARD_W, BOARD_H, PAIRING_CODE_ALPHABET } from './constants.js';
 import {
   configureSurface,
   registerDeviceResolvers,
@@ -99,7 +99,9 @@ function menuKeyIntent(k) {
   if (k === 'arrowdown' || k === 's') return { action: 'menuDown' };
   if (k === 'enter' || k === ' ') return { action: 'confirm' };
   if (game.screen.state === 'MENU' && k === 'r') return { action: 'startGame' };
-  if ((game.screen.state === 'SELECT_ROLE' || game.screen.state === 'SELECT_DURATION') && k === 'escape') {
+  // Escape leaves any of the sub-menus for the main menu. The way sub-menu is
+  // one of them: its Back control and its Escape key both answer toMenu.
+  if ((game.screen.state === 'SELECT_ROLE' || game.screen.state === 'SELECT_DURATION' || game.screen.state === 'SELECT_WAY') && k === 'escape') {
     return { action: 'toMenu' };
   }
   return null;
@@ -119,12 +121,30 @@ export function keyboardModelForKey(k) {
 // layout, so the layout that key belongs to names the player, and that
 // player's role decides whether the key steers the snake or the piece. A layout
 // no player locked drives nothing. In a single-player game the one role answers.
+// In a network duel each page accepts only the model its own peer confirmed on
+// that device, so a key belonging to the other peer's layout drives nothing here.
 function roleForKeyboardKey(k) {
   if (!game.screen.twoPlayerMode) return game.play.role;
   const model = keyboardModelForKey(k);
-  if (model && game.screen.p1Model === model) return game.screen.p1Role || game.play.role;
-  if (model && game.screen.p2Model === model) return game.screen.p2Role;
+  if (!model) return null;
+  if (game.screen.networkMode) {
+    if (game.screen.seat === 1) return game.screen.p1Model === model ? (game.screen.p1Role || game.play.role) : null;
+    if (game.screen.seat === 2) return game.screen.p2Model === model ? game.screen.p2Role : null;
+    return null;
+  }
+  if (game.screen.p1Model === model) return game.screen.p1Role || game.play.role;
+  if (game.screen.p2Model === model) return game.screen.p2Role;
   return null;
+}
+
+// The side this page drives: in a network duel the guest page drives the mirror
+// role, every other page drives the one role the match carries.
+export function localRole() {
+  if (game.screen.networkMode) {
+    if (game.screen.seat === 2) return game.screen.p2Role;
+    return game.screen.p1Role || game.play.role;
+  }
+  return game.play.role;
 }
 
 // Keys while a game runs: the Tetris side steers the falling piece, the Snake
@@ -154,12 +174,24 @@ function overKeyIntent(k) {
   return k === 'r' || k === 'enter' || k === ' ' ? { action: 'toMenu' } : null;
 }
 
+// Keys in the pairing step. The Pair item is the step's only item, so a confirm
+// key names it by its page id; Escape leaves for the menu. Every other key is one
+// character of the short readable code, and the code is upper case on screen.
+function pairingKeyIntent(k) {
+  if (k === 'enter' || k === ' ') return { action: 'select', id: 'pairing-join' };
+  if (k === 'escape') return { action: 'toMenu' };
+  const ch = k.toUpperCase();
+  return PAIRING_CODE_ALPHABET.includes(ch) ? { action: 'pairChar', char: ch } : null;
+}
+
 // One lookup per screen state, so the mapping reads the state instead of
 // testing it. A state with no entry maps no key.
 const KEY_BY_STATE = {
   MENU: menuKeyIntent,
+  SELECT_WAY: menuKeyIntent,
   SELECT_DURATION: menuKeyIntent,
   SELECT_ROLE: menuKeyIntent,
+  PAIRING: pairingKeyIntent,
   PLAYING: playingKeyIntent,
   RECORDS: viewKeyIntent,
   HELP: viewKeyIntent,
@@ -189,7 +221,7 @@ function gestureIntent(start, end) {
     return { action: 'toMenu' };
   }
   if (game.screen.state !== 'PLAYING') return null;
-  if (game.play.role === 'tetris') return pieceGesture(dx, dy, end.x);
+  if (localRole() === 'tetris') return pieceGesture(dx, dy, end.x);
   return snakeGesture(dx, dy, end.x, end.y);
 }
 
@@ -293,7 +325,8 @@ function menuIntent(state, s) {
   if (s.upEdge || s.stickUpEdge) return { action: 'menuUp' };
   if (s.downEdge || s.stickDownEdge) return { action: 'menuDown' };
   if (s.aEdge) return { action: 'confirm' };
-  if (state === 'SELECT_ROLE' || state === 'SELECT_DURATION') {
+  // B leaves any sub-menu for the main menu, matching Escape on the keyboard.
+  if (state === 'SELECT_ROLE' || state === 'SELECT_DURATION' || state === 'SELECT_WAY') {
     if (s.bEdge) return { action: 'toMenu' };
   }
   return null;
@@ -303,7 +336,9 @@ function menuIntent(state, s) {
 // the D-pad/stick direction is applied while held.
 function chooseIntent(state, role, s) {
   if (state === 'PLAYING') return playingIntent(role, s);
-  if (state === 'MENU' || state === 'SELECT_ROLE' || state === 'SELECT_DURATION') return menuIntent(state, s);
+  // The way sub-menu navigates exactly like the duration and role sub-menus:
+  // D-pad moves the cursor, A confirms, B leaves for the menu.
+  if (state === 'MENU' || state === 'SELECT_WAY' || state === 'SELECT_ROLE' || state === 'SELECT_DURATION') return menuIntent(state, s);
   // Two-player control screen: A locks the next player's gamepad model, and
   // names the pad they pressed with so the lock claims that device. Once both
   // players have locked, A starts the game. Edge-only, one press.

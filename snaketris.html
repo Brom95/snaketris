@@ -78,6 +78,33 @@
     #role-items li::before { content: '\25b6 '; opacity: 0; }
     #role-items li.on { color: #a7f3a0; }
     #role-items li.on::before { opacity: 1; }
+    /* The way sub-menu mirrors the other sub-menus: same marker rule, same sizes.
+       It only appears beside the field, so the narrow layout never shows it. */
+    #way-view.on {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    #way-title { font-size: 24px; margin: 0; }
+    #way-hints { font-size: 14px; color: #8899aa; }
+    #way-items { list-style: none; margin: 0; padding: 0; min-width: 170px; }
+    #way-items li { font-size: 20px; padding: 12px 0; }
+    #way-items li::before { content: '\25b6 '; opacity: 0; }
+    #way-items li.on { color: #a7f3a0; }
+    #way-items li.on::before { opacity: 1; }
+    /* The guest page's read-only copies of the host page's preparation sub-menus:
+       the same marker rule, dimmed, so a copy reads as the other device's choice
+       and never as something this page picks. */
+    #mirror-title { font-size: 20px; margin: 0; }
+    #mirror-hints { font-size: 14px; color: #8899aa; }
+    #mirror-duration-items, #mirror-role-items {
+      list-style: none; margin: 0; padding: 0; min-width: 170px;
+    }
+    #mirror-duration-items li, #mirror-role-items li { font-size: 16px; padding: 8px 0; color: #8899aa; }
+    #mirror-duration-items li::before, #mirror-role-items li::before { content: '\25b6 '; opacity: 0; }
+    #mirror-duration-items li.on, #mirror-role-items li.on { color: #a7f3a0; }
+    #mirror-duration-items li.on::before, #mirror-role-items li.on::before { opacity: 1; }
     /* The duration screen mirrors the role screen: same marker rule, same sizes. */
     #duration-view.on {
       display: flex;
@@ -91,6 +118,18 @@
     #duration-items li::before { content: '\25b6 '; opacity: 0; }
     #duration-items li.on { color: #a7f3a0; }
     #duration-items li.on::before { opacity: 1; }
+    /* The pairing step mirrors the other sub-menus: its own view, its own title.
+       The secret is page text, so it must wrap rather than widen the column. */
+    #pairing-view.on {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    #pairing-title { font-size: 24px; margin: 0; }
+    #pairing-hints, #pairing-waiting { font-size: 14px; color: #8899aa; }
+    #pairing-link, #pairing-code { font-size: 14px; word-break: break-all; }
+    #pairing-qr { width: 160px; height: 160px; }
     #github-link { color: inherit; text-decoration: none; }
     #github-link svg { width: 24px; height: 24px; fill: currentColor; }
     #records-title, #help-title { font-size: 24px; margin: 0; }
@@ -160,6 +199,18 @@
         </svg>
       </a>
     </div>
+    <!-- The way sub-menu sits under the menu's Two Players item: it splits the
+         entry into the two ways a duel runs. js/ui.js keeps the wide item off a
+         stacked layout, so this view only ever opens beside the field. -->
+    <div id="way-view" class="view">
+      <h2 id="way-title">Choose how two players meet</h2>
+      <p id="way-hints">Up / Down — choose · Enter — confirm · Escape — back</p>
+      <ul id="way-items">
+        <li id="way-item-local" tabindex="-1">Same computer</li>
+        <li id="way-item-network" tabindex="-1">Network</li>
+        <li id="way-back" tabindex="-1">Back</li>
+      </ul>
+    </div>
     <!-- The duration screen sits between the menu and the role screen: every path
          into play passes through it. -->
     <div id="duration-view" class="view">
@@ -170,6 +221,35 @@
         <li id="duration-item-5" tabindex="-1">5 minutes</li>
         <li id="duration-back" tabindex="-1">Back</li>
       </ul>
+    </div>
+    <!-- The pairing step is the network lobby. It shows no play field: the host
+         publishes its offer and paints the secret the second player needs, so no
+         match can start before a peer is paired. -->
+    <div id="pairing-view" class="view">
+      <h2 id="pairing-title">Pair with another device</h2>
+      <p id="pairing-hints" class="view"></p>
+      <p id="pairing-link" class="view"></p>
+      <p id="pairing-code" class="view"></p>
+      <canvas id="pairing-qr" class="view"></canvas>
+      <p id="pairing-waiting" class="view"></p>
+      <!-- The guest page's read-only mirrors of the host page's preparation
+           sub-menus: js/ui.js paints them from the mirror the host sends, so the
+           guest sees the other device choosing without offering a pick itself. -->
+      <p id="mirror-title" class="view"></p>
+      <p id="mirror-hints" class="view"></p>
+      <ul id="mirror-duration-items" class="view">
+        <li>1 minute</li>
+        <li>3 minutes</li>
+        <li>5 minutes</li>
+        <li>Back</li>
+      </ul>
+      <ul id="mirror-role-items" class="view">
+        <li>Snake</li>
+        <li>Tetris</li>
+        <li>Back</li>
+      </ul>
+      <p id="pairing-join" class="return">Pair</p>
+      <p id="pairing-back" class="return">Back</p>
     </div>
     <div id="role-view" class="view">
       <h2 id="role-title">Choose your side</h2>
@@ -234,12 +314,14 @@
           <li>Controller: A — confirm, B — back</li>
           <li>Back or Escape — return to the menu</li>
           <li>R or click — start</li>
+          <li>Network: the second player opens the link the pairing paints, or types the code beside it</li>
         </ul>
       </section>
       <section id="help-rules">
         <h3>Rules</h3>
         <ul>
           <li>The bot plays the side you did not choose.</li>
+          <li>Network: each device plays its own side, and no bot fills either.</li>
           <li>Snake: eat falling pieces, +1 per cell, +4 for a whole piece.</li>
           <li>The snake stops at 8 segments; later eaten cells recolour its body blue, then purple, then gold.</li>
           <li>Tetris: +2 per landed block, +10 per full row cleared.</li>

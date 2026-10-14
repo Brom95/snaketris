@@ -3,6 +3,7 @@ import { COLS, ROWS, EMPTY, SOLID, COLORS, TETROMINOES, PIECE_TYPES, PIECE_BOX, 
 import { game, gameOver } from './state.js';
 import { getCell, setCell } from './grid.js';
 import { consumePieceAtHead, snakeTicksPerCell } from './snake.js';
+import { nextInRange } from '../engine/js/source.js';
 
 // Difficulty ramp: fall speed (cells/tick) ticks up one step every three
 // completed pieces, from BASE_FALL, capped at MAX_FALL.
@@ -70,8 +71,10 @@ export function findPieceAt(r, c) {
 // (the previous one has landed and become solid, or been fully consumed).
 export function spawnPiece() {
   if (game.play.pieces.length !== 0) return;
-  const type = PIECE_TYPES[Math.floor(Math.random() * PIECE_TYPES.length)];
-  const col = Math.floor(Math.random() * (COLS - 3)); // fits widest piece
+  const seed = game.play.seed;
+  const type = PIECE_TYPES[nextInRange(seed, game.play.pieceDraws, PIECE_TYPES.length)];
+  const col = nextInRange(seed, game.play.pieceDraws + 1, COLS - 3); // fits widest piece
+  game.play.pieceDraws += 2;
   const row = -5; // above the top of the grid
   // Copy the state offsets: eating splices a falling piece's shape in place,
   // and the shared TETROMINOES table must stay intact for every future spawn.

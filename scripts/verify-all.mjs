@@ -19,6 +19,7 @@ const SCRIPTS = [
   'verify-p2-constraint.mjs',
   'verify-two-player-gating.mjs',
   'verify-role-line.mjs',
+  'verify-network-duel.mjs',
 ];
 
 function run(script) {

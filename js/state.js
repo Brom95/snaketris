@@ -10,6 +10,7 @@ import { PLAYING, ROWS, SPAWN_INTERVAL, DURATION_MINUTES, TICKS_PER_MINUTE } fro
 import { initGrid } from './grid.js';
 import { screenFields, applyGameOverScreen } from './screens.js';
 import { state, configureState, resetState } from '../engine/js/state.js';
+import { nextValue } from '../engine/js/source.js';
 
 // The engine skeleton holds the two containers; this module registers the
 // game's field tables into it and hands out the same binding every other
@@ -37,6 +38,8 @@ const PLAY_FIELDS = [
   ['result', null], // the finished game waiting for the records layer
   ['durationMinutes', DURATION_MINUTES[0]],
   ['durationTicks', DURATION_MINUTES[0] * TICKS_PER_MINUTE],
+  ['seed', 0], // the match seed: fixed before the first tick, never chosen by the player
+  ['pieceDraws', 0], // draws the seeded source has made this match
 ];
 
 // The engine refills both halves from the tables, then runs this hook so the
@@ -72,12 +75,18 @@ export function startGame() {
   const role = game.play.role;
   const twoPlayer = game.screen.twoPlayerMode;
   const durationMinutes = game.play.durationMinutes;
+  const seed = game.play.seed;
   // Preserve the locked control models and their pads across the reset so the
   // SHARED screen can re-show both layouts after a game ends (two-player mode).
   const p1Model = game.screen.p1Model;
   const p2Model = game.screen.p2Model;
   const p1Pad = game.screen.p1Pad;
   const p2Pad = game.screen.p2Pad;
+  // A network duel survives the reset the same way: the page that published the
+  // pairing offer keeps its seat, so the match that starts after a reset still
+  // runs its simulation on the peer link the lobby holds.
+  const networkMode = game.screen.networkMode;
+  const seat = game.screen.seat;
   resetGame();
   // resetGame clears the menu state; the role chosen before the game is kept.
   game.play.role = role;
@@ -86,6 +95,10 @@ export function startGame() {
   // the budget has to survive the reset; a single-player rematch re-asks it.
   game.play.durationMinutes = durationMinutes;
   game.play.durationTicks = durationMinutes * TICKS_PER_MINUTE;
+  // The seed is a match property, fixed here before the first tick and never
+  // chosen by the player: a rematch answers from the finished match's seed, so
+  // no match can replay the previous one's piece sequence.
+  game.play.seed = nextValue(seed, 0);
   if (twoPlayer) {
     game.screen.twoPlayerMode = true;
     game.screen.p1Role = role;
@@ -94,6 +107,10 @@ export function startGame() {
     game.screen.p2Model = p2Model;
     game.screen.p1Pad = p1Pad;
     game.screen.p2Pad = p2Pad;
+  }
+  if (networkMode) {
+    game.screen.networkMode = true;
+    game.screen.seat = seat;
   }
   game.screen.state = PLAYING;
   // Prime the spawn accumulator so the first piece appears on the very next
@@ -148,6 +165,9 @@ export function remainingSeconds() {
 }
 
 function finishedResult() {
+  // A network match that ended with the peer leaving is not a finished game:
+  // the records layer writes nothing for a null report.
+  if (game.screen.networkMode) return null;
   if (game.screen.twoPlayerMode) {
     return [
       { score: game.play.snakeScore, role: 'snake' },

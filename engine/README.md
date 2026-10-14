@@ -37,6 +37,9 @@ Run it with `node --test engine/tests/boundary.test.js`.
 | `js/layout.js` | One viewport rule answers both the stacked-layout test and the field gap, so the band and the fit cannot drift apart. |
 | `js/devices.js` | Pointer listeners, pointer capture, pointer→surface coordinates, thumbstick quantization, gamepad polling and edge clearing. |
 | `js/records.js` | A reported batch persists exactly once, then clears. A writer that throws cannot report the same batch again. |
+| `js/source.js` | The next value from a seed and a call count. Two arguments answer one value, so a run that draws from one seed replays in the same order. The engine supplies no seed and reads no browser entropy. |
+| `js/stream.js` | An intent carries the tick it applies on and applies on that tick only. An intent whose tick already passed is dropped and counted, never applied. |
+| `js/link.js` | The link holds the state a peer connection has and fires the close event once, to every registered handler. A resync re-sends state and drops every buffered intent, so one simulation stays authoritative. |
 
 The engine reads `document`, `window` and `localStorage` only inside called
 functions, never at module load. The engine suite therefore runs with no DOM,
@@ -57,6 +60,20 @@ no window and no storage present.
 | `js/present.js` | `registerCanvasPainter(name, painter)` / `registerPagePainter(name, painter)` | The painters and their draw order. |
 | `js/devices.js` | `configureSurface({ width, height })` and `registerDeviceResolvers({ gesture, shape, key, page, pad })` | The surface size and the resolvers that turn raw input into intents. |
 | `js/records.js` | `registerReport({ field, writer })` | The name of the report field in the play half and the writer for one entry. |
+| `js/source.js` | `nextValue(seed, callCount)` / `nextInRange(seed, callCount, bound)` | The seed and the call count. The engine supplies no seed and reads no browser entropy. |
+| `js/stream.js` | `createCommandStream(apply)` | The function that applies one intent. The engine owns the tick alignment only. |
+| `js/link.js` | `createLink(transport)` | The transport object that carries the channel. The engine builds none and names no channel class. |
+
+**Two supply lines the engine cannot fill.** The seed and the transport.
+
+- **The seed.** `nextValue(seed, callCount)` answers from two arguments only, so
+  the seed is a value the consumer fixes before the first tick. The engine never
+  picks one.
+- **The transport.** `createLink(transport)` receives the object that carries the
+  channel. A consumer that omits a transport must satisfy this line: the link
+  reports no peer (`link.peer === null`) and no match may start until
+  `link.pair(peer)` runs. The engine supplies no transport of its own, so a
+  network way that never pairs stays in the pairing step and starts nothing.
 
 ## Invariants that must not be broken
 
@@ -77,6 +94,13 @@ no window and no storage present.
 5. **No consumer import in the engine.** The boundary check in
    `engine/tests/boundary.test.js` is the enforcement. A failing check is a
    design error, not a workaround.
+6. **The seed is a match property.** `nextValue(seed, callCount)` and
+   `nextInRange(seed, callCount, bound)` answer from two arguments only, so the
+   seed is fixed before the first tick and identical on every peer. A run that
+   draws from one seed replays in the same order. A consumer must not read
+   browser entropy where a draw happens, and a peer must not advance its own
+   call count: the engine owns the tick slot, and `createCommandStream` applies
+   an intent on the tick it names and on no other tick.
 
 ## Mounting the engine as a submodule
 

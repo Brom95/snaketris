@@ -15,7 +15,9 @@ const context = await browser.newContext();
 console.log('=== Single-key-press control lock ===');
 const page = await freshPage(context, ROOT);
 await page.click('#menu-item-two-player');
-check(await stateIs(page, 'SELECT_DURATION'), 'clicking Two Players opens the duration sub-menu');
+check(await stateIs(page, 'SELECT_WAY'), 'clicking Two Players opens the way sub-menu');
+await page.click('#way-item-local');
+check(await stateIs(page, 'SELECT_DURATION'), 'confirming "Same computer" opens the duration sub-menu');
 await page.click('#duration-item-1');
 check(await stateIs(page, 'SELECT_ROLE'), 'confirming 1 minute opens the role screen');
 

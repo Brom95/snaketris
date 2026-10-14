@@ -222,7 +222,10 @@ export function makeCanvas(rect = { left: 0, top: 0, width: 240, height: 480 }, 
 // Serve the repo over HTTP so ES modules resolve; no local server is needed.
 export async function servePage(page, rootDir) {
   await page.route(BASE + '**', (route) => {
-    const file = path.join(rootDir, decodeURIComponent(route.request().url().slice(BASE.length)));
+    // A pairing link puts the secret in the URL fragment; the fragment names no
+    // file, so the path part alone selects the repo file to serve.
+    const requested = route.request().url().slice(BASE.length).split('#')[0];
+    const file = path.join(rootDir, decodeURIComponent(requested));
     try {
       return route.fulfill({
         status: 200,

@@ -16,14 +16,14 @@ import { check, report, stubDom } from './harness.mjs';
 import {
   ROWS, SOLID, COLORS, BOARD_W, BOARD_H,
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, UI_COLUMN_MIN,
-  MENU, PLAYING, RECORDS, HELP, GAME_OVER,
+  MENU, SELECT_DURATION, PLAYING, RECORDS, HELP, GAME_OVER,
 } from '../js/constants.js';
 import { initRender, render } from '../js/render.js';
 import { initGrid, setCell, getGrid } from '../js/grid.js';
 import { game, resetGame } from '../js/state.js';
 import { initInput, fitCanvas, handleIntent } from '../js/input.js';
 import { onPointerDown, onPointerMove, onPointerUp, toLogical } from '../js/devices.js';
-import { initUi, interfaceBandHeight } from '../js/ui.js';
+import { initUi, interfaceBandHeight, syncViews } from '../js/ui.js';
 import { readFileSync } from 'node:fs';
 
 function near(a, b) {
@@ -42,6 +42,7 @@ const ctxTarget = {
   moveTo: (...a) => calls.push(['moveTo', ...a]),
   lineTo: (...a) => calls.push(['lineTo', ...a]),
   stroke: () => calls.push(['stroke']),
+  strokeRect: (...a) => calls.push(['strokeRect', ...a]),
   fill: () => calls.push(['fill']),
   arc: (...a) => calls.push(['arc', ...a]),
   save: () => calls.push(['save']),
@@ -63,7 +64,7 @@ const ctx = new Proxy(ctxTarget, {
   },
 });
 
-const FIELD_METHODS = new Set(['fillRect', 'beginPath', 'moveTo', 'lineTo', 'stroke']);
+const FIELD_METHODS = new Set(['fillRect', 'beginPath', 'moveTo', 'lineTo', 'stroke', 'strokeRect']);
 const TEXT_METHODS = new Set(['fillText', 'strokeText', 'measureText', 'drawImage']);
 const FIELD_COLORS = new Set([COLORS.bg, COLORS.grid, COLORS.solid, COLORS.edible, COLORS.snakeHead, COLORS.snakeBody, COLORS.tierBlue, COLORS.tierPurple, COLORS.tierGold]);
 
@@ -85,7 +86,7 @@ const canvas = {
 const UI_BOX_HEIGHT = 150;
 
 const dom = stubDom({
-  elements: ['ui', 'score', 'status', 'menu-view', 'role-view', 'records-view', 'help-view',
+  elements: ['ui', 'score', 'status', 'menu-view', 'duration-view', 'role-view', 'records-view', 'help-view',
     'records-list', 'records-empty'],
   lists: { '#menu-items > li': ['menu-item-play', 'menu-item-records', 'menu-item-help'] },
   rects: { ui: { left: 0, top: 0, width: UI_COLUMN_MIN, height: UI_BOX_HEIGHT } },
@@ -112,7 +113,7 @@ check(!/fillText|measureText|strokeText|drawImage/.test(renderSrc), 'render.js h
 check(!/drawMenu|drawRecords|drawHelp|drawOverlay|overlayBackground|drawText|drawOctocat/.test(renderSrc), 'no canvas view helper survives in render.js');
 check(!/MENU_ITEMS|MENU_ITEM_Y|MENU_ITEM_HIT_H/.test(renderSrc), 'render.js no longer imports the menu layout constants');
 
-for (const state of [MENU, PLAYING, RECORDS, HELP, GAME_OVER]) {
+for (const state of [MENU, SELECT_DURATION, PLAYING, RECORDS, HELP, GAME_OVER]) {
   game.screen.state = state;
   calls.length = 0;
   painted.length = 0;
@@ -129,6 +130,17 @@ for (const state of [MENU, PLAYING, RECORDS, HELP, GAME_OVER]) {
   check(rects === 1 + solids + pieceCells + game.play.snake.length,
     'in ' + state + ' the painted cells are exactly background + ' + solids + ' solid + ' + pieceCells + ' falling + ' + game.play.snake.length + ' snake');
 }
+
+// ---------- The duration screen hides the field -----------------------------
+game.screen.state = SELECT_DURATION;
+syncViews(null);
+check(!dom.classes('game').has('on'), 'no field on screen while the duration screen is shown');
+check(dom.classes('duration-view').has('on'), 'the duration screen is the view on screen');
+check(!dom.classes('score').has('on'), 'the score readout stays hidden with the field');
+game.screen.state = MENU;
+syncViews(null);
+check(dom.classes('menu-view').has('on') && !dom.classes('duration-view').has('on'),
+  'the menu view replaces the duration view once the state is MENU');
 
 // ---------- 5.2 fitCanvas keeps the contain-fit rule on the canvas alone ----
 function canvasSize() {

@@ -21,6 +21,14 @@ export const ROLE_SCREEN_ITEMS = ['Snake', 'Tetris', 'Back'];
 // visible button outside this list.
 export const CONTROL_SCREEN_ITEMS = ['P1 Select', 'P2 Select', 'Start'];
 
+// The two ways a "Two Players" entry can run a match: both players share this
+// page, or each player plays on their own device. Page order matches the way
+// sub-menu's items.
+export const WAY_ITEMS = ['Same computer', 'Network'];
+export const WAY_SCREEN_ITEMS = ['Same computer', 'Network', 'Back'];
+export const WAY_TITLE = 'Choose how two players meet';
+export const WAY_HINTS = 'Up / Down — choose · Enter — confirm · Escape — back';
+
 // The four layout keys for each keyboard model, keyed by model name. A model is
 // "keyboard" when it has an entry here; gamepad and any other model are not.
 export const GAME_CONTROL_KEYBOARD_MODELS = {
@@ -45,6 +53,25 @@ export const GITHUB_URL = 'https://github.com/Brom95/snaketris';
 // plus Back. The arrow cycles over this list; only the first three entries are
 // durations.
 export const DURATION_SCREEN_ITEMS = ['1 minute', '3 minutes', '5 minutes', 'Back'];
+
+// The pairing step. The title names the step and the action the second player
+// takes; the hint line lists every key that advances it.
+export const PAIRING_TITLE = 'Pair with another device';
+export const PAIRING_HINTS = 'Enter or Space — pair · Escape — back';
+export const PAIRING_LINK_LABEL = 'Open this link';
+export const PAIRING_CODE_LABEL = 'Or type this code';
+export const PAIRING_WAITING = 'Waiting for the other device';
+export const PAIRING_JOIN = 'Pair';
+
+// The guest page's read-only copies of the host's preparation sub-menus. The
+// copy names the wait beside them so the guest always knows the other device
+// is the one choosing.
+export const MIRROR_TITLE = 'The other device chooses';
+export const MIRROR_HINTS = 'Nothing to choose here';
+
+// The alphabet for the short readable code: no I, O, 0 or 1, so a player can
+// read every character off the screen.
+export const PAIRING_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 // Palette
 export const COLORS = {

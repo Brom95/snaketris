@@ -520,6 +520,113 @@ Every other action verb belongs to the consumer's handler map.
 
 ---
 
+## js/source.js
+
+### `nextValue(seed, callCount)`
+
+- **Signature:** `nextValue(seed, callCount)` → a non-negative 31-bit integer.
+- **Contract (engine):** two arguments answer one value, always the same one. The
+  source holds no counter of its own and reads no browser entropy, so a run that
+  draws from one seed replays in the same order.
+- **Consumer must supply:** the seed, fixed before the first tick and identical
+  on every peer, and the call count the consumer owns. The engine supplies
+  neither.
+- **Worked call** (`engine/tests/source.test.js`):
+
+  ```js
+  const first = source.nextValue(20240601, 0);
+  ```
+
+### `nextInRange(seed, callCount, bound)`
+
+- **Signature:** `nextInRange(seed, callCount, bound)` → an integer in
+  `[0, bound)`.
+- **Contract (engine):** one draw from the same seed and call count. A bound of
+  `0` or less answers `0` and draws nothing, so a caller never divides by a
+  bound it has not checked.
+- **Consumer must supply:** the bound, which is the size of the consumer's own
+  table.
+- **Worked call** (`engine/tests/source.test.js`):
+
+  ```js
+  const drawn = source.nextInRange(20240601, 3, bound);
+  ```
+
+---
+
+## js/stream.js
+
+### `createCommandStream(apply)`
+
+- **Signature:** `createCommandStream(apply)` → a stream instance. `apply(intent,
+  tick)` runs once per applied intent.
+- **Contract (engine):** the tick alignment only. An intent carries the tick it
+  applies on and applies on that tick and on no other tick. An intent whose tick
+  already passed is dropped and counted, never applied. The engine reads the tick
+  from `ctx.state.play.tick`, the slot `createEngine` bumps.
+- **Consumer must supply:** the `apply` function, which is the whole meaning of
+  an intent, and one stream per peer.
+- **Worked call** (`engine/tests/peers.test.js`):
+
+  ```js
+  const host = stream.createCommandStream((intent, tick) => applied.host.push(`${intent}@${tick}`));
+  ```
+
+### `queue(intent, tick)` / `drain(ctx)` / `dropAll()` (instance)
+
+- **Contract (engine):** `queue` tags an intent and refuses a tag behind the
+  current tick, counting the drop. `drain` applies every buffered intent tagged
+  the current tick, in queue order, and returns how many it applied. `dropAll`
+  clears the buffer and counts every intent it cleared, so a resync cannot apply
+  an intent twice.
+- **Reads:** `applied` and `dropped` report the counts; `buffered` reports what
+  is still held.
+
+---
+
+## js/link.js
+
+### `createLink(transport)`
+
+- **Signature:** `createLink(transport)` → a link instance. `transport` is the
+  object the consumer built, or `null`.
+- **Contract (engine):** the state a peer connection has and the close event. The
+  link holds the `states` record, `open`, `closed`, `closeReason` and `peer`, and
+  it names no channel class: it receives a transport and never builds one.
+- **Consumer must supply:** the transport object. A consumer that omits one must
+  satisfy this line: the link reports no peer (`link.peer === null`) and no match
+  may start until `link.pair(peer)` runs.
+- **Worked call** (`engine/tests/link.test.js`):
+
+  ```js
+  const lonely = link.createLink(null);
+  ```
+
+### `pair(peer)` / `report(name, value)` / `onClose(handler)` / `close(reason)` (instance)
+
+- **Contract (engine):** `pair` records the identity and opens the link. `report`
+  writes one state value a peer connection answers. `close` fires once, runs
+  every registered handler in registration order with the reason it was given,
+  and a second call does nothing.
+
+### `attachStream(stream, label)` / `counts()` / `resync(state)` (instance)
+
+- **Contract (engine):** the resync policy. One simulation stays
+  authoritative, so `resync` re-sends state instead of replaying inputs: it calls
+  `dropAll()` on every attached stream and returns `{ state, dropped }`. `counts`
+  reports the `applied` and `dropped` totals of every stream, keyed by the label
+  the consumer gave when it attached it.
+- **Worked call** (`engine/tests/link.test.js`):
+
+  ```js
+  conn.attachStream(host, 'host');
+  conn.attachStream(guest, 'guest');
+  const sent = conn.resync({ tick: 5, board: [] });
+  conn.counts(); // { host: { applied: 0, dropped: 1 }, guest: { applied: 0, dropped: 2 } }
+  ```
+
+---
+
 ## Reading the contracts as one flow
 
 1. `createClock` + `createEngine` build the loop.
@@ -532,3 +639,6 @@ Every other action verb belongs to the consumer's handler map.
 6. `registerCanvasPainter` / `registerPagePainter` bind the painters to the two
    passes.
 7. `registerReport` binds the write policy to the consumer's storage writer.
+8. `nextValue` / `nextInRange` draw from the consumer's seed, and
+   `createCommandStream` + `createLink` carry one peer's intents to one
+   authoritative simulation.
