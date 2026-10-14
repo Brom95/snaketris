@@ -63,6 +63,12 @@ export const PAIRING_CODE_LABEL = 'Or type this code';
 export const PAIRING_WAITING = 'Waiting for the other device';
 export const PAIRING_JOIN = 'Pair';
 
+// The preloader line the pairing step paints while the page's own ICE attempt
+// runs: the attempt starts when the page opens, and the step counts the seconds
+// left in its budget, so a slow network shows the wait rather than a link that
+// pairs nobody.
+export const PAIRING_ICE_WAIT = 'Connecting to STUN servers';
+
 // What the pairing step says when the offer carries no remote ICE address. The
 // fallback blob reaches only another tab in the same browser instance, so the
 // step names the limit it leaves instead of painting a link that pairs nobody.

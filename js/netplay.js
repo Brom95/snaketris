@@ -30,7 +30,10 @@ export const lobby = {
   prepScreen: '', // the preparation step the host page sits on
   prepIndex: -1, // the marker the host page left there, mirrored onto this page
   closed: '', // the reason the peer link closed, once it did
-  ice: '', // what the published offer carries: 'remote' reaches another device, 'local' reaches another tab in the same browser instance, 'none' reaches neither
+  ice: '', // the ICE attempt: '' not started, 'gathering' the servers are being waited for, 'offer' published without waiting, 'remote' an address was resolved, 'local' none was, 'none' no connection at all
+  iceLeft: 0, // whole seconds of the ICE attempt still left, so the pairing step can count it down
+  rebuilt: false, // this page already rebuilt its channel with an empty ICE list
+  warm: '', // the offer SDP the page's own attempt produced, which the pairing step publishes instead of offering twice
 };
 
 // Drop every SDP comment line. libwebrtc puts a machine-dependent payload behind
@@ -141,6 +144,19 @@ export function registerTransport(factory) {
   transportFactory = factory;
   if (linkInstance) linkInstance = bindLink(createLink(factory()));
   return linkInstance;
+}
+
+// The page-level fallback the answering side uses when its servers gave it no
+// address: the game layer supplies it, because rebuilding the channel with a
+// different ICE list is the page's decision, not the link's.
+let iceFallback = null;
+
+// The page's own ICE attempt, kept so a publish or an answer can wait for the
+// attempt that is already running instead of starting a second one.
+let iceRunning = null;
+
+export function setIceFallback(factory) {
+  iceFallback = factory;
 }
 
 export function openLink() {
@@ -316,7 +332,116 @@ export function sendFrame() {
 // peer connection the transport carries; a channel object with no peer
 // connection behind it (a headless check's stand-in) carries the answer as
 // bytes only, which is all the link's pair call needs.
+// The ICE gathering budget, in whole seconds. The address a peer connects to
+// comes from the gathering, not from the offer: an answer built while gathering
+// is still 'new' carries `IN IP4 0.0.0.0`, which pairs nobody, and an offer
+// published that early warms nothing. A page waits, inside this budget, for its
+// servers to answer before it publishes or answers.
+export const ICE_GATHER_TIMEOUT_SECONDS = 15;
+
+async function sleep(ms) {
+  await new Promise((done) => setTimeout(done, ms));
+}
+
+// Wait for a connection's ICE gathering, reporting the whole seconds left so the
+// pairing step can count the attempt down. 'complete' means the servers were
+// reached and answered; 'timeout' means the budget ran out over a slow or
+// unreachable network. Wall time, not the game clock: the attempt is a network
+// round trip, and no tick advances because of it.
+export async function gatherIce(connection, secondsLeft) {
+  const budgetMs = ICE_GATHER_TIMEOUT_SECONDS * 1000;
+  const started = Date.now();
+  while (Date.now() - started < budgetMs) {
+    if (connection.iceGatheringState === 'complete') return 'complete';
+    if (secondsLeft) secondsLeft(Math.ceil((budgetMs - (Date.now() - started)) / 1000));
+    await sleep(500);
+  }
+  return 'timeout';
+}
+
+// The page's own ICE attempt. A page that opens for a network game runs it at
+// open, before the pairing step publishes or answers anything: the address a
+// peer connects to comes from the servers, and the servers answer only once the
+// page has set a local description, so the attempt creates the page's offer,
+// waits out the gathering budget, and records what that offer carries. The
+// offer it produced is kept in the lobby, so the publish step never offers a
+// second time over the same connection.
+async function iceAttempt() {
+  const link = openLink();
+  const pc = link && link.transport && link.transport.connection;
+  if (!pc) {
+    lobby.ice = 'none';
+    return;
+  }
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await gatherIce(pc, (left) => { lobby.iceLeft = left; });
+    const sdp = pc.localDescription.sdp;
+    if (carriesRemoteAddress(sdp)) {
+      lobby.ice = 'remote';
+      lobby.warm = sdp;
+      return;
+    }
+    // The servers gave this device no address, so no peer on any network is
+    // reachable. Rebuild the channel with an empty ICE list, which leaves
+    // libwebrtc the `<uuid>.local` candidate: the one-network form the
+    // pairing step warns about. That channel has no servers to wait for.
+    lobby.ice = 'local';
+    if (!lobby.rebuilt) {
+      lobby.rebuilt = true;
+      try {
+        pc.close();
+      } catch (e) {
+        // A connection the channel already closed closes nothing.
+      }
+      // The rebuild is the game layer's decision, so it comes as a supply the
+      // page handed over: registering that factory is what makes the next open
+      // build the channel with no servers.
+      if (iceFallback) registerTransport(iceFallback);
+    }
+  } catch (e) {
+    // An offer the connection cannot produce leaves the step on the code form.
+    lobby.ice = 'none';
+  }
+}
+
+// Start the page's attempt once per page open: the pairing step asks for it
+// every frame, and only the first ask starts the wait. The countdown starts at
+// the full budget so the step shows the wait before the first tick reports.
+export function startIceAttempt() {
+  if (iceRunning === null) {
+    lobby.ice = 'gathering';
+    lobby.iceLeft = ICE_GATHER_TIMEOUT_SECONDS;
+    iceRunning = iceAttempt();
+  }
+  return iceRunning;
+}
+
+// Wait until the page's attempt has finished. A publish or an answer that ran
+// while the servers were still answering would carry no address at all, so the
+// hop waits for the attempt that is already running rather than starting a
+// second one over the same connection.
+export async function awaitIceAttempt() {
+  if (iceRunning) await iceRunning;
+}
+
+// Whether an SDP carries an address a peer outside this browser could reach:
+// an ICE candidate line names a numeric address, the placeholder `0.0.0.0` names
+// none, and libwebrtc's own `<uuid>.local` line names a connection inside this
+// browser instance, which no other device resolves.
+export function carriesRemoteAddress(sdp) {
+  for (const line of sdp.split('\r\n')) {
+    if (!line.startsWith('IN IP4 ')) continue;
+    const address = line.slice(7).trim();
+    if (address === '0.0.0.0') continue;
+    if (/^\d+(\.\d+)*$/.test(address)) return true;
+  }
+  return false;
+}
+
 export async function answerOffer() {
+  await awaitIceAttempt();
   const link = openLink();
   if (!link || !lobby.secret) return false;
   const pc = link.transport && link.transport.connection;
@@ -330,7 +455,20 @@ export async function answerOffer() {
     await pc.setRemoteDescription({ type: 'offer', sdp: lobby.secret });
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    post('A', answer.sdp);
+    const sdp = pc.localDescription.sdp;
+    if (carriesRemoteAddress(sdp)) {
+      lobby.ice = 'remote';
+      post('A', sdp);
+      if (!link.open) link.pair({ side: 'host', secret: lobby.secret });
+      lobby.paired = true;
+      return true;
+    }
+    // The attempt left this page no address to connect to, so the answer carries
+    // only libwebrtc's `<uuid>.local` candidate: it reaches another connection
+    // inside the same browser instance, and the step says so instead of implying
+    // a second device can be reached.
+    lobby.ice = 'local';
+    post('A', sdp);
     if (!link.open) link.pair({ side: 'host', secret: lobby.secret });
     lobby.paired = true;
     return true;

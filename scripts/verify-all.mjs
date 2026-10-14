@@ -20,6 +20,7 @@ const SCRIPTS = [
   'verify-two-player-gating.mjs',
   'verify-role-line.mjs',
   'verify-network-duel.mjs',
+  'verify-ice-preload.mjs',
 ];
 
 function run(script) {

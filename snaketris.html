@@ -127,7 +127,7 @@
       align-items: center;
     }
     #pairing-title { font-size: 24px; margin: 0; }
-    #pairing-hints, #pairing-waiting { font-size: 14px; color: #8899aa; }
+    #pairing-hints, #pairing-waiting, #pairing-ice { font-size: 14px; color: #8899aa; }
     #pairing-link, #pairing-code { font-size: 14px; word-break: break-all; }
     #pairing-warn { font-size: 14px; color: #d9534f; }
     #pairing-qr { width: 160px; height: 160px; }
@@ -256,6 +256,9 @@
       <p id="pairing-code" class="view"></p>
       <canvas id="pairing-qr" class="view"></canvas>
       <p id="pairing-waiting" class="view"></p>
+      <!-- The preloader line: js/netplay.js starts the page's ICE attempt when the
+           page opens, and js/ui.js counts its seconds left down here. -->
+      <p id="pairing-ice" class="view"></p>
       <p id="pairing-warn" class="view"></p>
       <!-- The guest page's read-only mirrors of the host page's preparation
            sub-menus: js/ui.js paints them from the mirror the host sends, so the

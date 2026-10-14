@@ -7,7 +7,7 @@ import {
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
   GAME_CONTROL_PLAYER_MARKERS,
   PAIRING_TITLE, PAIRING_HINTS, PAIRING_LINK_LABEL, PAIRING_CODE_LABEL, PAIRING_WAITING,
-  PAIRING_WARN_LOCAL, PAIRING_WARN_NONE,
+  PAIRING_WARN_LOCAL, PAIRING_WARN_NONE, PAIRING_ICE_WAIT,
   DURATION_SCREEN_ITEMS, ROLE_SCREEN_ITEMS, MIRROR_TITLE, MIRROR_HINTS,
   twoPlayerOffered,
 } from './constants.js';
@@ -51,6 +51,7 @@ let pairingLinkEl = null;
 let pairingCodeEl = null;
 let pairingQrEl = null;
 let pairingWaitingEl = null;
+let pairingIceEl = null;
 let pairingWarnEl = null;
 let mirrorDurationEl = null;
 let mirrorRoleEl = null;
@@ -95,6 +96,7 @@ export function initUi() {
   pairingCodeEl = lookup('pairing-code');
   pairingQrEl = lookup('pairing-qr');
   pairingWaitingEl = lookup('pairing-waiting');
+  pairingIceEl = lookup('pairing-ice');
   pairingWarnEl = lookup('pairing-warn');
   mirrorDurationEl = lookup('mirror-duration-items');
   mirrorRoleEl = lookup('mirror-role-items');
@@ -230,6 +232,12 @@ function paintPairing(pctx) {
   if (pairingCodeEl) pairingCodeEl.textContent = codeForm ? PAIRING_CODE_LABEL + ': ' + lobby.code : '';
   show(pairingWaitingEl, !lobby.paired || preparationShown());
   if (pairingWaitingEl) pairingWaitingEl.textContent = PAIRING_WAITING;
+  // The preloader: the page's ICE attempt runs from the moment the page opens,
+  // so the step counts the seconds left in its budget. A slow network shows the
+  // wait instead of a link that pairs nobody.
+  const gathering = lobby.ice === 'gathering';
+  show(pairingIceEl, gathering);
+  if (pairingIceEl) pairingIceEl.textContent = gathering ? PAIRING_ICE_WAIT + ' — ' + lobby.iceLeft + 's' : '';
   // The step says what the published offer carries: a blob with no remote ICE
   // address pairs nobody outside this browser instance, and a page with no
   // channel at all pairs nobody anywhere. The limit is on screen, not implied.

@@ -14,7 +14,7 @@ import {
   adopt, registerTransport, openLink, peerLink, duelOpen, guestPage, hostPage,
   publish, sendFrame, sendPreparationMirror, answerOffer, acceptAnswer, onPeerClose,
   peerClosed, peerLeft, inboundReport, reportPeerState, localSeat, openGuestStream,
-  guestStreamReport,
+  guestStreamReport, setIceFallback, startIceAttempt, carriesRemoteAddress,
   lobby,
 } from './netplay.js';
 import { gameOver } from './state.js';
@@ -149,6 +149,12 @@ function networkDuties() {
   // sit on the pairing step with nothing to open. What separates the two pages
   // is which one adopted a fragment: the guest answers an offer, it never
   // publishes one.
+  // The ICE attempt runs once per page open, before anything publishes: the
+  // address a peer connects to comes from the servers, and an offer published
+  // while the attempt is still waiting carries no address at all. The pairing
+  // step counts the wait down while it runs.
+  startIceAttempt();
+  if (lobby.ice === 'gathering') return;
   if (guestPage()) return;
   if (!lobby.offer) {
     publishOffer();
@@ -160,14 +166,6 @@ function networkDuties() {
   // pages already returned to their pairing step.
   if (duelOpen() && (game.screen.state === PLAYING || game.play.gameOverReason)) sendFrame();
   sendPreparationMirror();
-}
-
-// Whether an offer carries a remote ICE address: the only thing that can reach
-// another device. libwebrtc records the servers it applied and the addresses it
-// gathered as SDP comment lines, which `trimmedOffer` drops before the blob
-// travels, so the evidence is read here, on the raw offer.
-function remoteCandidate(sdp) {
-  return /iceServer|stun:|dtlsbootstrap/i.test(sdp);
 }
 
 // The host publishes its offer: the consumer constructs the peer connection,
@@ -182,25 +180,33 @@ async function publishOffer() {
   }
   const href = typeof location === 'object' ? location.href : '';
   try {
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    const blob = pc.localDescription.sdp;
-    if (remoteCandidate(blob)) {
+    // The page's own attempt already produced an offer and waited its servers
+    // out, so publishing that SDP is what carries the address they resolved. A
+    // page whose attempt rebuilt the channel holds no warmed offer and offers
+    // again over the rebuilt one.
+    let blob = lobby.warm;
+    if (blob === '') {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      blob = pc.localDescription.sdp;
+    }
+    if (carriesRemoteAddress(blob)) {
       lobby.ice = 'remote';
       publish(blob, 0, href);
       return;
     }
-    if (lobby.ice === 'local') {
+    if (lobby.rebuilt) {
       // Second pass over the rebuilt channel: an empty ICE list leaves libwebrtc
       // the `<uuid>.local` candidate, which reaches another connection inside
       // the same browser instance — the one-network form the step warns about.
       publish(blob, 0, href);
       return;
     }
-    // No STUN server answered the first offer, so no remote address exists to
-    // carry. Rebuild the channel with an empty ICE list; the offer it produces
-    // on the next tick carries the same-browser candidate instead.
+    // The attempt found no address, so no remote peer exists to carry: rebuild
+    // the channel with an empty ICE list and publish on the next tick.
     lobby.ice = 'local';
+    lobby.rebuilt = true;
+    lobby.warm = '';
     try {
       pc.close();
     } catch (e) {
@@ -247,7 +253,14 @@ export function init() {
   initInput(canvas);
   initUi();
   resetGame();
+  // The transport is the page's: the consumer constructs the peer connection and
+  // the negotiated datachannel, and hands the engine link an object with the two
+  // verbs it owns. The engine never names the channel class.
   registerTransport(() => createTransport(iceServersFromUrl(ICE_SERVERS)));
+  // The same supply, with no servers: the attempt rebuilds the channel with it
+  // when its own servers give the page no address, which leaves the
+  // same-browser candidate the pairing step warns about.
+  setIceFallback(() => createTransport([]));
   // A closed peer link ends the match with the peer leaving and returns both
   // pages to the pairing step. The records layer writes nothing for that end
   // reason, so an abandoned match never claims a leaderboard entry.
@@ -258,7 +271,10 @@ export function init() {
   // The host page applies the control actions its peer sends through the same
   // steering path its own keys take, naming the role that player drives.
   openGuestStream((intent) => handleIntent(intent, game.screen.p2Role));
-  openPairingLink();
+  // A page opened for a network game — one whose address carries the secret —
+  // starts its ICE attempt at open, before the pairing step is even reached, so
+  // the step can count the wait down from the first frame it paints.
+  if (openPairingLink()) startIceAttempt();
   if (guestPage()) answerOffer();
   syncViews(null);
   fitField(true);
