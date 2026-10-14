@@ -32,6 +32,8 @@ See `proposal.md` (Why) for the motivation and the file:line evidence that the c
 - No leaderboard across devices, no reconnect mid-match, no more than two peers.
 - No native mobile app, no Electron, no wasm build of any Rust code.
 - No voice, video, or screen share; `RTCDataChannel` only.
+- Same-browser two-tab play is not a goal: the user rejected it as pointless. The
+  reach states stay only to report a failed attempt honestly, never as a play mode.
 
 ## Decisions
 
@@ -126,8 +128,8 @@ encodes it into the pairing link, so the guest receives it without typing. The
 public list stays as the other supply, refreshed and pruned per open.
 
 **Trade-off:** some ICE supply must exist for two devices to pair, and the page
-cannot pair them with none. Accepted and stated rather than hidden: with no
-supply the pairing step names that only this browser instance is reachable.
+cannot pair them with none. Accepted and stated rather than hidden: a supply
+that answers nothing is reported as no channel, never as a silent pairing.
 
 ### D9. The host sends every preparation selection; the guest paints read-only mirrors
 

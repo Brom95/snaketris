@@ -185,11 +185,11 @@ The system SHALL end a network match when its peer link closes, SHALL record the
 ### Requirement: A pairing completes between two devices on one network
 
 The system SHALL pair two pages on two devices that share one network — one local
-network, or one virtual network such as a tunnel service — using a candidate
-supply both devices can reach, and SHALL carry that supply in the pairing secret
-so the guest receives it without typing it. The system SHALL NOT require the
-player to run a supply of its own, and SHALL NOT require a public candidate list
-when the network offers its own endpoint.
+network, or one virtual network such as a tunnel service — and SHALL treat the
+host page as reachable from the guest page on that network. The system SHALL use
+a candidate supply that belongs to that network, SHALL carry it in the pairing
+secret so the guest receives it without typing it, and SHALL NOT require the
+player to run a supply of its own or a public candidate list.
 
 #### Scenario: The host names its network's supply
 
@@ -205,11 +205,6 @@ when the network offers its own endpoint.
 
 - **WHEN** a pairing completes with a supply that belongs to the players' network
 - **THEN** no request went to a public candidate list, and no server owned by the project was contacted at any point
-
-#### Scenario: No supply present pairs only this browser
-
-- **WHEN** a network match is attempted with no candidate supply at all
-- **THEN** the pairing step names that only this browser instance can be reached, and no match is scheduled between devices
 
 #### Scenario: A supply that answers nothing is reported
 
