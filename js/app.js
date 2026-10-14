@@ -130,7 +130,13 @@ export function update() {
 function networkDuties() {
   if (!game.screen.networkMode) return;
   openLink();
-  if (game.screen.seat !== 1) return;
+  // The seat cannot gate the publish: the seat is a consequence of publishing
+  // (`publish` names the host seat 1, `adopt` names the guest seat 2), so a gate
+  // on it would leave the first offer unpublished forever and a bare page would
+  // sit on the pairing step with nothing to open. What separates the two pages
+  // is which one adopted a fragment: the guest answers an offer, it never
+  // publishes one.
+  if (guestPage()) return;
   if (!lobby.offer) {
     publishOffer();
     return;
