@@ -14,7 +14,7 @@ import {
   adopt, registerTransport, openLink, peerLink, duelOpen, guestPage, hostPage,
   publish, sendFrame, sendPreparationMirror, answerOffer, acceptAnswer, onPeerClose,
   peerClosed, peerLeft, inboundReport, reportPeerState, localSeat, openGuestStream,
-  guestStreamReport, setIceFallback, startIceAttempt, carriesRemoteAddress,
+  guestStreamReport, setIceFallback, setIceOpen, startIceAttempt, carriesRemoteAddress,
   lobby,
 } from './netplay.js';
 import { gameOver } from './state.js';
@@ -23,11 +23,12 @@ import { initInput, fitCanvas, pollController, handleIntent } from './input.js';
 import { initRender, render } from './render.js';
 import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
-// The public ICE list the consumer supplies to every peer connection. A
-// two-device match needs addresses from a public list: an empty list leaves
-// only the `<uuid>.local` candidate, which reaches another connection inside
-// the same browser instance and never another device.
-const ICE_SERVERS = [
+// The shipped ICE floor every open starts with. An open that reaches the public
+// list adds entries to it; an open that cannot reaches only this. An empty
+// supply leaves only the `<uuid>.local` candidate, which reaches another
+// connection inside the same browser instance and never another device. An open
+// never writes into this list — the supply it chose is a local.
+export const ICE_SERVERS = [
   { urls: ['stun:turn.cloudflare.com'] },
   { urls: ['stun:l369369369.cdn.cloudflare.net'] },
   { urls: ['stun:webrtcstun.eporoi.com'] },
@@ -38,15 +39,88 @@ const ICE_SERVERS = [
 // Use this URL to fetch a fresh list of online STUN servers whenever needed.
 const STUN_SERVERS_URL = 'https://raw.githubusercontent.com/pradt2/always-online-stun/master/valid_hosts.txt';
 
+// How long one open may wait for that list before it gives up: the pairing step
+// already counts a longer wait, so a slow or unreachable source costs the open
+// this bound and falls back to the shipped supply rather than stretching it.
+export const STUN_FETCH_TIMEOUT_MS = 1200;
+
+// How many entries the public list may contribute to one open: an offer carries
+// a candidate block per server it can reach, and that blob travels in the
+// pairing secret, so the cap keeps the link inside the fragment cap and the
+// short code form reachable.
+export const ICE_SUPPLY_LIMIT = 4;
+
+// The supply this open resolved, chosen before its channel is built. The
+// shipped list starts the open; an open that asked the public list replaces it
+// for the channel it builds, and nothing ever writes into ICE_SERVERS.
+let iceSupply = ICE_SERVERS;
+
 async function fetchStunServers() {
   try {
-    const response = await fetch(STUN_SERVERS_URL);
+    // The read gets a bound of its own: an open whose source is slow or
+    // unreachable must not stretch the wait the pairing step already counts, so
+    // the read gives up and the open falls back to the shipped supply.
+    const response = await fetch(STUN_SERVERS_URL, { signal: AbortSignal.timeout(STUN_FETCH_TIMEOUT_MS) });
     if (!response.ok) return [];
     const text = await response.text();
-    return text.split('\n').filter((line) => line.trim());
+    // The list names hosts, not URLs: most lines are a bare `host:port` the
+    // source says answers now, and a peer connection needs a scheme, so the
+    // entries this page can hand are those hosts under the stun scheme. A line
+    // that already carries a scheme is taken as it is; one that carries neither
+    // form is dropped rather than handed on as something the connection rejects.
+    const entries = [];
+    for (const line of text.split('\n')) {
+      const host = line.trim();
+      const entry = /^[A-Za-z0-9.-]+:\d+$/.test(host) ? `stun:${host}` : host;
+      if (isIceUrl(entry)) entries.push(entry);
+    }
+    return entries;
   } catch (e) {
     return [];
   }
+}
+
+// A candidate supply entry a peer connection can take: the stun and turn schemes
+// only. A bare address — a host on the subnet, with or without a port — names no
+// ICE endpoint of its own, so it is never offered as a candidate.
+function isIceUrl(value) {
+  return /^stuns?:[A-Za-z0-9.-]+(:\d+)?$/.test(value) || /^turn:[A-Za-z0-9.-]+(:\d+)?$/.test(value);
+}
+
+// The candidate supply for one open, chosen per open rather than written back
+// into the page's constant. A link that names its own supply — the host endpoint
+// on the subnet — is that supply, and contacts no public list at all. Otherwise
+// the open reads the public list, which names the hosts online now, and adds a
+// sample of it to the shipped floor; entries the list does not name are never
+// offered, and a list this open cannot read leaves the floor alone. An attempt
+// reports what its offer carries, so a supply that answers nothing is a page
+// with no channel, never a silent pairing.
+export async function iceSupplyForOpen() {
+  const named = iceServersFromUrl([]);
+  if (named.length > 0) return named;
+  const fresh = await fetchStunServers();
+  if (fresh.length === 0) return ICE_SERVERS.slice();
+  return ICE_SERVERS.concat(pickIceServers(fresh, ICE_SUPPLY_LIMIT));
+}
+
+// A bounded sample of the public list for one open: the list names hundreds of
+// hosts, and an offer carries a candidate block per server it can reach, so an
+// open takes a few at random and a later open takes different ones.
+function pickIceServers(urls, limit) {
+  const picked = urls.slice(0, Math.min(limit, urls.length));
+  for (let i = picked.length; i < urls.length; i += 1) {
+    const replace = Math.floor(Math.random() * (i + 1));
+    if (replace < picked.length) picked[replace] = urls[i];
+  }
+  return picked.map((url) => ({ urls: [url] }));
+}
+
+// The supply this open resolved, recorded so the channel this open builds reads
+// it. The transport factory is registered once at page init, so choosing a
+// supply never rebuilds the channel and never replaces a transport another
+// page installed: the supply is data, and the channel is built after this runs.
+function chooseIceSupply(supply) {
+  iceSupply = supply;
 }
 
 // The transport supply: the consumer constructs the peer connection and the
@@ -56,15 +130,16 @@ async function fetchStunServers() {
 // A page with no channel object at all — a headless suite, which is exactly the
 // run the contract says the engine must survive — supplies no transport, and the
 // link reports no peer rather than failing.
-// The ICE list a page gathers with. A page can name its own servers from its own
+// The ICE list a page gathers with. A page can name its own supply from its own
 // address — `?ice=stun:...`, repeated — so two devices on one network that run
-// their own ICE server can point both pages at it. A browser page has no other
-// way to obtain an address to connect to: STUN is what supplies addresses, and
+// one ICE server can point both pages at it. A value that names no scheme is an
+// address, not a supply, and stays out of the list: a browser page has no other
+// way to obtain an address to connect to, so STUN is what supplies addresses, and
 // without one no peer, on any network, can be reached.
 function iceServersFromUrl(fallback) {
   const href = typeof location === 'object' ? location.href : '';
   if (href === '') return fallback;
-  const urls = new URL(href).searchParams.getAll('ice');
+  const urls = new URL(href).searchParams.getAll('ice').filter(isIceUrl);
   if (urls.length === 0) return fallback;
   return urls.map((url) => ({ urls: [url] }));
 }
@@ -157,6 +232,17 @@ export function update() {
 // the channel, so it has nothing to publish.
 function networkDuties() {
   if (!game.screen.networkMode) return;
+  // The ICE attempt runs once per page open, before anything publishes: the
+  // address a peer connects to comes from the servers, and an offer published
+  // while the attempt is still waiting carries no address at all. The pairing
+  // step counts the wait down while it runs.
+  startIceAttempt();
+  // The wait only precedes pairing: while it runs the page publishes nothing and
+  // builds no channel, so the offer it hands over already carries the supply
+  // this open chose. A page whose peer is already paired keeps pumping — the
+  // link it holds was built after that open resolved, so a later wait costs the
+  // match nothing.
+  if (lobby.ice === 'gathering' && !duelOpen()) return;
   openLink();
   // The seat cannot gate the publish: the seat is a consequence of publishing
   // (`publish` names the host seat 1, `adopt` names the guest seat 2), so a gate
@@ -164,12 +250,6 @@ function networkDuties() {
   // sit on the pairing step with nothing to open. What separates the two pages
   // is which one adopted a fragment: the guest answers an offer, it never
   // publishes one.
-  // The ICE attempt runs once per page open, before anything publishes: the
-  // address a peer connects to comes from the servers, and an offer published
-  // while the attempt is still waiting carries no address at all. The pairing
-  // step counts the wait down while it runs.
-  startIceAttempt();
-  if (lobby.ice === 'gathering') return;
   if (guestPage()) return;
   if (!lobby.offer) {
     publishOffer();
@@ -262,54 +342,27 @@ export function openPairingLink() {
 // Full setup: create/size the canvas, register input + render, seed state,
 // start the loop. The engine canvas owner sizes the buffer when the element
 // is attached, so the entry point names no board numbers.
-export async function init() {
+export function init() {
   const canvas = document.getElementById('game');
   initRender(canvas);
   initInput(canvas);
   initUi();
   resetGame();
-  // Fetch a fresh list of online STUN servers from the project's URL.
-  const servers = await fetchStunServers();
-  ICE_SERVERS.length = 0;
-  servers.forEach((url) => {
-    ICE_SERVERS.push({ urls: [url] });
-  });
-
-// Validate which servers from the list actually work.
-// Returns the list of URLs that successfully answered an ICE offer.
-async function validateStunServers() {
-  try {
-    const response = await fetch(STUN_SERVERS_URL);
-    if (!response.ok) return [];
-    const text = await response.text();
-    const servers = text.split('\n').filter((line) => line.trim());
-    const working = [];
-    for (const url of servers) {
-      try {
-        const serverUrl = new URL(url);
-        const pc = new RTCPeerConnection({ iceServers: [{ urls: [serverUrl.toString()] }] });
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        // Если сервер ответил — он работает
-        working.push(serverUrl.toString());
-        pc.close();
-      } catch (e) {
-        // Сервер не работает
-      }
-    }
-    return working;
-  } catch (e) {
-    return [];
-  }
-}
   // The transport is the page's: the consumer constructs the peer connection and
   // the negotiated datachannel, and hands the engine link an object with the two
-  // verbs it owns. The engine never names the channel class.
-  registerTransport(() => createTransport(iceServersFromUrl(ICE_SERVERS)));
+  // verbs it owns. The engine never names the channel class. The supply is read
+  // when the channel is built, which happens after the open below has resolved
+  // it, so one registration covers every open.
+  registerTransport(() => createTransport(iceServersFromUrl(iceSupply)));
   // The same supply, with no servers: the attempt rebuilds the channel with it
   // when its own servers give the page no address, which leaves the
   // same-browser candidate the pairing step warns about.
   setIceFallback(() => createTransport([]));
+  // The page owns the candidate supply, so it installs the step one open takes
+  // before its link exists: resolve the entries that answer, and record them so
+  // the channel this open builds reads them. The lobby never names the list, so
+  // this stays the page's and the lobby only asks.
+  setIceOpen(async () => chooseIceSupply(await iceSupplyForOpen()));
   // A closed peer link ends the match with the peer leaving and returns both
   // pages to the pairing step. The records layer writes nothing for that end
   // reason, so an abandoned match never claims a leaderboard entry.
@@ -322,7 +375,10 @@ async function validateStunServers() {
   openGuestStream((intent) => handleIntent(intent, game.screen.p2Role));
   // A page opened for a network game — one whose address carries the secret —
   // starts its ICE attempt at open, before the pairing step is even reached, so
-  // the step can count the wait down from the first frame it paints.
+  // the step can count the wait down from the first frame it paints. The open is
+  // not awaited: init must reach its first paint while the attempt still runs,
+  // or the countdown it shows would never be on screen. The link is built later
+  // than this open, so it already reads the supply this open resolved.
   if (openPairingLink()) startIceAttempt();
   if (guestPage()) answerOffer();
   syncViews(null);

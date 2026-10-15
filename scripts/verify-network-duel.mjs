@@ -132,6 +132,12 @@ const barePairing = await host.evaluate(async () => ({
 check(!barePairing.field && !barePairing.playing,
   'the pairing step shows no play field and starts no match before a peer is paired');
 
+// A page offers only once its own attempt resolved: the pairing step waits
+// before it publishes, so an answer can never arrive at a page that has no
+// channel yet. The harness stands in for that wait, or an answer can outrace the
+// host page's channel and the pair never opens.
+await waitFor(host, async () => (await import('/js/netplay.js')).lobby.ice !== 'gathering', null, 20000);
+
 // The offer this page publishes is a real offer, so the link the pairing paints
 // carries the bytes a real pairing would carry.
 const published = await host.evaluate(async (url) => {

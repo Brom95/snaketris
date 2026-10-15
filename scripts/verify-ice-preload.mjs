@@ -31,6 +31,7 @@ const context = await browser.newContext();
 async function attempt(page) {
   return await page.evaluate(async () => {
     const netplay = await import('/js/netplay.js');
+    const offer = netplay.lobby.warm || netplay.lobby.offer;
     return {
       ice: netplay.lobby.ice,
       iceLeft: netplay.lobby.iceLeft,
@@ -39,7 +40,17 @@ async function attempt(page) {
       rebuilt: netplay.lobby.rebuilt,
       budget: netplay.ICE_GATHER_TIMEOUT_SECONDS,
       secret: netplay.lobby.secret.length,
+      candidates: new Set(offer.match(/a=ice-candidate.*/g) || []).size,
     };
+  });
+}
+
+// What one open may put into an offer: the shipped floor it starts from, and the
+// cap on the entries it adds from the public list.
+async function supply(page) {
+  return await page.evaluate(async () => {
+    const app = await import('/js/app.js');
+    return { floor: app.ICE_SERVERS.length, limit: app.ICE_SUPPLY_LIMIT };
   });
 }
 
@@ -126,15 +137,33 @@ const again = await attempt(guest);
 check(again.ice === done.ice && again.iceLeft === done.iceLeft, 'asking again starts no second attempt (the state and the countdown stay put)');
 
 // 5. what the attempt found decides what the step says.
+const warn = await guest.evaluate(() => document.getElementById('pairing-warn').textContent);
 if (done.ice === 'remote') {
   check(done.warm > 0, 'the attempt kept the offer it produced, so the step publishes it without offering twice');
   check(await shown(guest, '#pairing-warn', false), 'a resolved ICE address leaves the step without a warning');
 } else {
   check(done.rebuilt, 'a page whose servers gave it no address rebuilds its channel with no ICE servers');
   check(await shown(guest, '#pairing-warn', true), 'the step says what the offer reaches');
-  const warn = await guest.evaluate(() => document.getElementById('pairing-warn').textContent);
-  check(warn.length > 0 && /browser|tab|network/i.test(warn), `the warning names the limit (${warn})`);
+  check(warn.includes('?ice='), `a no-address offer names the route that carries a supply (${warn})`);
+  check(!warn.includes('unavailable'), 'a page on a network is not told network play is unavailable');
 }
+
+// 6. the copy decides the report even when this run resolves an address: the
+//    line for an offer that carries no address names the route that carries a
+//    supply, and the dead-end line belongs only to a browser that cannot open a
+//    channel at all.
+const copy = await guest.evaluate(async () => {
+  const words = await import('/js/copy.js');
+  return { local: words.PAIRING_WARN_LOCAL, none: words.PAIRING_WARN_NONE };
+});
+check(copy.local.includes('?ice='), `the no-address line names the candidate-supply route (${copy.local})`);
+check(!copy.none.includes('?ice='), `the dead-end line stays the browser that cannot open a channel (${copy.none})`);
+
+// 7. an offer carries a candidate block per address the open could reach, and
+//    an open adds at most its cap of fetched entries to the shipped floor.
+const room = await supply(guest);
+check(done.candidates <= room.floor + room.limit, `the offer carries ${done.candidates} candidate addresses, within the ${room.floor} shipped plus up to ${room.limit} fetched the open may add`);
+check(done.ice !== 'remote' || done.candidates > 0, 'an offer that reached an address carries the candidates it reached');
 
 await guest.close();
 

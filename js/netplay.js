@@ -11,7 +11,6 @@ import { createCommandStream } from '../engine/js/stream.js';
 import { applyFrame, encodeFrame, encodeIntent, decodeIntent } from './netframe.js';
 import { game } from './state.js';
 import { lockControlModel, selectedIndex, gotoScreen } from './screens.js';
-import { validateStunServers } from './app.js';
 
 // The lobby survives every reset. `form` says which pairing form the step paints:
 // the share link when the offer blob fits the fragment cap, the code when it does
@@ -160,6 +159,14 @@ export function setIceFallback(factory) {
   iceFallback = factory;
 }
 
+// The page installs the step one open takes before its offer exists: it chooses
+// the candidate supply and rebuilds the channel with it. The lobby never names
+// an ICE list, so the supply stays the page's and this module only asks.
+let iceOpen = async () => {};
+export function setIceOpen(step) {
+  iceOpen = step;
+}
+
 export function openLink() {
   if (!linkInstance && transportFactory) linkInstance = bindLink(createLink(transportFactory()));
   return linkInstance;
@@ -241,10 +248,6 @@ export function openGuestStream(apply) {
 }
 
 export function guestStreamReport() {
-  // Если серверов не найдено — для локальной сети STUN вообще не нужен.
-  if (ICE_SERVERS.length === 0) {
-    return 'Local network play is active. No STUN servers needed for LAN play.';
-  }
   return guestStream;
 }
 
@@ -416,17 +419,22 @@ async function iceAttempt() {
 // the full budget so the step shows the wait before the first tick reports.
 export async function startIceAttempt() {
   if (iceRunning === null) {
-    // Валидация серверов каждый раз при открытии раздела сетевой игры
-    const servers = await validateStunServers();
-    ICE_SERVERS.length = 0;
-    servers.forEach((url) => {
-      ICE_SERVERS.push({ urls: [url] });
-    });
     lobby.ice = 'gathering';
     lobby.iceLeft = ICE_GATHER_TIMEOUT_SECONDS;
-    iceRunning = iceAttempt();
+    // The whole open is the attempt: choose the supply, then run the offer. The
+    // handle is set before the first await, so a publish or an answer that asks
+    // while the open is still resolving waits for this same open instead of
+    // racing past it and building the channel over the unresolved supply.
+    iceRunning = openIceAttempt();
   }
   return iceRunning;
+}
+
+// One page open's attempt: the supply the page resolved first, then the offer
+// that carries the addresses that supply gave this device.
+async function openIceAttempt() {
+  await iceOpen();
+  return iceAttempt();
 }
 
 // Wait until the page's attempt has finished. A publish or an answer that ran

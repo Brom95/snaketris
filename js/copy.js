@@ -72,7 +72,7 @@ export const PAIRING_ICE_WAIT = 'Connecting to STUN servers';
 // What the pairing step says when the offer carries no remote ICE address. The
 // fallback blob reaches only another tab in the same browser instance, so the
 // step names the limit it leaves instead of painting a link that pairs nobody.
-export const PAIRING_WARN_LOCAL = 'No STUN server reached — pairs another tab in this browser, or add ?ice=stun:your-server to both pages';
+export const PAIRING_WARN_LOCAL = 'No candidate supply reached this page — on one network, name the same supply in both addresses with ?ice=stun:your-server; otherwise this pairing has no channel';
 export const PAIRING_WARN_NONE = 'This browser cannot open a peer connection — network play is unavailable';
 
 // The guest page's read-only copies of the host's preparation sub-menus. The

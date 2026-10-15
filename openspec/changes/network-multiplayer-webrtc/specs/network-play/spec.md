@@ -214,19 +214,26 @@ player to run a supply of its own or a public candidate list.
 ### Requirement: The public candidate list is refreshed and pruned per open
 
 The system SHALL read the public candidate list from its configured source each
-time the network section is opened, and SHALL keep only the entries that answer a
-candidate request within the attempt's wait. The system SHALL NOT offer an entry
-that did not answer.
+time the network section is opened, and SHALL keep only the entries it can name
+as a candidate: a line that names no accepted scheme is dropped, and a bare
+`host:port` line is given one. The system SHALL offer the shipped floor on every
+open, and SHALL add at most its cap of entries read from the public list, so an
+open never hands an unbounded supply.
 
 #### Scenario: The list is read again on every open
 
 - **WHEN** the network section is opened a second time in the same page session
 - **THEN** the list is read again from the configured source, not reused from the earlier open
 
-#### Scenario: A dead entry is dropped
+#### Scenario: An entry the page cannot name is dropped
 
-- **WHEN** an entry of the public list names no candidate within the attempt's wait
-- **THEN** that entry is not offered to the attempt
+- **WHEN** a line of the public list names no accepted candidate scheme
+- **THEN** that line is not offered to the attempt, and a bare `host:port` line is offered with a scheme
+
+#### Scenario: The supply an open hands stays bounded
+
+- **WHEN** the public list names more entries than the open's cap
+- **THEN** the open hands the shipped floor plus at most its cap of the listed entries
 
 #### Scenario: Every entry dead leaves the one-network address selectable
 

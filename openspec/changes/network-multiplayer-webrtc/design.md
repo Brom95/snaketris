@@ -140,8 +140,11 @@ address cannot open a channel.
 
 Chosen: the host names a **supply** reachable on its network — an ICE endpoint a
 tunnel service hands out for that network, or a public list entry — and the page
-encodes it into the pairing link, so the guest receives it without typing. The
-public list stays as the other supply, refreshed and pruned per open.
+encodes it into the pairing link, so the guest receives it without typing. A link
+that names its own supply IS that supply: the shipped floor is not added to it.
+Otherwise every open starts from the shipped floor and adds at most its cap of
+public-list entries, read fresh per open and pruned to the entries the page can
+name as a candidate.
 
 **Trade-off:** some ICE supply must exist for two devices to pair, and the page
 cannot pair them with none. Accepted and stated rather than hidden: a supply
