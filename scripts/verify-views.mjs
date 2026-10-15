@@ -58,7 +58,8 @@ const helpLines = [
 ];
 const helpLinesPresent = helpLines.every((line) => page.includes('<li>' + line + '</li>'));
 const networkRule = page.includes('<li>Network: each device plays its own side, and no bot fills either.</li>');
-const oneNetworkRule = page.includes('<li>One network: an open reads the public candidate list; both pages can also name the same supply with ?ice=stun:... in the address, and without one the pairing has no channel.</li>');
+const globalFlowRule = page.includes("<li>Network anywhere: an open reads the public candidate list; both pages can also name the same supply with ?ice=stun:... in the address, and without one the pairing has no channel.</li>");
+const localFlowRule = page.includes("<li>Network on one network: each page types its own device's address, and each page offers the other that address — no list is read.</li>");
 
 // ---------- Static js/ assertions (the canvas views and their constants are gone) ----------
 
@@ -112,7 +113,8 @@ check(rulesSection, 'the rules block is <section id="help-rules"> with an <h3>Ru
 check(snakeTierLine, 'the snake tier line states the 8-segment cap and the blue, purple, gold recolour');
 check(helpLinesPresent, 'all ' + helpLines.length + ' control lines are selectable page text');
 check(networkRule, 'the help copy names the network way and the pairing action the second player performs');
-check(oneNetworkRule, 'the help copy names the one-network recipe: the public list an open reads, the supply a page can name from its address, and no channel without one');
+check(globalFlowRule, 'the help copy names the open flow: the public list an open reads, the supply a page can name from its address, and no channel without one');
+check(localFlowRule, 'the help copy names the same-network flow: each page types its own address and offers that address, with no list read');
 check(helpReturn, 'the return control is a page element');
 
 console.log('=== Canvas view layer retired ===');

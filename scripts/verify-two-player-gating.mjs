@@ -54,8 +54,8 @@ const wideWay = await page.evaluate(() => {
 });
 check((await page.evaluate(() => window.__game.screen.state)) === SELECT_WAY,
   'confirming the entry on a wide viewport opens the way sub-menu');
-check(wideWay.labels.join('|') === 'Same computer|Network|Back',
-  'the way sub-menu lists "Same computer" and "Network" beside its Back control');
+check(wideWay.labels.join('|') === 'Same computer|Network (anywhere)|Network (same network)|Back',
+  'the way sub-menu lists the shared-page way, both network flows and its Back control');
 check(wideWay.highlighted.length === 1, 'exactly one way is highlighted as the current selection');
 await page.close();
 

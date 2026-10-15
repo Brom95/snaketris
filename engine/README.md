@@ -75,16 +75,22 @@ no window and no storage present.
   `link.pair(peer)` runs. The engine supplies no transport of its own, so a
   network way that never pairs stays in the pairing step and starts nothing.
 
-**The one-network recipe.** Two pages on one network pair in two hops and need
-one precondition. The host hands its offer out of band — the share link or the
-QR code — and the guest answers over the channel that offer just opened. The
-precondition is a candidate supply both pages can reach: an address the page is
+**The two network flows.** A page belongs to one flow for its whole life, and
+the flow travels in the pairing link, so the guest inherits the host's choice
+instead of typing it. The **global flow** reads the public candidate list once
+per open and adds a sample of it to the supply it ships; an address the page is
 told to name (`?ice=stun:...`) is carried in the pairing secret, so the guest
-receives it without typing, and a page that names no supply reads the public
-list once per open and adds a sample of it to the supply it ships. A raw
-address on the address bar names no candidate: a peer connection needs a scheme
-it accepts, and an address alone has none. When no supply answers, the page
-reports no channel rather than pairing silently.
+receives it without typing. The **local flow** reads no list at all: each page
+states its own device's dotted-quad address, which its player types, beside the
+port the page read from its own gathered description, and each page offers the
+other that address. The port is never typed, and no page shows a field for the
+peer's address — the peer's address and port travel over the channel the pairing
+already uses, beside the answer that page produced.
+
+A raw address on the address bar still names no candidate: a peer connection
+needs a scheme it accepts, and an address alone has none. A local-flow page
+publishes nothing while its player has typed no address. When no supply answers,
+the page reports no channel rather than pairing silently.
 
 ## Invariants that must not be broken
 

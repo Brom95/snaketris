@@ -60,9 +60,11 @@ test('the way screen splits the two-player entry and gates the shared-page way',
   assert.equal(way.items[0].requiresWide, true);
   assert.equal(way.items[0].opens, C.SELECT_DURATION);
   assert.equal(way.items[1].opens, C.PAIRING);
+  assert.equal(way.items[2].opens, C.PAIRING);
   assert.equal(way.items[0].action, screens.TRANSITIONS['pick-way']);
   assert.equal(way.items[1].action, screens.TRANSITIONS['pick-way']);
-  assert.equal(way.items[2].action, screens.TRANSITIONS['back-menu']);
+  assert.equal(way.items[2].action, screens.TRANSITIONS['pick-way']);
+  assert.equal(way.items[3].action, screens.TRANSITIONS['back-menu']);
   assert.equal(way.controls.length, 0);
 });
 

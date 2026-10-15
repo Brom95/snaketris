@@ -32,10 +32,15 @@ schema: spec-driven
 #         - Summarize the archive outcome before finishing
 
 # Project requirements
-# This project uses OpenSpec for network play. The project supports local network play
-# without requiring a public STUN server. If a STUN server is needed, the user can supply
-# one via the transport configuration in js/app.js (ICE_SERVERS). The change
-# network-play implements local-network-only play without a server.
+# This project uses OpenSpec for network play. Network play runs in one of two
+# flows a page belongs to for its whole life. The global flow needs a candidate
+# supply both pages can reach: either the public list read once per open, or an
+# address the page is told to name via ?ice=stun:... carried in the pairing link.
+# The local flow needs no list and no server, but it does need a precondition:
+# each peer types its own device's dotted-quad address and offers the other that
+# address, so local-network play works only where the two devices' sockets can
+# reach each other. It is not true that local-network play works without any
+# candidate supply.
 
 # STUN server list
 # The project uses the hardcoded list of online STUN servers from:

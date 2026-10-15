@@ -34,6 +34,13 @@ export const lobby = {
   iceLeft: 0, // whole seconds of the ICE attempt still left, so the pairing step can count it down
   rebuilt: false, // this page already rebuilt its channel with an empty ICE list
   warm: '', // the offer SDP the page's own attempt produced, which the pairing step publishes instead of offering twice
+  flow: '', // the flow this page belongs to for its whole life: 'global' the public candidate supply, 'local' the same-network one; '' until the way pick or the opened link says
+  address: '', // the dotted-quad this page's own player typed as their device's address
+  addressBad: false, // this page was handed a value that names no network address
+  port: 0, // the DTLS port this page read from its own local description
+  peerAddress: '', // the address the other page named, read from the link it opened
+  peerPort: 0, // the port the other page named beside that address
+  copy: '', // the last copy attempt: '' none, 'ok' the clipboard took it, 'denied' the browser refused
 };
 
 // Drop every SDP comment line. libwebrtc puts a machine-dependent payload behind
@@ -62,23 +69,144 @@ export function codeOf(blob, length = PAIRING_CODE_LENGTH) {
   return out;
 }
 
+// The way screen records which network flow the player picked. A page belongs to
+// one flow for its whole life, so the choice is recorded once and never re-picked.
+export function pickFlow(flow) {
+  if (lobby.side === 'guest' || lobby.flow !== '') return;
+  lobby.flow = flow === 'local' ? 'local' : 'global';
+}
+
+// A network address is four groups of numbers with dots between. A value that
+// names a scheme (`http://…`) or a hostname is not an address, and the same-
+// network flow says so rather than guessing at one.
+const ADDRESS_SHAPE = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+
+// The address this page's own player typed. An empty value is no address yet,
+// and the step keeps waiting; a value that is not an address is reported.
+export function noteAddress(text) {
+  const typed = text.trim();
+  if (typed === '') {
+    lobby.address = '';
+    lobby.addressBad = false;
+    return;
+  }
+  if (!ADDRESS_SHAPE.test(typed)) {
+    lobby.addressBad = true;
+    return;
+  }
+  lobby.addressBad = false;
+  lobby.address = typed;
+}
+
+// The port this page read from its own local description: the `a=candidate:`
+// line libwebrtc allocates for the page's own DTLS socket. The page never types
+// it, and no other page needs it typed either.
+export function noteOwnPort(sdp) {
+  for (const line of sdp.split('\r\n')) {
+    if (!line.startsWith('a=candidate:')) continue;
+    const fields = line.split(' ');
+    // The candidate line is `a=candidate:<id> <proto> <family> <priority>
+    // <address> <port> …`: the port is the sixth field, and the address in
+    // front of it is libwebrtc's own unresolvable name, not a value to show.
+    if (fields.length > 5 && /^\d+$/.test(fields[5])) {
+      lobby.port = Number(fields[5]);
+      return;
+    }
+  }
+}
+
+// The address and port the other page named, read back from the link or the
+// return link this page was given.
+// The channel carries "address:port" beside the answer a page produced, so
+// neither page is asked to type what the other one painted. Reading it here is
+// the whole return trip: the candidate is offered as soon as both halves are
+// known, and only once this page holds a remote description to bind it to.
+export function learnPeerAnnouncement(text) {
+  const parts = text.split(':');
+  if (parts.length < 2 || !ADDRESS_SHAPE.test(parts[0])) return false;
+  lobby.peerAddress = parts[0];
+  lobby.peerPort = Number(parts[1]);
+  const link = openLink();
+  const pc = link.transport && link.transport.connection;
+  if (!pc) return false;
+  if (pc.localDescription) noteOwnPort(pc.localDescription.sdp);
+  return craftPeerCandidate(pc);
+}
+
+export function notePeerAddress(url) {
+  const match = /[?&]a=([0-9.]+)/.exec(url);
+  if (match !== null && ADDRESS_SHAPE.test(match[1])) lobby.peerAddress = match[1];
+  const port = /[?&]p=(\d+)/.exec(url);
+  if (port !== null) lobby.peerPort = Number(port[1]);
+}
+
+// The line this page shows its own player: the typed address with the port the
+// page read beside it, so the other player can carry one value in one click.
+function addressLine() {
+  if (lobby.address === '') return '';
+  return lobby.port === 0 ? lobby.address : lobby.address + ':' + lobby.port;
+}
+
+// A click on a copy affordance puts the named value on the clipboard. A browser
+// that refuses (an insecure page, or no gesture yet) says so and the value stays
+// selectable by hand.
+export async function copyValue(field) {
+  const value = field === 'link' ? lobby.link
+    : field === 'code' ? lobby.code
+    : field === 'address' ? addressLine() : '';
+  if (value === '' || typeof navigator !== 'object' || !navigator.clipboard) {
+    lobby.copy = value === '' ? '' : 'denied';
+    return false;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    lobby.copy = 'ok';
+    return true;
+  } catch (e) {
+    lobby.copy = 'denied';
+    return false;
+  }
+}
+// The marker a pairing link carries: the second page inherits the flow choice
+// from the link it opens, so it never types the flow itself.
+export function noteFlowOfLink(url) {
+  const flow = /[?&]flow=([a-z]+)/.exec(url);
+  if (flow === null || flow[1] !== 'local') return;
+  lobby.flow = 'local';
+}
+
 // The host publishes its offer before the peer link exists, so the share link can
 // carry the secret the second page needs to answer. The page url is a supply: this
 // module never reads `location`.
 export function publish(offerSdp, seed, pageUrl) {
+  // A same-network page publishes nothing while it waits for its own address:
+  // the link it hands over is the only way that address reaches the other page,
+  // so a value typed after publishing could never travel.
+  if (lobby.flow === 'local' && lobby.address === '') return;
   const blob = trimmedOffer(offerSdp);
   lobby.offer = blob;
   lobby.seed = seed === 0 ? seedOf(blob) : seed;
   lobby.code = codeOf(blob, PAIRING_CODE_LENGTH);
   if (lobby.side !== 'guest') lobby.side = 'host';
   game.screen.seat = 1;
+  // The flow marker rides on the link, not in the secret: the whole fragment IS
+  // the secret, and a line tagged onto the blob would reach setRemoteDescription.
+  // The same-network flow adds the two values the other page cannot read on its
+  // own: this page's address and the port it read beside it.
+  const local = lobby.flow === 'local'
+    ? (lobby.address === '' ? '' : '&a=' + lobby.address)
+      + (lobby.port === 0 ? '' : '&p=' + lobby.port)
+    : '';
+  const marked = lobby.flow === 'local' && !pageUrl.includes('flow=')
+    ? pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'flow=local' + local
+    : pageUrl;
   if (blob.length <= PAIRING_FRAGMENT_CAP) {
     lobby.form = 'link';
     lobby.secret = blob;
     // The fragment must be escapable: an SDP carries CRLF, spaces and `=`, so
     // the bytes that travel in a link are the escaped form and `adopt` decodes
     // them back. The secret itself stays unescaped.
-    lobby.link = pageUrl.split('#')[0] + '#' + encodeURIComponent(blob);
+    lobby.link = marked.split('#')[0] + '#' + encodeURIComponent(blob);
   } else {
     lobby.form = 'code';
     lobby.secret = lobby.code;
@@ -190,7 +318,7 @@ export function peerMessage(handler) {
   return transport.onMessage((message) => receive(message));
 }
 
-const inbound = { answer: '', frames: 0, intents: 0, prep: 0, closed: '' };
+const inbound = { answer: '', addr: '', frames: 0, intents: 0, prep: 0, closed: '' };
 
 // The guest follows the match the host simulates: it shows the field while a
 // frame says a match is running, and the result once a frame says it ended.
@@ -208,6 +336,10 @@ function receive(message) {
   const kind = message[0];
   const payload = message.slice(1);
   if (kind === 'A') inbound.answer = payload;
+  // The same-network flow's peer address travels beside the answer, over the
+  // channel the pairing already uses: a page learns the other page's address
+  // and port from the channel, never from a list of public candidates.
+  else if (kind === 'a') { inbound.addr = payload; learnPeerAnnouncement(payload); }
   else if (kind === 'F') {
     inbound.frames += 1;
     // A frame paints only while this page still holds a peer: once the peer
@@ -475,6 +607,16 @@ export async function answerOffer() {
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     const sdp = pc.localDescription.sdp;
+    // The same-network flow names the peer by the address the other page's
+    // player typed and the port that page read, so the candidate points at a
+    // real device instead of at a list of public candidates.
+    if (lobby.flow === 'local') {
+      noteOwnPort(sdp);
+      craftPeerCandidate(pc);
+      if (lobby.address !== '' && lobby.port !== 0) {
+        post('a', lobby.address + ':' + lobby.port);
+      }
+    }
     if (carriesRemoteAddress(sdp)) {
       lobby.ice = 'remote';
       post('A', sdp);
@@ -508,10 +650,45 @@ export async function acceptAnswer() {
     } catch (e) {
       return false;
     }
+    // The same-network flow: the channel carried the other page's address and
+    // port beside its answer, so this page points its candidate at that device
+    // rather than at a public list it never reads.
+    if (lobby.flow === 'local' && inbound.addr !== '') learnPeerAnnouncement(inbound.addr);
     link.report('connection', pc.connectionState);
   }
   if (!link.open) link.pair({ side: 'guest', secret: lobby.secret });
   lobby.paired = true;
+  return true;
+}
+
+// The same-network flow's candidate: the peer's address is the dotted-quad its
+// player typed, and the port is the one that page read from its own gathered
+// description. The candidate is bound to the media line of the description this
+// page already holds, so the handshake stays on that one section.
+export function craftPeerCandidate(pc) {
+  if (!pc || !pc.remoteDescription || lobby.peerAddress === '' || lobby.peerPort === 0) return false;
+  const held = pc.localDescription || pc.remoteDescription;
+  const sdp = held && held.sdp ? held.sdp : '';
+  const lines = sdp.split('\n');
+  let mid = '0';
+  let index = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith('m=')) continue;
+    const fields = lines[i].trim().split(' ');
+    mid = fields[0].slice(2);
+    const numbered = Number(fields[1]);
+    index = Number.isFinite(numbered) ? numbered : i;
+    break;
+  }
+  try {
+    pc.addIceCandidate({
+      sdpMid: mid,
+      sdpMLineIndex: index,
+      sdpDescription: 'candidate:9 1 udp 2113937151 ' + lobby.peerAddress + ' ' + lobby.peerPort + ' typ host',
+    });
+  } catch (error) {
+    return false;
+  }
   return true;
 }
 

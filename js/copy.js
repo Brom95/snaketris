@@ -25,7 +25,7 @@ export const CONTROL_SCREEN_ITEMS = ['P1 Select', 'P2 Select', 'Start'];
 // page, or each player plays on their own device. Page order matches the way
 // sub-menu's items.
 export const WAY_ITEMS = ['Same computer', 'Network'];
-export const WAY_SCREEN_ITEMS = ['Same computer', 'Network', 'Back'];
+export const WAY_SCREEN_ITEMS = ['Same computer', 'Network (anywhere)', 'Network (same network)', 'Back'];
 export const WAY_TITLE = 'Choose how two players meet';
 export const WAY_HINTS = 'Up / Down — choose · Enter — confirm · Escape — back';
 
@@ -74,6 +74,22 @@ export const PAIRING_ICE_WAIT = 'Connecting to STUN servers';
 // step names the limit it leaves instead of painting a link that pairs nobody.
 export const PAIRING_WARN_LOCAL = 'No candidate supply reached this page — on one network, name the same supply in both addresses with ?ice=stun:your-server; otherwise this pairing has no channel';
 export const PAIRING_WARN_NONE = 'This browser cannot open a peer connection — network play is unavailable';
+
+// The same-network flow: each peer types the one value the browser cannot read
+// on its own — its own address — and the page reads its own port. The lines name
+// that value, reject a value that names a scheme instead of a network address,
+// and hand the second page the address the first page cannot see.
+export const LOCAL_TITLE = 'Pair on one network';
+export const LOCAL_HINTS = 'Type your address · Escape — back';
+export const ADDRESS_LABEL = 'Your address';
+export const ADDRESS_HINTS = 'Type the numbers your device uses, like 192.168.4.10. The port beside it belongs to this page — you never type it.';
+export const ADDRESS_BAD = 'An address is four groups of numbers with dots between, like 192.168.4.10 — a name or a link is not an address.';
+
+// The copy affordance: a click puts the value beside it on the clipboard, so a
+// player never retypes a link or an address. A browser that refuses the copy
+// says so, and the value stays selectable by hand.
+export const COPY_LABEL = 'Copy';
+export const COPY_DENIED = 'This page could not copy it — select the text instead.';
 
 // The guest page's read-only copies of the host's preparation sub-menus. The
 // copy names the wait beside them so the guest always knows the other device

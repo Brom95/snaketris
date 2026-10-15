@@ -15,9 +15,11 @@ import {
   GAME_CONTROL_P1, GAME_CONTROL_P2, GAME_CONTROL_START,
   GAME_CONTROL_PLAYER_MARKERS,
   PAIRING_TITLE, PAIRING_HINTS, PAIRING_JOIN, PAIRING_WAITING,
+  LOCAL_TITLE, LOCAL_HINTS, ADDRESS_LABEL, ADDRESS_HINTS, ADDRESS_BAD,
+  COPY_LABEL, COPY_DENIED,
   twoPlayerOffered,
 } from './constants.js';
-import { attemptPair, guestPage } from './netplay.js';
+import { attemptPair, guestPage, pickFlow, copyValue } from './netplay.js';
 
 // The transitions an item can ask for. The screen system is the only module
 // that interprets them; no input module branches on a screen.
@@ -37,6 +39,7 @@ export const TRANSITIONS = {
   'start-bare': 'start-bare', // the start key with no item on screen: start whatever the flow allows
   pair: 'pair', // confirm the pairing secret and continue the network flow
   'pick-way': 'pick-way', // arm the way the "Two Players" entry offers, then continue the flow
+  copy: 'copy', // put the value beside the affordance on the clipboard
 };
 
 // cursor: 'arrow' — one item is highlighted and the arrow cycles over `items`.
@@ -103,7 +106,7 @@ export const SCREENS = [
         requiresWide: true,
       },
       {
-        id: 'way-item-network',
+        id: 'way-item-network-global',
         label: WAY_SCREEN_ITEMS[1],
         marker: null,
         hints: null,
@@ -111,8 +114,16 @@ export const SCREENS = [
         opens: PAIRING,
       },
       {
-        id: 'way-back',
+        id: 'way-item-network-local',
         label: WAY_SCREEN_ITEMS[2],
+        marker: null,
+        hints: null,
+        action: TRANSITIONS['pick-way'],
+        opens: PAIRING,
+      },
+      {
+        id: 'way-back',
+        label: WAY_SCREEN_ITEMS[3],
         marker: null,
         hints: null,
         action: TRANSITIONS['back-menu'],
@@ -339,6 +350,9 @@ export const SCREENS = [
     ],
     controls: [
       { id: 'pairing-back', label: 'Back', marker: null, action: TRANSITIONS['back-menu'] },
+      { id: 'copy-pairing-link', label: COPY_LABEL, marker: null, action: TRANSITIONS.copy, value: 'link' },
+      { id: 'copy-pairing-code', label: COPY_LABEL, marker: null, action: TRANSITIONS.copy, value: 'code' },
+      { id: 'copy-pairing-address', label: COPY_LABEL, marker: null, action: TRANSITIONS.copy, value: 'address' },
     ],
   },
 ];
@@ -596,6 +610,7 @@ const HANDLERS = {
     if (item.opens === PAIRING) {
       game.screen.networkMode = true;
       game.screen.twoPlayerMode = true;
+      pickFlow(item.id === 'way-item-network-local' ? 'local' : 'global');
     } else {
       game.screen.networkMode = false;
       game.screen.twoPlayerMode = true;
@@ -654,6 +669,12 @@ const HANDLERS = {
   // Pairing advances only when this page holds a secret. The host opens the
   // duration sub-menu; the guest keeps the pairing step open, because the host
   // page owns the preparation and the guest only mirrors it.
+  [TRANSITIONS.copy]: (item, intent) => {
+    // The affordance copies the value beside it; a browser that refuses says so
+    // on the step and the value stays selectable by hand.
+    copyValue(item.value);
+    return true;
+  },
   [TRANSITIONS.pair]: (item, intent) => {
     if (!attemptPair()) return false;
     if (guestPage()) return true;

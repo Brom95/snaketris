@@ -16,6 +16,7 @@ import { game } from '../js/state.js';
 import { drainIntents, toMenu } from '../js/screens.js';
 import { initInput, onKey } from '../js/input.js';
 import { initUi, syncViews } from '../js/ui.js';
+import { pickFlow, lobby } from '../js/netplay.js';
 import { readFileSync } from 'node:fs';
 
 const page = readFileSync(new URL('../snaketris.html', import.meta.url), 'utf8');
@@ -191,8 +192,23 @@ press('arrowdown');
 check(game.screen.waySelect === 1 && game.screen.state === SELECT_WAY, 'ArrowDown in the way sub-menu: Same computer -> Network');
 press('enter');
 check(game.screen.networkMode && game.screen.state === PAIRING, 'Enter on "Network" opens the pairing step');
+check(lobby.flow === 'global', 'the first network item picks the global flow');
 press('escape');
 check(game.screen.state === MENU, 'Escape in the pairing step returns to the menu');
+
+// Both network items are selectable and distinct: the one below opens the pairing
+// step too, and it is the flow that names the same network.
+toMenu();
+game.screen.menuSelect = 1;
+press('enter');
+press('arrowdown');
+press('arrowdown');
+check(game.screen.waySelect === 2, 'two ArrowDown presses reach the same-network item');
+press('enter');
+check(game.screen.networkMode && game.screen.state === PAIRING,
+  'Enter on "Network (same network)" opens the pairing step');
+press('escape');
+check(game.screen.state === MENU, 'Escape in the local pairing step returns to the menu');
 
 toMenu();
 game.screen.menuSelect = 1;

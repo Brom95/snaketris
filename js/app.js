@@ -15,7 +15,7 @@ import {
   publish, sendFrame, sendPreparationMirror, answerOffer, acceptAnswer, onPeerClose,
   peerClosed, peerLeft, inboundReport, reportPeerState, localSeat, openGuestStream,
   guestStreamReport, setIceFallback, setIceOpen, startIceAttempt, carriesRemoteAddress,
-  lobby,
+  lobby, noteFlowOfLink, notePeerAddress,
 } from './netplay.js';
 import { gameOver } from './state.js';
 import { PEER_LEFT } from './rules.js';
@@ -96,6 +96,9 @@ function isIceUrl(value) {
 // reports what its offer carries, so a supply that answers nothing is a page
 // with no channel, never a silent pairing.
 export async function iceSupplyForOpen() {
+  // The same-network flow names no supply at all: its page hand-crafts the one
+  // candidate that matters, so fetching a public list would only add noise.
+  if (lobby.flow === 'local') return [];
   const named = iceServersFromUrl([]);
   if (named.length > 0) return named;
   const fresh = await fetchStunServers();
@@ -334,6 +337,12 @@ export function frame(now) {
 // headless suite with no `location` at all, adopt nothing and stay on the menu.
 export function openPairingLink() {
   const fragment = typeof location === 'object' ? location.hash.slice(1) : '';
+  // The link a guest opened also names the flow the host picked, so the guest
+  // inherits the choice instead of typing it.
+  if (typeof location === 'object') {
+    noteFlowOfLink(location.href);
+    notePeerAddress(location.href);
+  }
   if (!adopt(fragment)) return false;
   enterPairing();
   return true;

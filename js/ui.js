@@ -8,13 +8,15 @@ import {
   GAME_CONTROL_PLAYER_MARKERS,
   PAIRING_TITLE, PAIRING_HINTS, PAIRING_LINK_LABEL, PAIRING_CODE_LABEL, PAIRING_WAITING,
   PAIRING_WARN_LOCAL, PAIRING_WARN_NONE, PAIRING_ICE_WAIT,
+  LOCAL_TITLE, LOCAL_HINTS, ADDRESS_LABEL, ADDRESS_HINTS, ADDRESS_BAD,
+  COPY_LABEL, COPY_DENIED,
   DURATION_SCREEN_ITEMS, ROLE_SCREEN_ITEMS, MIRROR_TITLE, MIRROR_HINTS,
   twoPlayerOffered,
 } from './constants.js';
 import { game, remainingSeconds } from './state.js';
 import { recordLines } from './highscores.js';
 import { SCREENS, SCREEN_BY_ID, itemForStep, controlModelAssigned } from './screens.js';
-import { lobby, guestPage } from './netplay.js';
+import { lobby, guestPage, noteAddress } from './netplay.js';
 import { paintQr } from './qr.js';
 import { createLayout } from '../engine/js/layout.js';
 import { createInterface } from '../engine/js/interface.js';
@@ -53,6 +55,11 @@ let pairingQrEl = null;
 let pairingWaitingEl = null;
 let pairingIceEl = null;
 let pairingWarnEl = null;
+let pairingAddressEl = null;
+let pairingAddressLineEl = null;
+let copyLinkEl = null;
+let copyCodeEl = null;
+let copyAddressEl = null;
 let mirrorDurationEl = null;
 let mirrorRoleEl = null;
 let mirrorTitleEl = null;
@@ -98,6 +105,11 @@ export function initUi() {
   pairingWaitingEl = lookup('pairing-waiting');
   pairingIceEl = lookup('pairing-ice');
   pairingWarnEl = lookup('pairing-warn');
+  pairingAddressEl = lookup('pairing-address');
+  pairingAddressLineEl = lookup('pairing-address-line');
+  copyLinkEl = lookup('copy-pairing-link');
+  copyCodeEl = lookup('copy-pairing-code');
+  copyAddressEl = lookup('copy-pairing-address');
   mirrorDurationEl = lookup('mirror-duration-items');
   mirrorRoleEl = lookup('mirror-role-items');
   mirrorTitleEl = lookup('mirror-title');
@@ -214,9 +226,13 @@ function paintScore(pctx) {
 // none, so the field stays hidden and no match can exist before a peer is paired.
 function paintPairing(pctx) {
   if (game.screen.state !== PAIRING) return;
-  if (pairingTitleEl) pairingTitleEl.textContent = PAIRING_TITLE;
+  // The same-network flow's address is typed into a real field by the player,
+  // so the page reads what they typed each time it paints the step.
+  if (pairingAddressEl) noteAddress(pairingAddressEl.value);
+  const localFlow = lobby.flow === 'local';
+  if (pairingTitleEl) pairingTitleEl.textContent = localFlow ? LOCAL_TITLE : PAIRING_TITLE;
   show(pairingHintsEl, true);
-  if (pairingHintsEl) pairingHintsEl.textContent = PAIRING_HINTS;
+  if (pairingHintsEl) pairingHintsEl.textContent = localFlow ? LOCAL_HINTS : PAIRING_HINTS;
   const published = lobby.secret !== '';
   const linkForm = published && lobby.form === 'link';
   show(pairingLinkEl, linkForm);
@@ -244,7 +260,31 @@ function paintPairing(pctx) {
   const warn = lobby.ice === 'none' ? PAIRING_WARN_NONE : (lobby.ice === 'local' ? PAIRING_WARN_LOCAL : '');
   show(pairingWarnEl, warn !== '');
   if (pairingWarnEl) pairingWarnEl.textContent = warn;
+  // A copy affordance sits beside the link and the code this page shows; the
+  // same-network flow's own lines and their affordances are the helper's job.
+  show(copyLinkEl, linkForm);
+  show(copyCodeEl, codeForm);
+  paintLocalPairing(localFlow);
   paintMirrors();
+}
+
+// The same-network flow's own lines: this page states the address its player
+// typed and the port it read, and keeps a denied copy visible as text the player
+// can still select.
+function paintLocalPairing(localFlow) {
+  show(pairingAddressEl, localFlow);
+  show(pairingAddressLineEl, localFlow);
+  if (pairingAddressLineEl) {
+    pairingAddressLineEl.textContent = lobby.addressBad ? ADDRESS_BAD :
+      (lobby.address === '' ? ADDRESS_HINTS :
+        ADDRESS_LABEL + ': ' + lobby.address +
+        (lobby.port === 0 ? '' : ' · port ' + lobby.port));
+  }
+  show(copyAddressEl, localFlow && lobby.address !== '' && !lobby.addressBad);
+  if (lobby.copy === 'denied') {
+    show(pairingWaitingEl, true);
+    pairingWaitingEl.textContent = COPY_DENIED;
+  }
 }
 
 // The guest page's read-only copies of the host page's preparation sub-menus:
