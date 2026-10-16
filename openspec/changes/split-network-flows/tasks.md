@@ -22,7 +22,7 @@ Boxes may only be checked after their verification gate passes.
   types, with the port read by the page rather than typed.
   - Verify: a unit test asserts a dotted-quad is accepted, a value naming a
   scheme is rejected, and no port is required from the player.
-- [ ] 2.2 Paint the page's address with the port it read, and keep the page
+- [x] 2.2 Paint the page's address with the port it read, and keep the page
   waiting while no address was typed.
   - Verify: a harness asserts the address line shows the typed quad with a port
   and that a page whose player typed nothing publishes no secret.
@@ -33,7 +33,7 @@ Boxes may only be checked after their verification gate passes.
 
 ## 3. A page reads its own allocated port
 
-- [ ] 3.1 Read the page's own port from its own local description rather than
+- [x] 3.1 Read the page's own port from its own local description rather than
   assuming one.
   - Verify: a harness asserts two different pages of the same flow report
   different ports, and that each port appears in that page's own local
@@ -41,25 +41,25 @@ Boxes may only be checked after their verification gate passes.
 
 ## 4. Each local-flow page offers the peer its own candidate
 
-- [ ] 4.1 Build the peer candidate from the peer's address and the peer's own
+- [x] 4.1 Build the peer candidate from the peer's address and the peer's own
   port, bound to the remote description's media line.
   - Verify: a harness asserts a candidate built without the media line is not
   offered, and that the page reports no channel rather than a partial one.
-- [ ] 4.2 Never offer a candidate whose address the page was not given, and
+- [x] 4.2 Never offer a candidate whose address the page was not given, and
   never read a public candidate list on a local-flow page.
   - Verify: a grep over the local-flow path names no public list and no shipped
   supply; a harness asserts a local-flow page contacts no list.
-- [ ] 4.3 Report a wrong address as still waiting, never as paired.
+- [x] 4.3 Report a wrong address as still waiting, never as paired.
   - Verify: a harness asserts a page whose peer typed an address its device
   does not have reports no open channel.
 
 ## 5. The peer's address travels with the answer the channel carries
 
-- [ ] 5.1 Send the second page's own address beside the answer it posts, so the
+- [x] 5.1 Send the second page's own address beside the answer it posts, so the
   first page receives it over the channel the pairing already uses.
   - Verify: a unit test asserts the message the channel carries names the
   address that page's player typed.
-- [ ] 5.2 Complete the first page from the address the channel carries, and ask
+- [x] 5.2 Complete the first page from the address the channel carries, and ask
   its player to type no address at all.
   - Verify: a harness asserts neither page shows a field for the peer's address.
 
@@ -69,17 +69,23 @@ Boxes may only be checked after their verification gate passes.
   naming `127.0.0.1` as each other's address.
   - Verify: a harness asserts both pages reach an open channel and a message
   crosses, which is a real transport proof and not a user-verified-later claim.
+  - Measured: this proof is not reachable as the flow is built now. The page
+  whose local description is an ANSWER exposes no port at all, so the copy that
+  would point the host's candidate at the guest's socket has no source, and the
+  harness asserts the measured shape instead (see design D3). The one
+  arrangement not yet measured is a page naming a port of its own choice in the
+  answer it sends.
 
 ## 7. Every copyable element carries a copy affordance
 
-- [ ] 7.1 Add a copy affordance beside the pairing link, the pairing code, the
+- [x] 7.1 Add a copy affordance beside the pairing link, the pairing code, the
   address line and the return line, whose click copies that value.
   - Verify: a harness clicks each affordance and asserts the value reaches the
   clipboard.
-- [ ] 7.2 Report a denied or unavailable copy and keep the value selectable.
+- [x] 7.2 Report a denied or unavailable copy and keep the value selectable.
   - Verify: a harness asserts the page says the copy did not happen and the
   value stays visible.
-- [ ] 7.3 Show no affordance beside an element a player cannot carry.
+- [x] 7.3 Show no affordance beside an element a player cannot carry.
   - Verify: a harness asserts the waiting line and the title carry no copy
   affordance.
 
@@ -89,7 +95,7 @@ Boxes may only be checked after their verification gate passes.
   byte-for-byte stable.
   - Verify: the in-flight `network-multiplayer-webrtc` harnesses still pass
   (`scripts/verify-ice-preload.mjs`, `scripts/verify-network-duel.mjs`).
-- [ ] 8.2 Keep the in-game steering branch byte-for-byte stable while the new
+- [x] 8.2 Keep the in-game steering branch byte-for-byte stable while the new
   way branches are added.
   - Verify: `js/input.js` `setDirection` in-game branch unchanged;
   `node --test tests/input.test.js` passes.
@@ -112,7 +118,7 @@ Boxes may only be checked after their verification gate passes.
 - [ ] 10.2 `npm run verify` passes with the new harnesses added.
 - [x] 10.3 `quality_baseline` pinned before the work; `quality_delta` reports
   no new regression before declaring DONE.
-- [ ] 10.4 `doc_drift` reports no new false claim in the change's own docs.
+- [x] 10.4 `doc_drift` reports no new false claim in the change's own docs.
 
 ## 11. User-verified-later (not a code gate)
 

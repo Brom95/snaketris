@@ -89,11 +89,12 @@ it cannot name.
 
 ### Requirement: The peer's address travels with the answer the channel carries
 
-The local flow SHALL carry the second page's address and port over the channel
-the pairing already uses, together with the answer that page produced, rather
-than through a second hop the player has to carry. The first page SHALL complete
-once that address arrives, and SHALL NOT ask its player to type an address the
-second page painted.
+The local flow SHALL carry each page's own address and port over the channel
+the pairing already uses, beside the answer that page produced, rather
+than through a second hop the player has to carry. A page SHALL announce only
+what it has read: a page that reads no port announces nothing and stays
+waiting. The first page SHALL complete once that address arrives, and SHALL NOT
+ask its player to type an address the second page painted.
 
 #### Scenario: The second page sends its address with its answer
 
@@ -104,7 +105,12 @@ second page painted.
 
 - **GIVEN** the first page waits for the peer's address
 - **WHEN** the channel carries the peer's address
-- **THEN** the first page offers its candidate and pairs
+- **THEN** the first page offers its candidate beside the address it read
+
+#### Scenario: A page with no port to read announces nothing
+
+- **GIVEN** a local-flow page whose own description carries no port
+- **THEN** it announces nothing and the peer stays waiting for that copy
 
 ### Requirement: Every copyable element carries a copy affordance
 

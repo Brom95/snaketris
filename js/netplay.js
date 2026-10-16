@@ -304,6 +304,16 @@ export function peerLink() {
   return linkInstance;
 }
 
+// The same-network flow announces this page's own address and port over the
+// channel it already shares with the peer. The channel opens only once that
+// peer's connection does, so the announcement is not a one-shot: the page
+// repeats it every tick and the copy that lands after the channel opens is
+// what carries the port the peer's candidate needs.
+export function announceOwn() {
+  if (lobby.flow !== 'local' || lobby.address === '' || lobby.port === 0) return false;
+  return post('a', lobby.address + ':' + lobby.port);
+}
+
 // The transport carries bytes one way; the game reads its two verbs and never
 // names the channel class behind them.
 export function post(kind, payload) {
@@ -613,9 +623,6 @@ export async function answerOffer() {
     if (lobby.flow === 'local') {
       noteOwnPort(sdp);
       craftPeerCandidate(pc);
-      if (lobby.address !== '' && lobby.port !== 0) {
-        post('a', lobby.address + ':' + lobby.port);
-      }
     }
     if (carriesRemoteAddress(sdp)) {
       lobby.ice = 'remote';

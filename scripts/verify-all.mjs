@@ -21,6 +21,7 @@ const SCRIPTS = [
   'verify-role-line.mjs',
   'verify-network-duel.mjs',
   'verify-ice-preload.mjs',
+  'verify-network-local.mjs',
 ];
 
 function run(script) {

@@ -15,7 +15,7 @@ import {
   publish, sendFrame, sendPreparationMirror, answerOffer, acceptAnswer, onPeerClose,
   peerClosed, peerLeft, inboundReport, reportPeerState, localSeat, openGuestStream,
   guestStreamReport, setIceFallback, setIceOpen, startIceAttempt, carriesRemoteAddress,
-  lobby, noteFlowOfLink, notePeerAddress,
+  lobby, noteFlowOfLink, notePeerAddress, noteOwnPort, announceOwn,
 } from './netplay.js';
 import { gameOver } from './state.js';
 import { PEER_LEFT } from './rules.js';
@@ -247,6 +247,17 @@ function networkDuties() {
   // match nothing.
   if (lobby.ice === 'gathering' && !duelOpen()) return;
   openLink();
+  // The same-network flow reads its own port out of its own local description
+  // and announces it every tick: the channel this page shares with its peer
+  // opens only once that peer's connection does, so a one-shot announcement
+  // could land before the channel is ready. The port is re-read each tick
+  // because the description grows the candidate line only as ICE gathers.
+  if (lobby.flow === 'local') {
+    const own = peerLink();
+    const ownPc = own && own.transport && own.transport.connection;
+    if (ownPc && ownPc.localDescription) noteOwnPort(ownPc.localDescription.sdp);
+    announceOwn();
+  }
   // The seat cannot gate the publish: the seat is a consequence of publishing
   // (`publish` names the host seat 1, `adopt` names the guest seat 2), so a gate
   // on it would leave the first offer unpublished forever and a bare page would
@@ -288,6 +299,9 @@ async function publishOffer() {
       await pc.setLocalDescription(offer);
       blob = pc.localDescription.sdp;
     }
+    // The same-network flow reads its own port out of the offer it just made,
+    // so the link it hands over can name the port the other page needs.
+    if (lobby.flow === 'local') noteOwnPort(blob);
     if (carriesRemoteAddress(blob)) {
       lobby.ice = 'remote';
       publish(blob, 0, href);

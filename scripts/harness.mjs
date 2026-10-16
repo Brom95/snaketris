@@ -241,8 +241,13 @@ export async function servePage(page, rootDir) {
 // Publish the live game object on the page so predicates can read it without an
 // await. `game` is mutated in place, so the reference stays valid.
 export async function exposeGame(page) {
+  await exposeSingletons(page);
+}
+
+export async function exposeSingletons(page) {
   await page.evaluate(async () => {
     window.__game = (await import('/js/state.js')).game;
+    window.__netplay = (await import('/js/netplay.js')).lobby;
   });
 }
 
