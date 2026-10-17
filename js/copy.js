@@ -83,7 +83,7 @@ export const LOCAL_TITLE = 'Pair on one network';
 export const LOCAL_HINTS = 'Type your address · Escape — back';
 export const ADDRESS_LABEL = 'Your address';
 export const ADDRESS_HINTS = 'Type the numbers your device uses, like 192.168.4.10. The port beside it belongs to this page — you never type it.';
-export const ADDRESS_BAD = 'An address is four groups of numbers with dots between, like 192.168.4.10 — a name or a link is not an address.';
+export const ADDRESS_BAD = 'An address is four numbers with dots between, each from 0 to 255, like 192.168.4.10 — a name or a link is not an address.';
 
 // The copy affordance: a click puts the value beside it on the clipboard, so a
 // player never retypes a link or an address. A browser that refuses the copy

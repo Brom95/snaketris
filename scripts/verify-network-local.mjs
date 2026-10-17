@@ -42,9 +42,9 @@ const context = await browser.newContext();
 // The player's own typing: the field is a real input, so the address travels
 // through the keyboard rather than being written into the field, which is what
 // proves a phone's own keyboard reaches it and the keys are not spent elsewhere.
+// Nothing focuses or clicks the field first: the page that shows the field holds
+// the typing at it, which is what a player who only opened the page does.
 async function typeAddress(page, address) {
-  const field = await page.locator('#pairing-address');
-  await field.focus();
   await page.keyboard.type(address);
   await page.waitForTimeout(400);
 }

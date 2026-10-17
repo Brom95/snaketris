@@ -185,6 +185,20 @@ on the code; on a page that shows no address a digit still spells the code. The 
 traded away is that a same-network page cannot spell a code digit — its join route is
 the address in its link, which does not carry the secret.
 
+### D9 — the field is typed at, and an address is four numbers of one byte
+
+A field the player must click before typing is a field a player loses: opening the
+page and typing straight away wrote nothing, because the typing sat on the rest of
+the document. A harness that focuses the field before typing cannot see this, so the
+check types into a page its player only opened. So the page that shows the address
+puts the typing at it, and the field stays a real input — a phone has no other way
+in.
+
+What counts as an address is four numbers with dots between, each small enough to be
+one byte, since that is the address of a device on a network. The shape rule alone
+would let a page accept 999.999.999.999 and pair nothing, so the rule bounds each
+number at one byte, and the line the page shows names the bound it wants.
+
 ## Risks and what they mean
 
 - **A real LAN needs the devices to reach each other.** A typed address that is

@@ -56,6 +56,16 @@ test('an address is four number groups and nothing else counts', async () => {
   assert.equal(netplay.lobby.addressBad, false, 'no address typed is waiting, not a bad address');
   netplay.noteAddress('100.107.90.10:3478');
   assert.equal(netplay.lobby.addressBad, true, 'a port typed with the quad is not an address the player types');
+  netplay.noteAddress('256.107.90.10');
+  assert.equal(netplay.lobby.addressBad, true, 'a group over one byte is not an address');
+  netplay.noteAddress('100.107.90.10.5');
+  assert.equal(netplay.lobby.addressBad, true, 'five groups is not an address');
+  netplay.noteAddress('100.107.90');
+  assert.equal(netplay.lobby.addressBad, true, 'three groups is not an address');
+  netplay.noteAddress('0.0.0.0');
+  assert.equal(netplay.lobby.address, '0.0.0.0', 'each group may be zero');
+  netplay.noteAddress('255.255.255.255');
+  assert.equal(netplay.lobby.address, '255.255.255.255', 'a group may reach one byte');
 });
 
 test('the flow and the typed address ride in the pairing link once', async () => {

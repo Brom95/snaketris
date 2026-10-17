@@ -74,6 +74,18 @@ field keeps its whole alphabet for the code.
 - **THEN** the field holds the address as typed
 - **AND** the code on the page is the one the page chose for itself
 
+#### Scenario: A player types without touching the field first
+
+- **GIVEN** a same-network page whose player has only opened it
+- **WHEN** the player starts typing the address right away
+- **THEN** the field holds the address as typed
+
+#### Scenario: A group over one byte is not an address
+
+- **GIVEN** a same-network page whose player typed four numbers with dots
+  between, one of them over 255
+- **THEN** the page keeps no address and names the shape it wants
+
 #### Scenario: A digit still spells a code on a page that names no address
 
 - **GIVEN** an anywhere-network page offering its short readable code

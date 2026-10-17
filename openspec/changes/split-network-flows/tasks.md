@@ -183,6 +183,12 @@ Boxes may only be checked after their verification gate passes.
     leaves it whole in the field, no key is spent on the code, and the letters of a code
     still spell.
   - Verify: `scripts/verify-network-local.mjs` the same typing on both paired pages.
+- [x] 14.6 State an address as four numbers of one byte each: a group over 255
+  counts as no address, and the line names the shape the page wants.
+  - Verify: `tests/netplay.test.js` an over-byte group is named; a quad of
+    255s and one of zeros are addresses.
+  - Verify: `scripts/verify-network-local.mjs` types without touching the field,
+    so the address the player reaches is accepted whole.
 
 ## 11. User-verified-later (not a code gate)
 

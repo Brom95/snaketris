@@ -276,6 +276,9 @@ function paintPairing(pctx) {
 // can still select.
 function paintLocalPairing(localFlow) {
   show(pairingAddressEl, localFlow);
+  // The field the flow shows is the field typing goes into: a player who opened
+  // the page types straight away, with no click to land on an empty box first.
+  if (localFlow && pairingAddressEl) pairingAddressEl.focus({ preventScroll: true });
   show(pairingAddressLineEl, localFlow);
   if (pairingAddressLineEl) {
     pairingAddressLineEl.textContent = lobby.addressBad ? ADDRESS_BAD :

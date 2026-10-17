@@ -103,8 +103,12 @@ export function pickFlow(flow, localAddress = '') {
 
 // A network address is four groups of numbers with dots between. A value that
 // names a scheme (`http://…`) or a hostname is not an address, and the same-
-// network flow says so rather than guessing at one.
-const ADDRESS_SHAPE = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+// network flow says so rather than guessing at one. Each group is one byte.
+function isDottedByteQuad(value) {
+  const groups = value.split('.');
+  if (groups.length !== 4) return false;
+  return groups.every((group) => /^\d{1,3}$/.test(group) && Number(group) < 256);
+}
 
 // The address this page's own player typed. An empty value is no address yet,
 // and the step keeps waiting; a value that is not an address is reported.
@@ -115,7 +119,7 @@ export function noteAddress(text) {
     lobby.addressBad = false;
     return;
   }
-  if (!ADDRESS_SHAPE.test(typed)) {
+  if (!isDottedByteQuad(typed)) {
     lobby.addressBad = true;
     return;
   }
@@ -148,7 +152,7 @@ export function noteOwnPort(sdp) {
 // known, and only once this page holds a remote description to bind it to.
 export function learnPeerAnnouncement(text) {
   const parts = text.split(':');
-  if (parts.length < 2 || !ADDRESS_SHAPE.test(parts[0])) return false;
+  if (parts.length < 2 || !isDottedByteQuad(parts[0])) return false;
   lobby.peerAddress = parts[0];
   lobby.peerPort = Number(parts[1]);
   const link = openLink();
@@ -160,7 +164,7 @@ export function learnPeerAnnouncement(text) {
 
 export function notePeerAddress(url) {
   const match = /[?&]a=([0-9.]+)/.exec(url);
-  if (match !== null && ADDRESS_SHAPE.test(match[1])) lobby.peerAddress = match[1];
+  if (match !== null && isDottedByteQuad(match[1])) lobby.peerAddress = match[1];
   const port = /[?&]p=(\d+)/.exec(url);
   if (port !== null) lobby.peerPort = Number(port[1]);
 }
