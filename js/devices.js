@@ -8,6 +8,7 @@
 import { game } from './state.js';
 import { currentControlPlayer } from './screens.js';
 import { BOARD_W, BOARD_H, PAIRING_CODE_ALPHABET } from './constants.js';
+import { addressFieldOnPage } from './netplay.js';
 import {
   configureSurface,
   registerDeviceResolvers,
@@ -176,10 +177,17 @@ function overKeyIntent(k) {
 
 // Keys in the pairing step. The Pair item is the step's only item, so a confirm
 // key names it by its page id; Escape leaves for the menu. Every other key is one
-// character of the short readable code, and the code is upper case on screen.
+// character of the short readable code, and the code is upper case on screen —
+// except while the page asks its own player for an address, where a digit and a
+// dot belong to that address and reach the field instead of the code.
 function pairingKeyIntent(k) {
   if (k === 'enter' || k === ' ') return { action: 'select', id: 'pairing-join' };
   if (k === 'escape') return { action: 'toMenu' };
+  // The page asks its own player for an address on one network only, and an
+  // address is digits and dots. While that field is on the page those keys
+  // belong to it, so the browser writes them into it and they are not spent
+  // on the short readable code the page offers beside it.
+  if (addressFieldOnPage() && (k === '.' || (k >= '0' && k <= '9'))) return null;
   const ch = k.toUpperCase();
   return PAIRING_CODE_ALPHABET.includes(ch) ? { action: 'pairChar', char: ch } : null;
 }

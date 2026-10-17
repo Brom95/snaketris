@@ -34,7 +34,7 @@ export const lobby = {
   iceLeft: 0, // whole seconds of the ICE attempt still left, so the pairing step can count it down
   rebuilt: false, // this page already rebuilt its channel with an empty ICE list
   warm: '', // the offer SDP the page's own attempt produced, which the pairing step publishes instead of offering twice
-  flow: '', // the flow this page belongs to for its whole life: 'global' the public candidate supply, 'local' the same-network one; '' until the way pick or the opened link says
+  flow: '', // the flow this page runs under: 'global' the public candidate supply, 'local' the same-network one; '' until the way pick or the opened link says, and re-chosen until the page pairs
   address: '', // the dotted-quad this page's own player typed as their device's address
   addressBad: false, // this page was handed a value that names no network address
   port: 0, // the DTLS port this page read from its own local description
@@ -69,11 +69,36 @@ export function codeOf(blob, length = PAIRING_CODE_LENGTH) {
   return out;
 }
 
-// The way screen records which network flow the player picked. A page belongs to
-// one flow for its whole life, so the choice is recorded once and never re-picked.
-export function pickFlow(flow) {
-  if (lobby.side === 'guest' || lobby.flow !== '') return;
-  lobby.flow = flow === 'local' ? 'local' : 'global';
+// The way screen records which network flow the player picked. The choice is the
+// page's until it pairs, so re-picking the other network way switches the flow and
+// takes back what the first one published; a page that came over a link keeps its
+// host's flow.
+export function pickFlow(flow, localAddress = '') {
+  const page = lobby;
+  // A page that came over a link already belongs to one flow.
+  if (page.side === 'guest') return;
+  // Picking the way again while the page is still alone switches the flow it
+  // runs under, so a player who chose the wrong way can try the other one
+  // without reloading; a page that paired, or whose channel already carried an
+  // answer, is committed and keeps its flow.
+  if (page.joined || page.paired || page.closed !== '') return;
+  if (page.flow === flow) {
+    if (localAddress) page.address = localAddress;
+    return;
+  }
+  page.flow = flow;
+  // The address belongs to the flow, so switching takes the typed one back.
+  page.address = flow === 'local' ? localAddress : '';
+  page.peerAddress = '';
+  page.peerPort = 0;
+  // Whatever the first way published is taken back, so the page publishes a
+  // fresh offer under the way it just picked.
+  withdrawOffer();
+  // The offer an earlier way warmed came from that way's channel, so it is taken
+  // back as well: the page runs its open again under the new way, and only what
+  // that open's supply gave this device may travel to a peer.
+  page.warm = '';
+  page.rebuilt = false;
 }
 
 // A network address is four groups of numbers with dots between. A value that
@@ -175,6 +200,13 @@ export function noteFlowOfLink(url) {
   lobby.flow = 'local';
 }
 
+// Whether this page asks its own player for an address: the same-network way does,
+// the anywhere-network way does not. The keyboard reads this to decide which keys
+// belong to the address field and which spell the short readable code.
+export function addressFieldOnPage() {
+  return lobby.flow === 'local';
+}
+
 // The host publishes its offer before the peer link exists, so the share link can
 // carry the secret the second page needs to answer. The page url is a supply: this
 // module never reads `location`.
@@ -244,6 +276,21 @@ export function attemptPair() {
   return true;
 }
 
+// Taking back what a page published before its way choice changed. The offer, the
+// secret behind it and the link carrying them are one page's own publication, so
+// clearing them leaves the page to publish a fresh one under the way it picked
+// next; the channel itself stays, since both ways move over the same machinery.
+// The flow itself, the seat and the screen the page walks through stay: this is
+// the same player choosing again.
+function withdrawOffer() {
+  lobby.offer = '';
+  lobby.secret = '';
+  lobby.form = '';
+  lobby.seed = 0;
+  lobby.link = '';
+  lobby.code = '';
+}
+
 // ---------- The peer link and the traffic that moves over it ----------
 // The engine owns the link, the streams and the resync policy; this module owns
 // the secret, the messages that travel, and which page is the host. The
@@ -282,6 +329,12 @@ let iceFallback = null;
 // The page's own ICE attempt, kept so a publish or an answer can wait for the
 // attempt that is already running instead of starting a second one.
 let iceRunning = null;
+// The way the page's running (or last finished) attempt ran under, and whether
+// that attempt has finished. The way a page runs under names the candidate
+// supply before the attempt reads it, so these two say when a finished attempt
+// belongs to a way the page left and a fresh open is owed.
+let iceFlow = '';
+let iceDone = false;
 
 export function setIceFallback(factory) {
   iceFallback = factory;
@@ -560,13 +613,21 @@ async function iceAttempt() {
 // every frame, and only the first ask starts the wait. The countdown starts at
 // the full budget so the step shows the wait before the first tick reports.
 export async function startIceAttempt() {
-  if (iceRunning === null) {
+  // One attempt per page open, and one more when the page changed the way it
+  // runs under: the way names the candidate supply before the attempt runs, so a
+  // finished attempt under another way is not the supply this page needs, and the
+  // page runs its open again over the new one. An attempt that is still waiting is
+  // kept as it is — a second over the same connection would answer the first with
+  // nothing — so a way pick made during the wait is settled on the next open.
+  if (iceRunning === null || (iceDone && iceFlow !== lobby.flow)) {
     lobby.ice = 'gathering';
     lobby.iceLeft = ICE_GATHER_TIMEOUT_SECONDS;
     // The whole open is the attempt: choose the supply, then run the offer. The
     // handle is set before the first await, so a publish or an answer that asks
     // while the open is still resolving waits for this same open instead of
     // racing past it and building the channel over the unresolved supply.
+    iceFlow = lobby.flow;
+    iceDone = false;
     iceRunning = openIceAttempt();
   }
   return iceRunning;
@@ -576,7 +637,13 @@ export async function startIceAttempt() {
 // that carries the addresses that supply gave this device.
 async function openIceAttempt() {
   await iceOpen();
-  return iceAttempt();
+  try {
+    return await iceAttempt();
+  } finally {
+    // The attempt has finished: the flow it ran under is then the supply the
+    // channel holds, and a page whose way has since changed runs its open again.
+    iceDone = true;
+  }
 }
 
 // Wait until the page's attempt has finished. A publish or an answer that ran

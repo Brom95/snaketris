@@ -65,11 +65,43 @@ export async function iceSupplyForOpen() {
 }
 
 // The supply this open resolved, recorded so the channel this open builds reads
-// it. The transport factory is registered once at page init, so choosing a
-// supply never rebuilds the channel and never replaces a transport another
-// page installed: the supply is data, and the channel is built after this runs.
+// it. The transport factory is registered at page init, so choosing a supply
+// never rebuilds a channel and never replaces a transport another page
+// installed: the supply is data, and the channel is built after this runs. A
+// page that re-opens — one whose way changed — rebuilds in the step below.
 function chooseIceSupply(supply) {
   iceSupply = supply;
+}
+
+// The channel this page builds: the supply it resolved at the moment the channel
+// is built, so one registration covers every open of this page and a re-open
+// builds over the supply it just chose.
+function buildChannel() {
+  return createTransport(iceServersFromUrl(iceSupply));
+}
+
+// The step one open takes before its offer exists: choose the candidate supply,
+// and rebuild the channel with it when an earlier open already negotiated one.
+// The first open has no channel yet — the lobby builds it after this step runs,
+// and it reads the supply chosen here — so there is nothing to rebuild. A page
+// whose way choice changed does have one: the same-network way names no supply
+// and the anywhere way ships the named servers, so keeping the channel the first
+// way built would leave the page offering candidates that way chose. The
+// connection that channel negotiated is closed before its replacement takes its
+// place.
+async function reopenIceChannel() {
+  chooseIceSupply(await iceSupplyForOpen());
+  const link = peerLink();
+  if (!link) return;
+  const pc = link.transport && link.transport.connection;
+  if (pc) {
+    try {
+      pc.close();
+    } catch (e) {
+      // A connection the channel already closed closes nothing.
+    }
+  }
+  registerTransport(buildChannel);
 }
 
 // The transport supply: the consumer constructs the peer connection and the
@@ -322,7 +354,7 @@ export function init() {
   // verbs it owns. The engine never names the channel class. The supply is read
   // when the channel is built, which happens after the open below has resolved
   // it, so one registration covers every open.
-  registerTransport(() => createTransport(iceServersFromUrl(iceSupply)));
+  registerTransport(buildChannel);
   // The same supply, with no servers: the attempt rebuilds the channel with it
   // when its own servers give the page no address, which leaves the
   // same-browser candidate the pairing step warns about.
@@ -331,7 +363,7 @@ export function init() {
   // before its link exists: resolve the entries that answer, and record them so
   // the channel this open builds reads them. The lobby never names the list, so
   // this stays the page's and the lobby only asks.
-  setIceOpen(async () => chooseIceSupply(await iceSupplyForOpen()));
+  setIceOpen(reopenIceChannel);
   // A closed peer link ends the match with the peer leaving and returns both
   // pages to the pairing step. The records layer writes nothing for that end
   // reason, so an abandoned match never claims a leaderboard entry.

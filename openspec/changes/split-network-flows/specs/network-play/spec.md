@@ -5,9 +5,10 @@
 The network section SHALL offer two flows a player chooses between: a global
 flow whose channel depends on a candidate supply, and a local flow whose
 channel depends on both peers naming their own network address on one network.
-A page SHALL belong to exactly one flow for its whole life: a global-flow page
+A page SHALL belong to exactly one flow at a time: a global-flow page
 SHALL NOT hand an address to a peer connection, and a local-flow page SHALL NOT
-read a public candidate list.
+read a public candidate list. The way a page runs under is its choice until the
+page pairs with a peer.
 
 #### Scenario: Both flows are selectable
 
@@ -58,6 +59,26 @@ names a scheme.
 
 - **GIVEN** a page of the local flow whose player types no address
 - **THEN** the page publishes no link, waits, and offers no channel
+
+### Requirement: The address field takes the address the player types
+
+While the address field is on the page, the browser SHALL be able to write an
+address into it, and a character that starts an address SHALL NOT be spent on
+the short readable code the page offers beside it. A page that shows no address
+field keeps its whole alphabet for the code.
+
+#### Scenario: A dotted address is typed with the browser
+
+- **GIVEN** a same-network page showing the address field
+- **WHEN** the player types a dotted address into the page with the browser
+- **THEN** the field holds the address as typed
+- **AND** the code on the page is the one the page chose for itself
+
+#### Scenario: A digit still spells a code on a page that names no address
+
+- **GIVEN** an anywhere-network page offering its short readable code
+- **WHEN** the player types a digit
+- **THEN** the digit is one character of that code
 
 ### Requirement: Each local-flow page offers the peer its own candidate
 
@@ -136,6 +157,34 @@ the copy SHALL report it and leave the value selectable, never silently lose it.
 
 - **GIVEN** a pairing element whose value a player cannot carry
 - **THEN** it shows no copy affordance
+
+### Requirement: The way choice re-opens until pairing starts
+
+A player who picked a network way and is still alone on its own page SHALL be
+able to pick the other network way on the same page, and the switch SHALL take
+back whatever the first way published. A page that came over a link keeps the
+flow its host chose, and a page that has already paired keeps its flow.
+
+#### Scenario: The other way opens on the same page
+
+- **GIVEN** a page that picked one network way, published its offer, and paired
+  with nobody
+- **WHEN** the player picks the other network way on that page
+- **THEN** the page runs under the way it just picked
+- **AND** the offer it published under the first way is taken back
+
+#### Scenario: The new way runs its own open
+
+- **GIVEN** a page that picked one network way and ran its candidate attempt under it
+- **WHEN** the player picks the other network way on that page
+- **THEN** the page runs its candidate attempt again under the way it just picked, on a channel built for that way's supply
+- **AND** the page shows nothing of the way it left: no offer, no code, no address asked of the player
+
+#### Scenario: A page that paired keeps its flow
+
+- **GIVEN** a page whose channel is open with a peer
+- **WHEN** the player picks the other network way on that page
+- **THEN** the page keeps the flow it is running under and its pairing stands
 
 ### Requirement: The flow choice is offered at every viewport width
 

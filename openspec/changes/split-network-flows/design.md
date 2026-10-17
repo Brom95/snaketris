@@ -164,6 +164,27 @@ from a page with no channel. Dropping the read also drops its bounds — the fet
 timeout and the entry cap — which existed only to keep a fetched blob inside the
 pairing fragment cap; a shipped list of five is bounded by construction.
 
+### D8 — the field keeps what the player typed, and the key stays a key
+
+The address the player types is the only field the browser itself feeds, and two
+places spent it against the player. The page read the field every frame and posted
+what it read back into the field, so an unfinished address — the player's own
+half-typed line, which no address rule accepts — was replaced with what the page
+last accepted, and the player's own digits went missing mid-typing. So the page
+reads the field only while its flow shows the field, and posts nothing there: the
+field is the player's, the painted line is the page's. A completion test cannot see
+this, because a test names the whole address at once; a browser that types it one
+key at a time is what shows it, and the check types and reads the field rather than
+naming it.
+
+The other half is the key. A digit is in the alphabet the short readable code is
+spelled from, so a digit typed over the address was spent on the code and stopped
+from the field: only the digits outside that alphabet reached the field at all. On
+a page that shows the field, a digit and a dot belong to the field and are not spent
+on the code; on a page that shows no address a digit still spells the code. The rule
+traded away is that a same-network page cannot spell a code digit — its join route is
+the address in its link, which does not carry the secret.
+
 ## Risks and what they mean
 
 - **A real LAN needs the devices to reach each other.** A typed address that is

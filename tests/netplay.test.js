@@ -17,12 +17,31 @@ test('the flow a guest inherits rides in the link it opened', async () => {
   assert.equal(netplay.lobby.flow, 'local', 'the marker on the opened link names the flow');
 });
 
-test('a page cannot change its flow once it has one', async () => {
+test('a page still alone takes the other way until it pairs', async () => {
+  netplay.pickFlow('local');
+  assert.equal(netplay.lobby.flow, 'local', 'the first way lands on a page that is alone');
   netplay.pickFlow('global');
-  assert.equal(netplay.lobby.flow, 'local', 'the flow the link already gave stays');
+  assert.equal(netplay.lobby.flow, 'global', 'the other way takes over while the page is still alone');
+});
+
+test('a page that paired keeps the way it paired under', async () => {
+  netplay.pickFlow('global');
+  netplay.lobby.paired = true;
+  netplay.pickFlow('local');
+  assert.equal(netplay.lobby.flow, 'global', 'a paired page keeps its flow');
+  netplay.lobby.paired = false;
+});
+
+test('a page opened at a link keeps the flow its host chose', async () => {
+  netplay.noteFlowOfLink('https://example.com/snaketris.html?flow=local#abc');
+  netplay.lobby.side = 'guest';
+  netplay.pickFlow('global');
+  assert.equal(netplay.lobby.flow, 'local', 'the guest keeps the flow the link gave');
+  netplay.lobby.side = '';
 });
 
 test('a same-network page still waiting for its address publishes nothing', async () => {
+  netplay.pickFlow('local');
   netplay.noteAddress('');
   netplay.publish('offer-blob', 0, 'https://example.com/snaketris.html');
   assert.equal(netplay.lobby.link, '', 'a page with no address hands over no link');
@@ -40,6 +59,7 @@ test('an address is four number groups and nothing else counts', async () => {
 });
 
 test('the flow and the typed address ride in the pairing link once', async () => {
+  netplay.pickFlow('local');
   netplay.noteAddress('100.107.90.10');
   netplay.noteOwnPort('a=candidate:1 1 udp 1 100.107.90.10 3478 typ host');
   netplay.publish('offer-blob', 0, 'https://example.com/snaketris.html');

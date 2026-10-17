@@ -39,10 +39,13 @@ const context = await browser.newContext();
 
 // The harness leaves the field the way a player's typing leaves it: the input
 // holds the quad, and the page reads it on the next paint.
+// The player's own typing: the field is a real input, so the address travels
+// through the keyboard rather than being written into the field, which is what
+// proves a phone's own keyboard reaches it and the keys are not spent elsewhere.
 async function typeAddress(page, address) {
-  await page.evaluate((value) => {
-    document.getElementById('pairing-address').value = value;
-  }, address);
+  const field = await page.locator('#pairing-address');
+  await field.focus();
+  await page.keyboard.type(address);
   await page.waitForTimeout(400);
 }
 
@@ -70,6 +73,7 @@ async function local(page) {
       form: held.form,
       secret: held.secret.length,
       rebuilt: held.rebuilt,
+      typed: held.typed,
       addressText: line ? line.textContent : '',
       waitingText: waiting ? waiting.textContent : '',
       waitingVisible: waiting ? waiting.checkVisibility() : null,
@@ -166,6 +170,8 @@ check(hostNow.peerAddress === '' && hostNow.peerPort === 0,
 check(hostNow.addressText.includes(HOST_ADDRESS),
   'the address line names the address this page typed, and no field for the peer address');
 check(guestNow.addressInput === GUEST_ADDRESS, 'the guest typed its own address into its own field');
+check(hostNow.typed === '' && guestNow.typed === '',
+  'typing an address spends nothing on the short readable code');
 check(hostNow.copyCount.length > 0 && guestNow.copyCount.length > 0,
   'a copy affordance stands beside a value the player can carry');
 check(host.reads.publicList === 0, 'a local-flow page reads no public candidate list');

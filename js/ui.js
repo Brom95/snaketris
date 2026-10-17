@@ -226,10 +226,13 @@ function paintScore(pctx) {
 // none, so the field stays hidden and no match can exist before a peer is paired.
 function paintPairing(pctx) {
   if (game.screen.state !== PAIRING) return;
-  // The same-network flow's address is typed into a real field by the player,
-  // so the page reads what they typed each time it paints the step.
-  if (pairingAddressEl) noteAddress(pairingAddressEl.value);
   const localFlow = lobby.flow === 'local';
+  // The same-network flow's address is typed into a real field by the player,
+  // so the page reads what they typed each time it paints the step. A page that
+  // names no address has no field to read, and a field a player filled before
+  // they changed the way still holds that value: reading it on another way would
+  // hand back the address of the way this page left.
+  if (localFlow && pairingAddressEl) noteAddress(pairingAddressEl.value);
   if (pairingTitleEl) pairingTitleEl.textContent = localFlow ? LOCAL_TITLE : PAIRING_TITLE;
   show(pairingHintsEl, true);
   if (pairingHintsEl) pairingHintsEl.textContent = localFlow ? LOCAL_HINTS : PAIRING_HINTS;

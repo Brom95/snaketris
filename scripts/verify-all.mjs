@@ -22,6 +22,7 @@ const SCRIPTS = [
   'verify-network-duel.mjs',
   'verify-ice-preload.mjs',
   'verify-network-local.mjs',
+  'verify-way-switch.mjs',
 ];
 
 function run(script) {

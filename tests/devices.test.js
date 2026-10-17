@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installDomStub, makePad } from './helpers/dom-stub.js';
 import { startIn } from './helpers/game.js';
+import { lobby } from '../js/netplay.js';
 
 const stub = installDomStub();
 const { game } = await import('../js/state.js');
@@ -326,4 +327,22 @@ test('a narrow viewport opens the way sub-menu and hides only the shared-page wa
 
   screens.resetScreen();
   stub.window.innerWidth = 1920;
+});
+
+test('a digit on the same-network address field belongs to the field', () => {
+  startIn('PAIRING');
+  lobby.flow = 'local';
+  assert.equal(devices.keyToIntent('5'), null,
+    'the digit reaches the field instead of spelling the code');
+  assert.equal(devices.keyToIntent('.'), null, 'the dot between the groups reaches the field');
+  assert.deepEqual(devices.keyToIntent('b'), { action: 'pairChar', char: 'B' },
+    'a letter still spells a code beside the address');
+});
+
+test('a digit on a page that names no address still spells the code', () => {
+  startIn('PAIRING');
+  lobby.flow = '';
+  assert.deepEqual(devices.keyToIntent('5'), { action: 'pairChar', char: '5' },
+    'the anywhere-network page keeps its code alphabet');
+  lobby.flow = '';
 });
