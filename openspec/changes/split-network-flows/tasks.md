@@ -161,9 +161,9 @@ Boxes may only be checked after their verification gate passes.
     typed digit yields no intent; a typed letter still spells the code.
   - Verify: `scripts/verify-network-local.mjs` types a whole dotted address with
     the keyboard and the field holds it.
-- [ ] 14.2 Keep the address the player typed on the page as they type it.
-  - Verify: a half-typed address stays in the field; a malformed one is named
-    as it stands.
+- [x] 14.2 Keep the address the player typed on the page as they type it.
+  - Verify: `scripts/verify-way-switch.mjs` the field keeps its value while the page
+    shows a malformed address, and nothing writes back into the field.
 - [x] 14.3 Re-open the way choice until the page pairs: a page that picked a way
   and paired with nobody accepts the other way on the same page, and the switch
   takes back the offer the first way published.

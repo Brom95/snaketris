@@ -54,6 +54,8 @@ const typed = await page.evaluate(() => ({
 }))
 check(typed.field === '100.107.90.10', `the field holds the whole address: ${JSON.stringify(typed.field)}`, (m) => failures = m)
 check(typed.lobby === '100.107.90.10', `the lobby accepts it: ${JSON.stringify(typed.lobby)} bad ${JSON.stringify(typed.bad)}`, (m) => failures = m)
+const onPage = await page.evaluate(() => document.getElementById('pairing-address-line')?.textContent ?? '')
+check(onPage.includes('100.107.90.10'), `what the page names is what the player typed: ${JSON.stringify(onPage.trim())}`, (m) => failures = m)
 check(typed.typed === '', `the digits went to the field, not the code: typed ${JSON.stringify(typed.typed)}`, (m) => failures = m)
 
 const letter = await page.evaluate(async () => {
@@ -95,15 +97,17 @@ check(dom.addressFieldHidden, `the re-picked way asks nothing of the player as a
 
 // The re-picked way runs its open to the end: the attempt settles, the page
 // publishes, and the recorder shows the way it opened the attempt under.
-const settled = await page.waitForFunction(() => window.__netplay.ice !== 'gathering' && window.__netplay.ice !== '', { timeout: 45000 })
-check(!!settled, `the re-picked way ran its ICE attempt to the end`, (m) => failures = m)
-const published = await page.waitForFunction(() => window.__netplay.link !== '', { timeout: 45000 })
-check(!!published, `the re-picked way published its own offer: ${JSON.stringify(await page.evaluate(() => window.__netplay.link))}`, (m) => failures = m)
+await page.waitForFunction(() => window.__netplay.ice !== 'gathering' && window.__netplay.ice !== '', { timeout: 45000 })
+const settled = await page.evaluate(() => ({ ice: window.__netplay.ice, rebuilt: window.__netplay.rebuilt }))
+check(settled.ice !== 'gathering' && settled.ice !== '', `the re-picked way ran its ICE attempt to the end: ice ${JSON.stringify(settled.ice)} rebuilt ${JSON.stringify(settled.rebuilt)}`, (m) => failures = m)
+await page.waitForFunction(() => window.__netplay.link !== '', { timeout: 45000 })
+const published = await page.evaluate(() => window.__netplay.link)
+check(published !== '', `the re-picked way published its own offer: ${JSON.stringify(published)}`, (m) => failures = m)
 const trace = await page.evaluate(() => window.__trace)
 const ways = trace.map((row) => row.split('/')[0]).filter((way, i, all) => i === 0 || way !== all[i - 1])
 check(JSON.stringify(ways) === '["","local","global"]', `the page ran its open under the way it had picked, then under the new one, in that order: ${JSON.stringify(ways)}`, (m) => failures = m)
 check(trace.some((row) => row.startsWith('local/gathering')) && trace.some((row) => row.startsWith('global/gathering')) && trace.some((row) => row.startsWith('global/') && !row.startsWith('global/gathering')), `the attempt ran under the first way and then under the new one, to a finish: ${trace.length} states, first 12 ${JSON.stringify(trace.slice(0, 12))}`, (m) => failures = m)
 
 await browser.close()
-await report([{ label: 'the address a player types, and switching the way', n: failures, bad: failures > 0 }])
+report('the address a player types and switching the way', failures)
 if (failures) { console.log(`FAIL ${failures}`); process.exitCode = 1 }

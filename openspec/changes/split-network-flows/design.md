@@ -199,6 +199,29 @@ one byte, since that is the address of a device on a network. The shape rule alo
 would let a page accept 999.999.999.999 and pair nothing, so the rule bounds each
 number at one byte, and the line the page shows names the bound it wants.
 
+### D10 — the address keeps its own letters, and the way re-opens until it pairs
+
+Two more things a player found on a real page. The page spells a short readable code
+by reading keys itself, and the alphabet it accepts carries digits — the same digits
+the address field is made of. So a page that asks for both spends a digit on the code
+and takes it away from the address: typing an address one character at a time lands
+only its first digit, and the field the player typed into keeps showing the address
+the page accepted last. The one page that asks for an address is the one that runs
+under the same-network way, so on that page a digit or a dot belongs to the field and
+not to the code; a page that shows no field still spells a code with a digit, which is
+what a keyboard-only player does today. The address line is drawn from what is typed
+even half-typed, so the field and the line agree while the player is still typing.
+
+The other thing: the way was meant to hold for a page's whole life, and a player who
+changed their mind on the same page found the page kept the way it had. That decision
+is kept only while pairing has not started — until a page has paired with anyone it
+can change its mind, and the switch takes back whatever the first way had published
+and runs its open again. A page that has paired, or was opened at a link, keeps its
+way: two pages half paired under one way and re-picked to another have no meaning.
+Re-running the open also re-runs the candidate search, because the offer one way
+warmed came from that way's channel; a page navigating from the menu pays the search
+twice, which costs nothing for a local way that searches nothing.
+
 ## Risks and what they mean
 
 - **A real LAN needs the devices to reach each other.** A typed address that is
