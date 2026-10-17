@@ -40,6 +40,7 @@ export const lobby = {
   port: 0, // the DTLS port this page read from its own local description
   peerAddress: '', // the address the other page named, read from the link it opened
   peerPort: 0, // the port the other page named beside that address
+  aimed: false, // this page already aimed its channel at the peer address it holds
   copy: '', // the last copy attempt: '' none, 'ok' the clipboard took it, 'denied' the browser refused
 };
 
@@ -293,6 +294,10 @@ function withdrawOffer() {
   lobby.seed = 0;
   lobby.link = '';
   lobby.code = '';
+  // The way this page left aimed its channel at that way's peer; a page that
+  // switches way has nothing aimed until its new way names an address again.
+  lobby.aimed = false;
+  aimedPc = null;
 }
 
 // ---------- The peer link and the traffic that moves over it ----------
@@ -339,6 +344,9 @@ let iceRunning = null;
 // belongs to a way the page left and a fresh open is owed.
 let iceFlow = '';
 let iceDone = false;
+// The connection this page already aimed at a peer address, so one channel is
+// aimed once and only a rebuilt one is aimed again.
+let aimedPc = null;
 
 export function setIceFallback(factory) {
   iceFallback = factory;
@@ -744,7 +752,11 @@ export async function acceptAnswer() {
 // description. The candidate is bound to the media line of the description this
 // page already holds, so the handshake stays on that one section.
 export function craftPeerCandidate(pc) {
-  if (!pc || !pc.remoteDescription || lobby.peerAddress === '' || lobby.peerPort === 0) return false;
+  // Either description names the media line a candidate binds to. A page that
+  // only ever made its own offer still names its line, so pointing at a network
+  // address is not waiting for an answer that no other device can carry here.
+  if (!pc || (!pc.localDescription && !pc.remoteDescription)) return false;
+  if (lobby.peerAddress === '' || lobby.peerPort === 0) return false;
   const held = pc.localDescription || pc.remoteDescription;
   const sdp = held && held.sdp ? held.sdp : '';
   const lines = sdp.split('\n');
@@ -768,6 +780,24 @@ export function craftPeerCandidate(pc) {
     return false;
   }
   return true;
+}
+
+// The pointing step, run every tick of the same-network way. A page that holds a
+// peer address — from a link its peer published, or from an announcement — aims
+// its own channel at that address whether or not the channel ever carried a
+// report, because a link is the only route a second device has. One connection
+// is aimed once, so a rebuilt channel is what makes a page aim again.
+export function pointAtPeer() {
+  if (lobby.flow !== 'local' || lobby.peerAddress === '' || lobby.peerPort === 0) return false;
+  const link = openLink();
+  const pc = link.transport && link.transport.connection;
+  if (!pc || pc === aimedPc) return false;
+  aimedPc = pc;
+  // The description grows its candidate line as ICE gathers, so the port is read
+  // again here: an announcement that named no port still leaves one to read.
+  if (pc.localDescription) noteOwnPort(pc.localDescription.sdp);
+  lobby.aimed = true;
+  return craftPeerCandidate(pc);
 }
 
 // The state a peer connection reports, held by the engine link. The consumer

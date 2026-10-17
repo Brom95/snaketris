@@ -202,6 +202,29 @@ Boxes may only be checked after their verification gate passes.
 - [x] 15.3 A page that publishes a link of its own still shows that link and its QR.
   - Verify: scripts/verify-pairing-step.mjs, scripts/verify-network-links.mjs
 
+## 16. The address a link carries is used, and the steps can be read
+
+- [ ] 16.1 A page whose peer address and port came from a link its peer published
+  points its own channel at that address and port, with nothing carried over the
+  channel: the pointing belongs to the way, not to the browser's own message bus.
+  - Verify: `tests/netplay.test.js` a page holding a peer address offers the
+    candidate with no inbound report at all; a page holding none offers nothing.
+  - Verify: `scripts/trace-pairing.mjs` the candidate lands on a page that never
+    received a channel report.
+- [ ] 16.2 The same-network way names no candidate line at any point of its
+  pairing step; only the anywhere-network way names that route.
+  - Verify: `scripts/verify-ice-preload.mjs` no candidate line on the local way,
+    the route still named on the global way.
+  - Verify: `scripts/verify-opened-link.mjs` the phone-sized page shows neither
+    a candidate sentence nor a server name.
+- [ ] 16.3 A durable harness prints every stage both pages pass through, in order
+  and with the fields a stalled pair is recognised by, so reading the handshake is
+  a printed table rather than a guess.
+  - Verify: `scripts/trace-pairing.mjs` prints both pages' stage rows and names the
+    stage each page reached last.
+- [ ] 16.4 Re-check the gates on this tree: `npm test`, the full verify sweep,
+    and `quality_delta`; then name what a two-device pair still lacks.
+
 ## 11. User-verified-later (not a code gate)
 
 - [ ] 11.1 Two real devices on one network pair through the local flow in the

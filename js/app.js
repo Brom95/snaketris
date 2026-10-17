@@ -15,7 +15,7 @@ import {
   publish, sendFrame, sendPreparationMirror, answerOffer, acceptAnswer, onPeerClose,
   peerClosed, peerLeft, inboundReport, reportPeerState, localSeat, openGuestStream,
   guestStreamReport, setIceFallback, setIceOpen, startIceAttempt, carriesRemoteAddress,
-  lobby, noteFlowOfLink, notePeerAddress, noteOwnPort, announceOwn,
+  lobby, noteFlowOfLink, notePeerAddress, noteOwnPort, announceOwn, pointAtPeer,
 } from './netplay.js';
 import { gameOver } from './state.js';
 import { PEER_LEFT } from './rules.js';
@@ -235,6 +235,11 @@ function networkDuties() {
     const ownPc = own && own.transport && own.transport.connection;
     if (ownPc && ownPc.localDescription) noteOwnPort(ownPc.localDescription.sdp);
     announceOwn();
+    // A page that holds the peer address its link named aims its own channel at
+    // that address, whether or not the channel ever carried a report: a link is
+    // the only route a second device has, so aiming belongs to this way and not
+    // to a report the browser's own bus cannot deliver across devices.
+    pointAtPeer();
   }
   // The seat cannot gate the publish: the seat is a consequence of publishing
   // (`publish` names the host seat 1, `adopt` names the guest seat 2), so a gate

@@ -235,6 +235,30 @@ to the global flow, and the same-network flow names the address it waits on inst
 because a player who reads the other sentence types a server this flow never asks
 for.
 
+### D10 — the address in a link is used, not only read
+
+A page opened at a local-flow link already holds what its host published:
+`lobby.peerAddress` and `lobby.peerPort`, read out of `?a=` and `?p=`. Nothing
+acted on them. The only function that points a channel at such an address,
+`craftPeerCandidate`, had one caller, `learnPeerAnnouncement`, and that call
+needs `inbound.addr` — the browser's own message bus, which joins pages inside
+one browser and reaches no other device. So across two devices the address was
+carried into the page and never used, which is why a pair opened from a phone
+stayed unpaired no matter what the host published.
+
+The step is moved out of the bus: the local-flow branch of `networkDuties` runs
+`pointAtPeer` every tick beside `announceOwn`, and that function points the
+channel at the peer address the page holds whenever it holds one, whether or not
+anything travelled. `craftPeerCandidate` no longer demands a remote description
+— it reads the media line off whichever description the channel has, preferring
+the one it made itself — because a page that never received an answer still
+names its own media line. One page may point one connection once, so the step
+records the connection it pointed and re-points only when the channel rebuilds.
+
+The candidate line is dropped from this way rather than reworded again: a local
+page asks an address, never a server, so a line about candidates names something
+the way cannot act on and reads like a failure the player cannot fix.
+
 ## Risks and what they mean
 
 - **A real LAN needs the devices to reach each other.** A typed address that is

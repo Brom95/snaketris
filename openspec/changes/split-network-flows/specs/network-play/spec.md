@@ -100,6 +100,13 @@ bound to the remote description's media line. A page SHALL NOT offer a candidate
 whose address it was not given, and SHALL NOT offer a candidate whose media line
 it cannot name.
 
+#### Scenario: The address arrives only in the link
+
+- **GIVEN** a page of the local flow whose peer address and port came from a
+  link that peer published, with nothing carried over the channel yet
+- **WHEN** that page prepares its channel
+- **THEN** it offers its peer the candidate naming that address and port
+
 #### Scenario: Two pages on one network pair with no supply
 
 - **GIVEN** two pages of the local flow that each named its own address and
@@ -251,3 +258,24 @@ SHALL stay within the pairing fragment cap so the link opens on a typed address.
 - **GIVEN** a local-flow page publishes its link
 - **THEN** the link names the address it was given and stays within the
   pairing fragment cap
+
+### Requirement: The local way names no candidate line
+
+The local flow SHALL paint no line about a candidate supply at any point in its
+pairing step: that way asks the player for an address, never for a server, so a
+line about candidates would name something this way cannot act on. Only the
+anywhere-network way names the candidate route, and only when its own attempt
+found no reachable address.
+
+#### Scenario: A local page whose attempt found no address says nothing about servers
+
+- **GIVEN** a page of the local flow whose candidate attempt found no reachable
+  address
+- **THEN** the page paints no line about a candidate supply
+- **AND** it keeps the lines this way uses: its address and the link it hands over
+
+#### Scenario: The global way still names its route
+
+- **GIVEN** a page of the global flow whose candidate attempt found no reachable
+  address
+- **THEN** the page names the candidate-supply route it wants the player to name
