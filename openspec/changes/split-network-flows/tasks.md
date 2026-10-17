@@ -190,6 +190,18 @@ Boxes may only be checked after their verification gate passes.
   - Verify: `scripts/verify-network-local.mjs` types without touching the field,
     so the address the player reaches is accepted whole.
 
+## 15. What a page opened at a link shows
+
+- [x] 15.1 A page that opens at a link its host published inherits the hosts code
+  and holds no link of its own, so it paints no share line and no QR of an empty
+  string. A scanner reading such a QR lands nowhere.
+  - Verify: scripts/verify-opened-link.mjs
+- [x] 15.2 The same-network way states what that way waits for; the candidate-server
+  line belongs to the global way only.
+  - Verify: scripts/verify-ice-preload.mjs, scripts/verify-opened-link.mjs
+- [x] 15.3 A page that publishes a link of its own still shows that link and its QR.
+  - Verify: scripts/verify-pairing-step.mjs, scripts/verify-network-links.mjs
+
 ## 11. User-verified-later (not a code gate)
 
 - [ ] 11.1 Two real devices on one network pair through the local flow in the

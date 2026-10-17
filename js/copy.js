@@ -81,6 +81,7 @@ export const PAIRING_WARN_NONE = 'This browser cannot open a peer connection —
 // and hand the second page the address the first page cannot see.
 export const LOCAL_TITLE = 'Pair on one network';
 export const LOCAL_HINTS = 'Type your address · Escape — back';
+export const LOCAL_WARN = 'This way asks no candidate server, so nothing on it waits for one: the page pairs on the address its link names';
 export const ADDRESS_LABEL = 'Your address';
 export const ADDRESS_HINTS = 'Type the numbers your device uses, like 192.168.4.10. The port beside it belongs to this page — you never type it.';
 export const ADDRESS_BAD = 'An address is four numbers with dots between, each from 0 to 255, like 192.168.4.10 — a name or a link is not an address.';

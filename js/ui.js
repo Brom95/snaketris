@@ -8,7 +8,7 @@ import {
   GAME_CONTROL_PLAYER_MARKERS,
   PAIRING_TITLE, PAIRING_HINTS, PAIRING_LINK_LABEL, PAIRING_CODE_LABEL, PAIRING_WAITING,
   PAIRING_WARN_LOCAL, PAIRING_WARN_NONE, PAIRING_ICE_WAIT,
-  LOCAL_TITLE, LOCAL_HINTS, ADDRESS_LABEL, ADDRESS_HINTS, ADDRESS_BAD,
+  LOCAL_TITLE, LOCAL_HINTS, LOCAL_WARN, ADDRESS_LABEL, ADDRESS_HINTS, ADDRESS_BAD,
   COPY_LABEL, COPY_DENIED,
   DURATION_SCREEN_ITEMS, ROLE_SCREEN_ITEMS, MIRROR_TITLE, MIRROR_HINTS,
   twoPlayerOffered,
@@ -236,8 +236,11 @@ function paintPairing(pctx) {
   if (pairingTitleEl) pairingTitleEl.textContent = localFlow ? LOCAL_TITLE : PAIRING_TITLE;
   show(pairingHintsEl, true);
   if (pairingHintsEl) pairingHintsEl.textContent = localFlow ? LOCAL_HINTS : PAIRING_HINTS;
+  // A link this page holds of its own is what a second device opens, so its text
+  // and its QR are painted together — never a QR of the empty string, which a
+  // scanner reads as a link to nowhere while the page says it is sharing one.
   const published = lobby.secret !== '';
-  const linkForm = published && lobby.form === 'link';
+  const linkForm = published && lobby.form === 'link' && lobby.link !== '';
   show(pairingLinkEl, linkForm);
   if (pairingLinkEl) pairingLinkEl.textContent = linkForm ? lobby.link : '';
   show(pairingQrEl, linkForm);
@@ -260,7 +263,7 @@ function paintPairing(pctx) {
   // The step says what the published offer carries: a blob with no remote ICE
   // address pairs nobody outside this browser instance, and a page with no
   // channel at all pairs nobody anywhere. The limit is on screen, not implied.
-  const warn = lobby.ice === 'none' ? PAIRING_WARN_NONE : (lobby.ice === 'local' ? PAIRING_WARN_LOCAL : '');
+  const warn = lobby.ice === 'none' ? PAIRING_WARN_NONE : (lobby.ice === 'local' ? localFlow ? LOCAL_WARN : PAIRING_WARN_LOCAL : '');
   show(pairingWarnEl, warn !== '');
   if (pairingWarnEl) pairingWarnEl.textContent = warn;
   // A copy affordance sits beside the link and the code this page shows; the

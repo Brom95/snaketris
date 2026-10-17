@@ -222,6 +222,19 @@ Re-running the open also re-runs the candidate search, because the offer one way
 warmed came from that way's channel; a page navigating from the menu pays the search
 twice, which costs nothing for a local way that searches nothing.
 
+### D9.5 — a page opened at a link paints only what it holds itself
+
+A page opened at a link inherits the host's secret, so the short readable code it
+shows repeats the one the host showed; that is the link's own proof. It holds no
+link of its own until it publishes, and painting the empty string as a share line
+and as a QR made the page look like it was sharing a link while the QR decoded to
+nothing a scanner could use. The share line and the QR are painted only while the
+link field carries a link, not merely because the step is in link form. The same
+reasoning covers the warning line: the sentence naming a candidate server belongs
+to the global flow, and the same-network flow names the address it waits on instead,
+because a player who reads the other sentence types a server this flow never asks
+for.
+
 ## Risks and what they mean
 
 - **A real LAN needs the devices to reach each other.** A typed address that is
