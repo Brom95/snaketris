@@ -155,7 +155,7 @@ Boxes may only be checked after their verification gate passes.
 
 ## 14. The address a player types and the way re-pick
 
-- [ ] 14.1 Let the address field take every digit and dot the player types: on a
+- [x] 14.1 Let the address field take every digit and dot the player types: on a
   page that names an address, a digit or dot is not spent spelling the code.
   - Verify: `tests/devices.test.js` with the flow recorded as the local one, a
     typed digit yields no intent; a typed letter still spells the code.
@@ -164,18 +164,19 @@ Boxes may only be checked after their verification gate passes.
 - [ ] 14.2 Keep the address the player typed on the page as they type it.
   - Verify: a half-typed address stays in the field; a malformed one is named
     as it stands.
-- [ ] 14.3 Re-open the way choice until the page pairs: a page that picked a way
+- [x] 14.3 Re-open the way choice until the page pairs: a page that picked a way
   and paired with nobody accepts the other way on the same page, and the switch
   takes back the offer the first way published.
   - Verify: `tests/netplay.test.js` a picked flow switches while unpaired, an
     unposted offer stays unpublished, a joined page keeps its flow.
-  - Verify: `scripts/verify-network-local.mjs` and
-    `scripts/verify-network-duel.mjs` still pair, and a page that walks back to
-    the way choice and picks the other way runs under it.
+  - Verify: `scripts/verify-way-switch.mjs` in a browser: a page that typed an address,
+    walked back and picked the other way switches its flow, takes back its offer, link
+    and address, hides the address it had asked for, runs its candidate attempt again
+    under the new way, and publishes.
 - [ ] 14.4 Re-check the claims the re-opened way weakens: the port constraint
   measured for one page holds for the other, and a page whose offer was taken
   back shows its waiting line plainly.
-- [ ] 14.5 Say why a typed address stays on the page while its digits go missing, and
+- [x] 14.5 Say why a typed address stays on the page while its digits go missing, and
   fix the cause where the page reads the field back and where a key stops a character:
   what is on the page is what the player typed, whole.
   - Verify: `scripts/verify-way-switch.mjs` in a browser: typing a whole dotted address

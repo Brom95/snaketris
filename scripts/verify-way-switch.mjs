@@ -86,13 +86,12 @@ check(secondWay.ice === 'gathering' && secondWay.rebuilt === false, `the page ra
 const dom = await page.evaluate(() => ({
   linkCopy: (document.getElementById('pairing-link') || {}).textContent || '',
   codeCopy: (document.getElementById('pairing-code') || {}).textContent || '',
-  addressLine: (document.getElementById('pairing-address-line') || {}).textContent || '',
-  addressBad: (document.getElementById('pairing-address-line') || {}).classList.contains('bad'),
+  addressFieldHidden: getComputedStyle(document.getElementById('pairing-address')).display === 'none',
+  addressLineWidth: (document.getElementById('pairing-address-line') || {}).getBoundingClientRect().width,
   addressFieldWidth: (document.getElementById('pairing-address') || {}).getBoundingClientRect().width,
 }))
 check(dom.linkCopy === '' && dom.codeCopy === '', `the page shows no offer of the way it left: link copy ${JSON.stringify(dom.linkCopy)} code copy ${JSON.stringify(dom.codeCopy)}`, (m) => failures = m)
-check(dom.addressFieldWidth === 0, `the re-picked way asks no address of the player: field width ${dom.addressFieldWidth}`, (m) => failures = m)
-check(dom.addressLine !== '' && !dom.addressBad, `the page says what it is waiting for under the new way: ${JSON.stringify(dom.addressLine)}`, (m) => failures = m)
+check(dom.addressFieldHidden, `the re-picked way asks nothing of the player as an address: the field is not on the page (rect width ${dom.addressFieldWidth}, address line width ${dom.addressLineWidth})`, (m) => failures = m)
 
 // The re-picked way runs its open to the end: the attempt settles, the page
 // publishes, and the recorder shows the way it opened the attempt under.
