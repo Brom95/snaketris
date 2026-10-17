@@ -39,9 +39,9 @@ offer blob the current flow carries.
 ### What Changes
 
 - **Two network ways, one section.** The way sub-menu gains a global flow
-  (today's flow: the shipped floor plus the public list read per open) and a
-  local flow (one network, no candidate supply). A page belongs to exactly one
-  flow; the flows never mix.
+  (today's flow: the shipped floor of named ICE servers) and a local flow
+  (one network, no candidate supply). A page belongs to exactly one flow; the
+  flows never mix.
 - **The local flow states its own address.** Each page reads its own allocated
   port from its own local SDP and asks the player for their device's network
   address (a dotted-quad). The pairing link carries that address beside the
@@ -56,19 +56,31 @@ offer blob the current flow carries.
   negotiated, so the second page's own address travels in the same message and
   the first page asks its player to carry nothing back.
 - **A copy affordance on every copyable element.** The pairing link, the pairing
-  code and the address line each carry a copy icon; clicking it copies the value
-  into the clipboard. A browser that denies clipboard access says so and leaves
-  the value selectable.
+  code and the address line each carry a 📑 mark directly under the value they
+  copy; clicking it copies the value into the clipboard. A browser that denies
+  clipboard access says so and leaves the value selectable.
 - **Docs and help copy** name the two flows and the one address each peer types.
+- **The flow choice survives a narrow viewport.** The two-player entry opens the
+  way sub-menu at every viewport width, so a player on a phone picks which
+  network flow runs; the narrow shortcut that jumped straight to the pairing step
+  silently chose one flow and left the other unreachable. Only the shared-page
+  way, which needs a second pad on this device, stays wide-only.
+- **The global flow names its supply outright.** The shipped floor becomes the
+  five ICE servers the user named — `stun1`–`stun4.l.google.com:19302` and
+  `stun.stunprotocol.org:3478` — and the per-open read of a public list is
+  dropped: it measured as yielding no candidates, and a page can still name its
+  own supply with `?ice=`.
 
 ### User Stories
 
 - As two players on one network, I open one link, type my device's address once,
   and the match starts with no server, no public list and no relay.
-- As a player, I tap the copy icon beside the link, the code and the address
+- As a player, I tap the 📑 mark under the link, the code and the address
   instead of selecting text.
 - As a player on the internet, I use the global flow and its candidate supply,
   unchanged.
+- As a player on a phone, I still get the choice between the two network flows,
+  and the shared-page way is the only item that stays hidden from me.
 
 ### Ownership
 
@@ -85,8 +97,9 @@ offer blob the current flow carries.
 - The engine contract stays: the engine never names a candidate supply, an
   address or a clipboard.
 - The existing global-flow requirements in the in-flight `network-multiplayer-webrtc`
-  delta keep their meaning; this change adds the split and the local flow, and
-  must not regress them.
+  delta keep their meaning except for the candidate-supply read: group 13
+  replaces the fetched public list with the named servers the user chose, and
+  retires the read with its bounds.
 - The board invariants keep holding: layout constants stay in `js/config.js`
   and `js/constants.js`; `js/input.js` `setDirection` keeps its in-game branch
   byte-for-byte stable.

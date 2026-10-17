@@ -16,7 +16,7 @@
 import { chromium } from '@playwright/test';
 import path from 'node:path';
 import { BASE, check, failureCount, report, freshPage, servePage, exposeGame, shown, waitFor } from './harness.mjs';
-import { PAIRING } from '../js/constants.js';
+import { PAIRING, SELECT_WAY } from '../js/constants.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
@@ -45,12 +45,12 @@ async function attempt(page) {
   });
 }
 
-// What one open may put into an offer: the shipped floor it starts from, and the
-// cap on the entries it adds from the public list.
+// What one open may put into an offer: the shipped list of named servers, which
+// is the whole supply — no open reads a list from anywhere else.
 async function supply(page) {
   return await page.evaluate(async () => {
     const app = await import('/js/app.js');
-    return { floor: app.ICE_SERVERS.length, limit: app.ICE_SUPPLY_LIMIT };
+    return { floor: app.ICE_SERVERS.length };
   });
 }
 
@@ -160,21 +160,23 @@ check(copy.local.includes('?ice='), `the no-address line names the candidate-sup
 check(!copy.none.includes('?ice='), `the dead-end line stays the browser that cannot open a channel (${copy.none})`);
 
 // 7. an offer carries a candidate block per address the open could reach, and
-//    an open adds at most its cap of fetched entries to the shipped floor.
+//    the supply it could reach is the shipped list of named servers alone.
 const room = await supply(guest);
-check(done.candidates <= room.floor + room.limit, `the offer carries ${done.candidates} candidate addresses, within the ${room.floor} shipped plus up to ${room.limit} fetched the open may add`);
+check(done.candidates <= room.floor, `the offer carries ${done.candidates} candidate addresses, within the ${room.floor} named servers the page ships`);
 check(done.ice !== 'remote' || done.candidates > 0, 'an offer that reached an address carries the candidates it reached');
 
 await guest.close();
 
 // ---------- A bare page whose player walks the menu to Network ----------
 
-// The narrow stacked layout opens the pairing step straight from the entry, so
-// the walk is one click and the attempt starts on the first frame of the step.
+// The narrow stacked layout opens the way sub-menu from the entry, so the walk
+// is two clicks and the attempt starts on the first frame of the step.
 const bare = await freshPage(context, ROOT);
 await bare.setViewportSize({ width: 500, height: 768 });
 await bare.waitForTimeout(200);
 await bare.click('#menu-item-two-player');
+await waitFor(bare, (wanted) => window.__game.screen.state === wanted, SELECT_WAY, 5000);
+await bare.click('#way-item-network-global');
 await waitFor(bare, (wanted) => window.__game.screen.state === wanted, PAIRING, 5000);
 
 const walked = await attempt(bare);

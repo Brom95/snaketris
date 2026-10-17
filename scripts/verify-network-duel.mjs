@@ -17,7 +17,7 @@
 
 import { chromium } from '@playwright/test';
 import path from 'node:path';
-import { BASE, check, report, failureCount, servePage, exposeGame, freshPage, snapshot, stateIs, waitFor, shown } from './harness.mjs';
+import { BASE, check, report, failureCount, servePage, exposeSingletons, freshPage, snapshot, stateIs, waitFor, shown } from './harness.mjs';
 import { COLS, ROWS } from '../js/constants.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -110,7 +110,6 @@ async function pushIntents(page, intents) {
 // ---------- The host page ----------
 
 const host = await freshPage(context, ROOT);
-await standIn(host, 'wire-host', 'wire-guest');
 
 // The menu lists the same four items at a wide viewport, and the Two Players
 // entry opens the way sub-menu rather than the duration screen.
@@ -134,9 +133,14 @@ check(!barePairing.field && !barePairing.playing,
 
 // A page offers only once its own attempt resolved: the pairing step waits
 // before it publishes, so an answer can never arrive at a page that has no
-// channel yet. The harness stands in for that wait, or an answer can outrace the
-// host page's channel and the pair never opens.
-await waitFor(host, async () => (await import('/js/netplay.js')).lobby.ice !== 'gathering', null, 20000);
+// channel yet. The harness waits that attempt out rather than standing in for it:
+// a resolved attempt rebuilds the channel over its own supply, and standing in
+// before the attempt resolves would leave that rebuild to replace the stand-in
+// and swallow the answer the harness posts next.
+const attemptSettled = (x) => window.__netplay.ice !== '' && window.__netplay.ice !== 'gathering';
+check(await waitFor(host, attemptSettled, null, 30000),
+  'the host page resolves its candidate attempt before a channel is stood in');
+await standIn(host, 'wire-host', 'wire-guest');
 
 // The offer this page publishes is a real offer, so the link the pairing paints
 // carries the bytes a real pairing would carry.
@@ -160,9 +164,9 @@ await servePage(guest, ROOT);
 guest.on('pageerror', (err) => console.log('GUEST ' + err.message + ' :: ' + String(err.stack || '').split('\n').slice(0, 4).join(' | ')));
 host.on('pageerror', (err) => console.log('HOST ' + err.message + ' :: ' + String(err.stack || '').split('\n').slice(0, 4).join(' | ')));
 await guest.goto(published.link);
-await guest.evaluate(async () => {
-  window.__game = (await import('/js/state.js')).game;
-});
+await exposeSingletons(guest);
+check(await waitFor(guest, attemptSettled, null, 30000),
+  'the guest page resolves its candidate attempt before a channel is stood in');
 await standIn(guest, 'wire-guest', 'wire-host');
 const adopted = await live(guest);
 check(adopted.seat === 2 && adopted.side === 'guest',

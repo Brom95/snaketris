@@ -128,15 +128,17 @@
     }
     #pairing-title { font-size: 24px; margin: 0; }
     #pairing-hints, #pairing-waiting, #pairing-ice { font-size: 14px; color: #8899aa; }
-    #pairing-link, #pairing-code { font-size: 14px; word-break: break-all; }
+    #pairing-link, #pairing-code, #pairing-address-line { font-size: 14px; word-break: break-all; margin: 0; }
     #pairing-warn { font-size: 14px; color: #d9534f; }
     /* The same-network flow types one value per peer, so the field is a real
        input: a phone has no hardware keyboard otherwise. The copy affordances
        sit beside the values a player would carry. */
     #pairing-address { font-size: 14px; width: 190px; }
+    /* Each copy affordance sits directly under the value it copies, so the
+       player taps the mark beside the text rather than hunting for it. */
     #copy-pairing-link, #copy-pairing-code, #copy-pairing-address {
-      font-size: 12px; padding: 2px 8px; border: 1px solid #8899aa; border-radius: 4px;
-      background: transparent; color: #8899aa;
+      font-size: 16px; margin: 2px 0 0; padding: 4px 10px; background: transparent; border: 0;
+      color: #8899aa; cursor: pointer;
     }
     #pairing-qr { width: 160px; height: 160px; }
     #github-link { color: inherit; text-decoration: none; }
@@ -191,6 +193,13 @@
         min-height: 65vh;
         max-height: 65vh;
         overflow-y: auto;
+      }
+      /* The shared-page way needs two pads on one device, which a stacked
+         viewport does not have: js/screens.js keeps its cursor off the item,
+         and the item is hidden here so the sub-menu a phone shows lists only
+         the two network flows and Back. */
+      #way-item-local {
+        display: none;
       }
       /* The views that carry page text — the help view, the leaderboard, the
          pairing step — can run taller than the viewport, and body clips the rest
@@ -262,7 +271,9 @@
       <h2 id="pairing-title">Pair with another device</h2>
       <p id="pairing-hints" class="view"></p>
       <p id="pairing-link" class="view"></p>
+      <p id="copy-pairing-link" class="view" tabindex="-1">📑</p>
       <p id="pairing-code" class="view"></p>
+      <p id="copy-pairing-code" class="view" tabindex="-1">📑</p>
       <canvas id="pairing-qr" class="view"></canvas>
       <p id="pairing-waiting" class="view"></p>
       <!-- The preloader line: js/netplay.js starts the page's ICE attempt when the
@@ -271,9 +282,7 @@
       <p id="pairing-warn" class="view"></p>
       <input id="pairing-address" class="view" type="text" autocomplete="off" spellcheck="false" placeholder="192.168.4.10">
       <p id="pairing-address-line" class="view"></p>
-      <p id="copy-pairing-link" class="view" tabindex="-1">Copy</p>
-      <p id="copy-pairing-code" class="view" tabindex="-1">Copy</p>
-      <p id="copy-pairing-address" class="view" tabindex="-1">Copy</p>
+      <p id="copy-pairing-address" class="view" tabindex="-1">📑</p>
       <!-- The guest page's read-only mirrors of the host page's preparation
            sub-menus: js/ui.js paints them from the mirror the host sends, so the
            guest sees the other device choosing without offering a pick itself. -->

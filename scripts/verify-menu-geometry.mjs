@@ -204,9 +204,13 @@ press('enter');
 press('arrowdown');
 press('arrowdown');
 check(game.screen.waySelect === 2, 'two ArrowDown presses reach the same-network item');
+// A page keeps the first flow pick it makes, so the pick this block is about to
+// test has to start from no flow at all.
+lobby.flow = '';
 press('enter');
 check(game.screen.networkMode && game.screen.state === PAIRING,
   'Enter on "Network (same network)" opens the pairing step');
+check(lobby.flow === 'local', 'the second network item picks the same-network flow');
 press('escape');
 check(game.screen.state === MENU, 'Escape in the local pairing step returns to the menu');
 

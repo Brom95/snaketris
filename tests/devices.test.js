@@ -280,7 +280,7 @@ test('a pad no player owns drives no character', () => {
   assert.equal(devices.pollController(), null);
 });
 
-test('a narrow viewport opens the network way without the way sub-menu', () => {
+test('a narrow viewport opens the way sub-menu and hides only the shared-page way', () => {
   screens.resetScreen();
   stub.window.innerWidth = 300; // at or below UI_STACK_MAX_WIDTH: a phone
   screens.pushIntent({ action: 'menuDown' });
@@ -289,9 +289,22 @@ test('a narrow viewport opens the network way without the way sub-menu', () => {
   assert.equal(game.screen.menuSelect, 1);
   screens.pushIntent({ action: 'confirm' });
   screens.drainIntents();
-  // A phone has no second pad: the network way is selected and the pairing
-  // step opens direct, skipping the way sub-menu that offers the shared-page
-  // way.
+  // A phone has no second pad, so the shared-page way is the item hidden there.
+  // The sub-menu still opens, and it arms the duel without naming a flow yet.
+  assert.equal(game.screen.state, 'SELECT_WAY');
+  assert.equal(game.screen.twoPlayerMode, true);
+  assert.equal(game.screen.networkMode, false);
+
+  // The shared-page way is not offered at a stacked width, so naming it changes
+  // nothing and arms no same-computer duel.
+  screens.pushIntent({ action: 'select', id: 'way-item-local' });
+  screens.drainIntents();
+  assert.equal(game.screen.state, 'SELECT_WAY');
+  assert.equal(game.screen.networkMode, false);
+
+  // A network way is offered there, and it opens the pairing step.
+  screens.pushIntent({ action: 'select', id: 'way-item-network-local' });
+  screens.drainIntents();
   assert.equal(game.screen.state, 'PAIRING');
   assert.equal(game.screen.networkMode, true);
   assert.equal(game.screen.twoPlayerMode, true);
@@ -310,15 +323,6 @@ test('a narrow viewport opens the network way without the way sub-menu', () => {
   screens.pushIntent({ action: 'menuUp' });
   screens.drainIntents();
   assert.equal(game.screen.menuSelect, 1); // Two Players: listed at every width
-
-  // The shared-page way stays off a stacked layout even for a pointer that
-  // names it: the item is not offered there, so the way sub-menu never opens
-  // and no same-computer duel is armed.
-  screens.pushIntent({ action: 'select', id: 'way-item-local' });
-  screens.drainIntents();
-  assert.equal(game.screen.state, 'MENU');
-  assert.equal(game.screen.menuSelect, 1);
-  assert.equal(game.screen.networkMode, true); // the network way from above, unchanged
 
   screens.resetScreen();
   stub.window.innerWidth = 1920;

@@ -591,16 +591,10 @@ const HANDLERS = {
     return true;
   },
   [TRANSITIONS['two-player']]: (item, intent) => {
-    // The entry is offered at every viewport width. A wide viewport asks which
-    // of the two ways the match runs; a narrow one has no second pad on this
-    // device, so the network way is selected and the pairing step opens direct.
-    if (!twoPlayerOffered()) {
-      game.screen.networkMode = true;
-      game.screen.twoPlayerMode = true;
-      gotoScreen(PAIRING);
-      return true;
-    }
-    // The entry arms the duel; the way sub-menu decides which way runs it.
+    // The entry is offered at every viewport width and always opens the way
+    // sub-menu. A narrow viewport has no second pad on this device, so the
+    // shared-page way is the item the sub-menu hides there and the player still
+    // chooses between the two network flows. The way itself arms the duel.
     game.screen.twoPlayerMode = true;
     gotoScreen(SELECT_WAY);
     return true;

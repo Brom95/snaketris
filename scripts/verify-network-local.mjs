@@ -6,7 +6,7 @@
 // Run: node scripts/verify-network-local.mjs
 //
 // Two pages stand in for the two devices that share one network. Both run on
-// this machine, so the only address either one can name is 127.0.0.1, and the
+// this machine, so both pages name the one address the player tests with, and
 // candidate each page offers names that address with the OTHER page's own port.
 // What this check asserts is the measured shape of the transport: the address
 // travels, the page that keeps its own offer locally reads its own port, and
@@ -19,14 +19,17 @@
 import { chromium } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { BASE, check, failureCount, report, exposeGame, exposeSingletons, waitFor, freshPage } from './harness.mjs';
+import { BASE, check, failureCount, report, exposeSingletons, waitFor, freshPage } from './harness.mjs';
 import { SELECT_WAY, PAIRING } from '../js/constants.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const HOST_ADDRESS = '127.0.0.1';
-const GUEST_ADDRESS = '127.0.0.1';
-// The public candidate list a global-flow open reads; a local-flow page must
-// never ask for it.
+// The address the player tests this flow with: the address their own device
+// answers with. Neither page can reach it headlessly, which is what the check
+// asserts, so the value only has to be a well-formed address.
+const HOST_ADDRESS = '100.107.90.10';
+const GUEST_ADDRESS = '100.107.90.10';
+// A candidate list no open reads any more. A local-flow page has no supply to
+// ask for either, so the check asserts nothing reaches it on either flow.
 const PUBLIC_LIST = 'https://raw.githubusercontent.com/pradt2/always-online-stun/';
 
 console.log('=== local network flow ===');
@@ -178,7 +181,7 @@ check(denied.copy === 'denied' && denied.visible && denied.text.length > 0,
   'a copy this browser denies is reported on the page, and the value stays visible');
 
 // A wrong address must stay waiting, never paired.
-const wrongHost = await hostPage('127.0.0.2');
+const wrongHost = await hostPage('100.107.90.11');
 await waitFor(wrongHost.page, () => window.__netplay.link.includes('flow=local'), null, 20000);
 const wrongPublished = await local(wrongHost.page);
 const wrongGuest = await guestPage(wrongPublished.link);

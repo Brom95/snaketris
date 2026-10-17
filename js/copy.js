@@ -88,7 +88,7 @@ export const ADDRESS_BAD = 'An address is four groups of numbers with dots betwe
 // The copy affordance: a click puts the value beside it on the clipboard, so a
 // player never retypes a link or an address. A browser that refuses the copy
 // says so, and the value stays selectable by hand.
-export const COPY_LABEL = 'Copy';
+export const COPY_LABEL = '📑';
 export const COPY_DENIED = 'This page could not copy it — select the text instead.';
 
 // The guest page's read-only copies of the host's preparation sub-menus. The

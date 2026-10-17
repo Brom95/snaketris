@@ -15,11 +15,11 @@ read a public candidate list.
 - **THEN** the network section offers a global flow and a local flow as
   separate selectable items
 
-#### Scenario: A local-flow page never reads the public list
+#### Scenario: A local-flow page names no supply
 
 - **GIVEN** a page opened at the local flow
 - **WHEN** it prepares its channel
-- **THEN** it contacts no public candidate list and ships no candidate supply
+- **THEN** it hands its peer connection no candidate supply at all
 
 #### Scenario: A global-flow page never hand-crafts a candidate
 
@@ -115,13 +115,14 @@ ask its player to type an address the second page painted.
 ### Requirement: Every copyable element carries a copy affordance
 
 Every element a player may copy — the pairing link, the pairing code, an
-address line and a return line — SHALL carry a copy affordance whose click
-copies that element's value into the clipboard. A browser that denies the copy
-SHALL report it and leave the value selectable, never silently lose it.
+address line — SHALL carry a copy affordance whose click copies that element's
+value into the clipboard. The affordance SHALL sit directly under the value it
+copies, so a player can see which value a mark belongs to. A browser that denies
+the copy SHALL report it and leave the value selectable, never silently lose it.
 
 #### Scenario: A click copies the value
 
-- **GIVEN** a player clicks the copy affordance beside the pairing link
+- **GIVEN** a player clicks the copy affordance under the pairing link
 - **THEN** the link's value is in the clipboard
 
 #### Scenario: A denied copy is reported
@@ -136,15 +137,56 @@ SHALL report it and leave the value selectable, never silently lose it.
 - **GIVEN** a pairing element whose value a player cannot carry
 - **THEN** it shows no copy affordance
 
+### Requirement: The flow choice is offered at every viewport width
+
+The two-player entry SHALL open the way sub-menu at every viewport width, so a
+player on one pad still chooses which network flow runs. The shared-page way is
+the wide-only item, since it needs a second pad on this device.
+
+#### Scenario: A narrow viewport picks a flow
+
+- **GIVEN** a player opens the two-player entry on a narrow viewport
+- **THEN** the way sub-menu opens and lists both network flows as selectable items
+
+#### Scenario: The shared-page way stays wide-only
+
+- **GIVEN** the way sub-menu on a narrow viewport
+- **THEN** the shared-page way is not offered
+
+### Requirement: The global flow ships a named candidate supply
+
+The global flow SHALL hand its peer connection a shipped list of named ICE
+servers — the four Google hosts on port 19302 and `stun.stunprotocol.org` on
+3478 — rather than a list read from somewhere else at open time. A page SHALL
+still name a supply of its own from its address, and that named supply SHALL
+replace the shipped list for the channel that page builds.
+
+#### Scenario: An open with no supply in its address uses the shipped list
+
+- **GIVEN** a global-flow page whose address names no supply
+- **WHEN** it prepares its channel
+- **THEN** its peer connection is built with the shipped named servers
+
+#### Scenario: No page reads a candidate list
+
+- **GIVEN** any page of either flow
+- **WHEN** it prepares its channel
+- **THEN** it fetches no candidate list from a remote source
+
+#### Scenario: A named supply replaces the shipped list
+
+- **GIVEN** a pairing link whose address names a supply with `?ice=`
+- **THEN** the page hands its peer connection only the supply it names
+
 ### Requirement: The pairing link carries the local flow's address
 
-The local flow's pairing link SHALL carry the page's address and the port its
-own page read, beside the flow marker, so the peer learns both without typing
-them. The secret itself SHALL stay the offer the channel negotiates from, and
+The local flow's pairing link SHALL carry the address the page was given, beside the flow
+marker, so the peer learns it without typing. The link SHALL carry a port only once this
+page has read one. The secret itself SHALL stay the offer the channel negotiates from, and
 SHALL stay within the pairing fragment cap so the link opens on a typed address.
 
 #### Scenario: An address travels where a supply would not
 
 - **GIVEN** a local-flow page publishes its link
-- **THEN** the link names one address and one port and stays within the
+- **THEN** the link names the address it was given and stays within the
   pairing fragment cap

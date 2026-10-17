@@ -12,7 +12,7 @@ Boxes may only be checked after their verification gate passes.
   host's flow without typing, and a page's flow cannot change after it opens.
   - Verify: a unit test asserts the flow is read from the link and that a page
   opened without a flow marker takes the global flow.
-- [ ] 1.3 Keep the keyboard and pointer intents for both new items on the way
+- [x] 1.3 Keep the keyboard and pointer intents for both new items on the way
   screen.
   - Verify: a harness selects each item by key and by pointer.
 
@@ -66,7 +66,7 @@ Boxes may only be checked after their verification gate passes.
 ## 6. The local flow pairs on one machine as a harness proof
 
 - [ ] 6.1 Prove the transport in the harness with two pages on one machine
-  naming `127.0.0.1` as each other's address.
+  naming `100.107.90.10` as each other's address and `3478` beside it.
   - Verify: a harness asserts both pages reach an open channel and a message
   crosses, which is a real transport proof and not a user-verified-later claim.
   - Measured: this proof is not reachable as the flow is built now. The page
@@ -78,8 +78,8 @@ Boxes may only be checked after their verification gate passes.
 
 ## 7. Every copyable element carries a copy affordance
 
-- [x] 7.1 Add a copy affordance beside the pairing link, the pairing code, the
-  address line and the return line, whose click copies that value.
+- [x] 7.1 Add a copy affordance — the 📑 mark — directly under the pairing link,
+  under the pairing code and under the address line, whose click copies that value.
   - Verify: a harness clicks each affordance and asserts the value reaches the
   clipboard.
 - [x] 7.2 Report a denied or unavailable copy and keep the value selectable.
@@ -95,6 +95,8 @@ Boxes may only be checked after their verification gate passes.
   byte-for-byte stable.
   - Verify: the in-flight `network-multiplayer-webrtc` harnesses still pass
   (`scripts/verify-ice-preload.mjs`, `scripts/verify-network-duel.mjs`).
+  - Superseded for the supply itself by group 13: the user named the ICE servers
+    the global flow ships, which replaces the floor and retires the list read.
 - [x] 8.2 Keep the in-game steering branch byte-for-byte stable while the new
   way branches are added.
   - Verify: `js/input.js` `setDirection` in-game branch unchanged;
@@ -119,6 +121,37 @@ Boxes may only be checked after their verification gate passes.
 - [x] 10.3 `quality_baseline` pinned before the work; `quality_delta` reports
   no new regression before declaring DONE.
 - [x] 10.4 `doc_drift` reports no new false claim in the change's own docs.
+
+## 12. The flow choice survives a narrow viewport
+
+- [x] 12.1 Open the way sub-menu from the "Two Players" entry at every viewport
+  width, so a phone picks which network flow runs rather than getting one
+  unnamed flow.
+  - Verify: `scripts/verify-two-player-gating.mjs` at 500px lands on the way
+    sub-menu and picks each network item to its own flow.
+- [x] 12.2 Keep the shared-page way the wide-only item, since it needs a second
+  pad on this device.
+  - Verify: the narrow layout lists the two network flows and no shared-page way.
+
+## 13. The global flow names its candidate supply outright
+
+- [x] 13.1 Ship the global flow's supply as the five ICE servers the user named:
+  `stun1`–`stun4.l.google.com:19302` and `stun.stunprotocol.org:3478`.
+  - Verify: `js/app.js` `ICE_SERVERS` names those five entries and an open with
+    no supply in its address hands them to its peer connection.
+- [x] 13.2 Retire the public-list read and its bounds: the read measured as
+  yielding no candidates, and the shipped list is the supply now.
+  - Verify: no page fetches a candidate list; `tests/app.test.js` and
+    `scripts/verify-ice-preload.mjs` assert the shipped list and the `?ice=`
+    override in place of the read. The named servers cost a headless page the
+    whole attempt budget instead of resolving at once, so `scripts/verify-network-duel.mjs`
+    now waits each page's attempt out before standing a channel in: standing in
+    first left the attempt's own rebuild to replace the stand-in and swallow the
+    answer the harness posts next.
+- [x] 13.3 Keep the `?ice=` supply a page names for itself working, and the
+  local flow naming no supply at all.
+  - Verify: a link that names its supply hands only that supply; a local-flow
+    page hands none.
 
 ## 11. User-verified-later (not a code gate)
 

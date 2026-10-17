@@ -23,62 +23,23 @@ import { initInput, fitCanvas, pollController, handleIntent } from './input.js';
 import { initRender, render } from './render.js';
 import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
-// The shipped ICE floor every open starts with. An open that reaches the public
-// list adds entries to it; an open that cannot reaches only this. An empty
-// supply leaves only the `<uuid>.local` candidate, which reaches another
-// connection inside the same browser instance and never another device. An open
-// never writes into this list — the supply it chose is a local.
+// The candidate supply every global-flow open ships: the ICE servers this
+// project names, so an open needs no read of a remote list to have a supply.
+// An empty supply leaves only the `<uuid>.local` candidate, which reaches
+// another connection inside the same browser instance and never another device.
+// An open never writes into this list — the supply it chose is a local.
 export const ICE_SERVERS = [
-  { urls: ['stun:turn.cloudflare.com'] },
-  { urls: ['stun:l369369369.cdn.cloudflare.net'] },
-  { urls: ['stun:webrtcstun.eporoi.com'] },
-  { urls: ['stun:st3043834177.stun.eporoi.com'] },
+  { urls: ['stun:stun1.l.google.com:19302'] },
+  { urls: ['stun:stun2.l.google.com:19302'] },
+  { urls: ['stun:stun3.l.google.com:19302'] },
+  { urls: ['stun:stun4.l.google.com:19302'] },
+  { urls: ['stun:stun.stunprotocol.org:3478'] },
 ];
 
-// STUN server list URL — hardcoded per project requirement.
-// Use this URL to fetch a fresh list of online STUN servers whenever needed.
-const STUN_SERVERS_URL = 'https://raw.githubusercontent.com/pradt2/always-online-stun/master/valid_hosts.txt';
-
-// How long one open may wait for that list before it gives up: the pairing step
-// already counts a longer wait, so a slow or unreachable source costs the open
-// this bound and falls back to the shipped supply rather than stretching it.
-export const STUN_FETCH_TIMEOUT_MS = 1200;
-
-// How many entries the public list may contribute to one open: an offer carries
-// a candidate block per server it can reach, and that blob travels in the
-// pairing secret, so the cap keeps the link inside the fragment cap and the
-// short code form reachable.
-export const ICE_SUPPLY_LIMIT = 4;
-
 // The supply this open resolved, chosen before its channel is built. The
-// shipped list starts the open; an open that asked the public list replaces it
+// shipped list starts the open; a link that names its own supply replaces it
 // for the channel it builds, and nothing ever writes into ICE_SERVERS.
 let iceSupply = ICE_SERVERS;
-
-async function fetchStunServers() {
-  try {
-    // The read gets a bound of its own: an open whose source is slow or
-    // unreachable must not stretch the wait the pairing step already counts, so
-    // the read gives up and the open falls back to the shipped supply.
-    const response = await fetch(STUN_SERVERS_URL, { signal: AbortSignal.timeout(STUN_FETCH_TIMEOUT_MS) });
-    if (!response.ok) return [];
-    const text = await response.text();
-    // The list names hosts, not URLs: most lines are a bare `host:port` the
-    // source says answers now, and a peer connection needs a scheme, so the
-    // entries this page can hand are those hosts under the stun scheme. A line
-    // that already carries a scheme is taken as it is; one that carries neither
-    // form is dropped rather than handed on as something the connection rejects.
-    const entries = [];
-    for (const line of text.split('\n')) {
-      const host = line.trim();
-      const entry = /^[A-Za-z0-9.-]+:\d+$/.test(host) ? `stun:${host}` : host;
-      if (isIceUrl(entry)) entries.push(entry);
-    }
-    return entries;
-  } catch (e) {
-    return [];
-  }
-}
 
 // A candidate supply entry a peer connection can take: the stun and turn schemes
 // only. A bare address — a host on the subnet, with or without a port — names no
@@ -89,33 +50,18 @@ function isIceUrl(value) {
 
 // The candidate supply for one open, chosen per open rather than written back
 // into the page's constant. A link that names its own supply — the host endpoint
-// on the subnet — is that supply, and contacts no public list at all. Otherwise
-// the open reads the public list, which names the hosts online now, and adds a
-// sample of it to the shipped floor; entries the list does not name are never
-// offered, and a list this open cannot read leaves the floor alone. An attempt
+// on the subnet — is that supply, and contacts no list at all. Otherwise the
+// open ships the named servers, and a local-flow page ships none: its candidate
+// is the one it hand-crafts from the address its player typed. An attempt
 // reports what its offer carries, so a supply that answers nothing is a page
 // with no channel, never a silent pairing.
 export async function iceSupplyForOpen() {
   // The same-network flow names no supply at all: its page hand-crafts the one
-  // candidate that matters, so fetching a public list would only add noise.
+  // candidate that matters, so a supply would only add noise.
   if (lobby.flow === 'local') return [];
   const named = iceServersFromUrl([]);
   if (named.length > 0) return named;
-  const fresh = await fetchStunServers();
-  if (fresh.length === 0) return ICE_SERVERS.slice();
-  return ICE_SERVERS.concat(pickIceServers(fresh, ICE_SUPPLY_LIMIT));
-}
-
-// A bounded sample of the public list for one open: the list names hundreds of
-// hosts, and an offer carries a candidate block per server it can reach, so an
-// open takes a few at random and a later open takes different ones.
-function pickIceServers(urls, limit) {
-  const picked = urls.slice(0, Math.min(limit, urls.length));
-  for (let i = picked.length; i < urls.length; i += 1) {
-    const replace = Math.floor(Math.random() * (i + 1));
-    if (replace < picked.length) picked[replace] = urls[i];
-  }
-  return picked.map((url) => ({ urls: [url] }));
+  return ICE_SERVERS.slice();
 }
 
 // The supply this open resolved, recorded so the channel this open builds reads
