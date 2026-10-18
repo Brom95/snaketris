@@ -6,7 +6,9 @@
 // the wide-viewport rule that once hid the whole entry now gates the "Same
 // computer" way only. A wide viewport lists the four menu items and shows the
 // way sub-menu; the narrow stacked layout lists the same four items and opens
-// the pairing step straight from the entry, with no way sub-menu at all.
+// the way sub-menu too, because choosing which network flow to run under belongs
+// to the phone player - only the shared-page way, which needs two pads on one
+// device, is hidden there.
 //
 // Run: node scripts/verify-two-player-gating.mjs
 

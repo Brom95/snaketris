@@ -299,6 +299,33 @@ Boxes may only be checked after their verification gate passes.
 - [ ] 20.2 Re-check the claims this weakens.
   - Verify: npm test green, scripts/verify-all.mjs whole sweep green.
 
+## 21. The way choice opens wherever its player is
+
+- [x] 21.1 The two-player entry offers the way sub-menu at every viewport width
+  - Verifies: 1.2, 3.1, 5.2
+  - Why: a phone player had no way to name an address at all, so the wide-viewport shortcut
+    picked the shared-page way for them and the LAN match could not be finished; the choice
+    is offered everywhere and only the shared-page way - the one that needs two pads on one
+    device - is hidden on a stacked viewport.
+  - Counter: the way sub-menu is hidden again at the narrow width, or the shared-page way is
+    offered there and a phone player picks it.
+  - Verify: scripts/verify-two-player-gating.mjs (the narrow section opens the way sub-menu,
+    lists both network ways and Back, and hides the shared-page item), scripts/verify-ice-preload.mjs.
+
+- [x] 21.2 A page that picked one way and paired with nobody takes the other way and runs
+  its open again under it
+  - Verifies: 5.2
+  - Why: the two-page LAN match was being tested on one screen, and the second variant a
+    player opened kept the first variant's flow.
+  - Counter: the page keeps its first way, keeps the first way's offer published, or keeps
+    the channel that first way opened.
+  - Verify: scripts/verify-way-switch.mjs (the global way publishes; after backing out the
+    same-network way is taken, the offer is gone, a fresh connection appears, and the typed
+    address reaches the published link and its painted code).
+
+- [ ] 21.3 Re-check the claims this weakens.
+  - Verify: npm test green, scripts/verify-all.mjs whole sweep green.
+
 ## 11. User-verified-later (not a code gate)
 
 - [ ] 11.1 Two real devices on one network pair through the local flow in the

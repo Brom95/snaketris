@@ -359,6 +359,18 @@ link, its QR, its address lines and the waiting line, which name what that way's
 player can still do. Retiring `LOCAL_WARN` leaves the copy file without an unused
 line, and `js/constants.js` stops re-exporting it.
 
+### D10: The way choice is offered wherever its player is, not only on a wide screen
+
+A stacked viewport had a shortcut that answered the flow question for the player:
+it opened the pairing step under the shared-page way, hiding the choice. A phone
+player therefore never saw an address field at all, and no match across two real
+devices could be finished from one. The choice is now opened at every width — the
+player decides, even when the device is small — and only the shared-page way, the
+one that needs two controllers on one device, is hidden where the layout is stacked.
+An item that needs a second pad on the same screen cannot be played on a viewport
+that stacks its panels, so hiding that one item is the honest narrow rule; hiding
+the choice is not.
+
 ## Risks and what they mean
 
 - **A real LAN needs the devices to reach each other.** A typed address that is

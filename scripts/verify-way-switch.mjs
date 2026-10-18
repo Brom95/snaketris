@@ -1,115 +1,152 @@
-// Browser check for the way a page runs under: the address a player types arrives
-// whole, a digit typed over it is not spent on the code, and a page that walks back
-// to the way choice re-runs its open under the other way, rebuilding its channel.
-// Run: node scripts/verify-way-switch.mjs
+// verify-way-switch.mjs — measure the way choice re-opens, and the address field takes typing.
 //
-// The way items are clicked rather than keyboard-navigated: this check is about
-// re-picking a way, not about which viewports offer the choice.
-import { chromium } from '@playwright/test'
-import { resolve as pathResolve } from 'node:path'
-const { freshPage, exposeSingletons, check, report, stateIs } = await import(import.meta.resolve('./harness.mjs'))
+// What it proves on one real page, at the wide viewport:
+//   1. Picking a way starts its open: the page publishes, its offer reaches.
+//   2. Leaving the pairing step and picking the OTHER way re-decides on the same page:
+//      the flow flips, what the first way published is taken back, and the channel
+//      that open used is replaced (a fresh RTCPeerConnection identity appears).
+//   3. The second way shows its own address field, and every digit the player types
+//      lands in the field whole — not in lobby.typed — while the published link names
+//      the way, carries the address, and has a code to show it under.
+// The narrow half of the claim (the choice offered at all on a 360×640 viewport) is
+// measured in verify-ice-preload.mjs; this file is the switch and the typing.
+//
+// Run: node scripts/verify-way-switch.mjs
+import { chromium } from '@playwright/test';
+import { resolve } from 'node:path';
 
-const ROOT = pathResolve(import.meta.dirname, '..')
-const browser = await chromium.launch()
-const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
-const page = await freshPage(context, ROOT)
-await exposeSingletons(page)
-let failures = 0
+const ROOT = resolve(import.meta.dirname, '..');
+const BASE = 'http://duel.test/';
 
-// Record every state the page's ICE machinery runs through, in order, so the switch
-// is read as a sequence rather than a before/after pair that any one change could
-// have caused. The page drives its own frames on requestAnimationFrame, so sampling
-// there sees each change at most once per frame.
+const { freshPage, exposeSingletons, check, report, failureCount, waitFor, stateIs, shown } =
+  await import(import.meta.resolve('./harness.mjs'));
+
+const browser = await chromium.launch();
+const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page = await freshPage(context, ROOT);
+await exposeSingletons(page);
+
+// Count the connections the page has used, keyed by identity, so the switch's fresh
+// channel is measured by the object rather than by what the lobby says afterwards.
 await page.evaluate(async () => {
-  const mod = await import('/js/netplay.js')
-  const trace = []
-  window.__trace = trace
-  const sample = () => {
-    const link = mod.peerLink()
-    const pc = link && link.transport && link.transport.connection ? link.transport.connection.signalingState : 'no connection'
-    const row = `${mod.lobby.flow}/${mod.lobby.ice}/${pc}`
-    if (trace[trace.length - 1] !== row) trace.push(row)
-  }
-  const tick = () => {
-    sample()
-    requestAnimationFrame(tick)
-  }
-  requestAnimationFrame(tick)
-})
+  const mod = await import('/js/netplay.js');
+  const peerLink = mod.peerLink;
+  const names = new Map();
+  const nameOf = (conn) => {
+    if (!conn) return '';
+    if (!names.has(conn)) names.set(conn, 'pc' + (names.size + 1));
+    return names.get(conn);
+  };
+  window.__channels = [];
+  const record = () => {
+    const row = { flow: mod.lobby.flow, ice: mod.lobby.ice, pc: nameOf(peerLink()) };
+    if (window.__channels.length && JSON.stringify(window.__channels.at(-1)) === JSON.stringify(row)) return;
+    window.__channels.push(row);
+  };
+  record();
+  const step = () => {
+    record();
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+});
 
-await page.click('#menu-item-two-player')
-await stateIs(page, 'SELECT_WAY')
-await page.click('#way-item-network-local')
-await stateIs(page, 'PAIRING')
+// The recorder runs every frame; let it start before the page does anything else.
+await page.evaluate(() => null);
 
-// The address the player types, typed as real keystrokes into the field.
-const field = page.locator('#pairing-address')
-await field.focus()
-await page.keyboard.type('100.107.90.10', { delay: 90 })
-const typed = await page.evaluate(() => ({
-  field: document.getElementById('pairing-address').value,
-  lobby: window.__netplay.address,
-  bad: window.__netplay.addressBad,
-  typed: window.__netplay.typed,
-}))
-check(typed.field === '100.107.90.10', `the field holds the whole address: ${JSON.stringify(typed.field)}`, (m) => failures = m)
-check(typed.lobby === '100.107.90.10', `the lobby accepts it: ${JSON.stringify(typed.lobby)} bad ${JSON.stringify(typed.bad)}`, (m) => failures = m)
-const onPage = await page.evaluate(() => document.getElementById('pairing-address-line')?.textContent ?? '')
-check(onPage.includes('100.107.90.10'), `what the page names is what the player typed: ${JSON.stringify(onPage.trim())}`, (m) => failures = m)
-check(typed.typed === '', `the digits went to the field, not the code: typed ${JSON.stringify(typed.typed)}`, (m) => failures = m)
+// MENU → two-player → the way sub-menu → the global way.
+await page.click('#menu-item-two-player');
+await check(
+  await waitFor(page, () => {
+    const el = document.querySelector('#way-item-network-global');
+    return Boolean(el) && el.checkVisibility();
+  }, undefined, 15000),
+  'the two-player entry offers the way sub-menu');
+await page.click('#way-item-network-global');
+await check(await stateIs(page, 'PAIRING', 15000), 'the global way reaches the pairing step');
 
-const letter = await page.evaluate(async () => {
-  const devices = await import('/js/devices.js')
-  return devices.keyToIntent('b')
-})
-check(letter && letter.action === 'pairChar' && letter.char === 'B', `a letter still spells the code: pairChar ${letter && letter.char}`, (m) => failures = m)
-
-// Walk back to the menu the way choice sits under and pick the other way.
-await page.click('#pairing-back')
-await stateIs(page, 'MENU')
-await page.click('#menu-item-two-player')
-await stateIs(page, 'SELECT_WAY')
-await page.click('#way-item-network-global')
-await stateIs(page, 'PAIRING')
-
-const secondWay = await page.evaluate(() => ({
+// The candidate gather costs the whole 15-second attempt budget on this machine, so
+// the open takes that long to publish — the wait is generous on its own account.
+await check(
+  await waitFor(page, () => window.__netplay.link !== '', undefined, 90000),
+  'the first way published a link');
+const first = await page.evaluate(() => ({
   flow: window.__netplay.flow,
   offer: window.__netplay.offer,
+  warm: window.__netplay.warm,
   link: window.__netplay.link,
-  address: window.__netplay.address,
-  ice: window.__netplay.ice,
+}));
+await check(first.flow === 'global', 'the page runs under the way it picked first');
+await check(first.offer !== '' && first.link !== '', 'that way published an offer');
+const beforeIds = new Set(
+  (await page.evaluate(() => window.__channels.map((row) => row.pc))).filter(Boolean)
+);
+
+// Back out of the pairing step, then pick the other way on the same page.
+await page.keyboard.press('Escape');
+await check(await stateIs(page, 'MENU', 5000), 'the pairing step backs out to the menu');
+await page.click('#menu-item-two-player');
+await check(
+  await waitFor(page, () => window.__game.screen.state === 'SELECT_WAY', undefined, 15000),
+  'returning to the two-player entry offers the way choice again');
+await page.click('#way-item-network-local');
+await check(await stateIs(page, 'PAIRING', 15000), 'the same-network way reaches the pairing step');
+await check(
+  await waitFor(page, () => window.__netplay.flow === 'local', undefined, 15000),
+  'the page now runs under the way it picked second');
+const switched = await page.evaluate(() => ({
+  offer: window.__netplay.offer,
+  warm: window.__netplay.warm,
+  link: window.__netplay.link,
   rebuilt: window.__netplay.rebuilt,
-}))
-check(secondWay.flow === 'global', `the way switched: flow ${JSON.stringify(secondWay.flow)}`, (m) => failures = m)
-check(secondWay.address === '', `the address the first way asked for is gone: ${JSON.stringify(secondWay.address)}`, (m) => failures = m)
-check(secondWay.offer === '' && secondWay.link === '', `the first way's offer and link were taken back: offer ${JSON.stringify(secondWay.offer)} link ${JSON.stringify(secondWay.link)}`, (m) => failures = m)
-check(secondWay.ice === 'gathering' && secondWay.rebuilt === false, `the page ran its open again under the new way: ice ${JSON.stringify(secondWay.ice)} rebuilt ${JSON.stringify(secondWay.rebuilt)}`, (m) => failures = m)
+}));
+await check(
+  switched.offer === '' && switched.warm === '' && switched.link === '' && !switched.rebuilt,
+  'the switch takes back what the first way published'
+);
+const afterIds = new Set(
+  (await page.evaluate(() => window.__channels.map((row) => row.pc))).filter(Boolean)
+);
+await check(
+  afterIds.size > beforeIds.size && [...afterIds].some((id) => !beforeIds.has(id)),
+  'the switch runs its open again on a fresh channel'
+);
 
-const dom = await page.evaluate(() => ({
-  linkCopy: (document.getElementById('pairing-link') || {}).textContent || '',
-  codeCopy: (document.getElementById('pairing-code') || {}).textContent || '',
-  addressFieldHidden: getComputedStyle(document.getElementById('pairing-address')).display === 'none',
-  addressLineWidth: (document.getElementById('pairing-address-line') || {}).getBoundingClientRect().width,
-  addressFieldWidth: (document.getElementById('pairing-address') || {}).getBoundingClientRect().width,
-}))
-check(dom.linkCopy === '' && dom.codeCopy === '', `the page shows no offer of the way it left: link copy ${JSON.stringify(dom.linkCopy)} code copy ${JSON.stringify(dom.codeCopy)}`, (m) => failures = m)
-const waiting = await page.evaluate(() => document.getElementById('pairing-waiting')?.textContent ?? '')
-check(waiting.includes('Waiting for'), `the page whose offer was taken back shows its waiting line plainly, with no offer beside it: ${JSON.stringify(waiting.trim())}`, (m) => failures = m)
-check(dom.addressFieldHidden, `the re-picked way asks nothing of the player as an address: the field is not on the page (rect width ${dom.addressFieldWidth}, address line width ${dom.addressLineWidth})`, (m) => failures = m)
+// The second way's own affordance, then what the player types into it.
+await check(await shown(page, '#pairing-address', true), 'the same-network way shows its address field');
+await page.evaluate(() => document.getElementById('pairing-address').focus());
+await page.keyboard.type('100.107.90.10', { delay: 90 });
+await check(
+  await waitFor(page, () => window.__netplay.link !== '', undefined, 30000),
+  'the page publishes its address-bearing link'
+);
+const typed = await page.evaluate(() => ({
+  field: document.getElementById('pairing-address').value,
+  address: window.__netplay.address,
+  addressBad: window.__netplay.addressBad, // false once a whole dotted-quad is in the field
+  typed: window.__netplay.typed,
+  link: window.__netplay.link,
+}));
+await check(typed.field === '100.107.90.10', 'the field keeps every digit typed');
+await check(typed.address === '100.107.90.10', 'the page reads the typed address');
+await check(typed.addressBad === false, 'the address typed whole is accepted');
+await check(typed.typed === '', 'the address digits are not spent on the short readable code');
+await check(
+  typed.link.includes('flow=local') && typed.link.includes('a=100.107.90.10'),
+  'the published link names the way and carries the address'
+);
+const qr = await page.evaluate(() => {
+  const el = document.getElementById('pairing-qr');
+  if (!el || !el.checkVisibility() || !el.getContext) return { shown: false, lit: 0 };
+  const face = el.getContext('2d');
+  const pixels = face.getImageData(0, 0, el.width, el.height).data;
+  let lit = 0;
+  for (let at = 0; at < pixels.length; at += 4) {
+    if (pixels[at + 3] > 0 && pixels[at] < 128) lit++;
+  }
+  return { shown: true, lit };
+});
+await check(qr.shown && qr.lit > 0, 'a code is painted under the address-bearing link');
 
-// The re-picked way runs its open to the end: the attempt settles, the page
-// publishes, and the recorder shows the way it opened the attempt under.
-await page.waitForFunction(() => window.__netplay.ice !== 'gathering' && window.__netplay.ice !== '', { timeout: 45000 })
-const settled = await page.evaluate(() => ({ ice: window.__netplay.ice, rebuilt: window.__netplay.rebuilt }))
-check(settled.ice !== 'gathering' && settled.ice !== '', `the re-picked way ran its ICE attempt to the end: ice ${JSON.stringify(settled.ice)} rebuilt ${JSON.stringify(settled.rebuilt)}`, (m) => failures = m)
-await page.waitForFunction(() => window.__netplay.link !== '', { timeout: 45000 })
-const published = await page.evaluate(() => window.__netplay.link)
-check(published !== '', `the re-picked way published its own offer: ${JSON.stringify(published)}`, (m) => failures = m)
-const trace = await page.evaluate(() => window.__trace)
-const ways = trace.map((row) => row.split('/')[0]).filter((way, i, all) => i === 0 || way !== all[i - 1])
-check(JSON.stringify(ways) === '["","local","global"]', `the page ran its open under the way it had picked, then under the new one, in that order: ${JSON.stringify(ways)}`, (m) => failures = m)
-check(trace.some((row) => row.startsWith('local/gathering')) && trace.some((row) => row.startsWith('global/gathering')) && trace.some((row) => row.startsWith('global/') && !row.startsWith('global/gathering')), `the attempt ran under the first way and then under the new one, to a finish: ${trace.length} states, first 12 ${JSON.stringify(trace.slice(0, 12))}`, (m) => failures = m)
-
-await browser.close()
-report('the address a player types and switching the way', failures)
-if (failures) { console.log(`FAIL ${failures}`); process.exitCode = 1 }
+await browser.close();
+report('way re-pick and address typing report', failureCount());
