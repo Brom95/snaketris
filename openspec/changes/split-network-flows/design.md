@@ -174,6 +174,13 @@ from a page with no channel. Dropping the read also drops its bounds — the fet
 timeout and the entry cap — which existed only to keep a fetched blob inside the
 pairing fragment cap; a shipped list of five is bounded by construction.
 
+Swapping which names sit in that list is measured to change nothing here: a page
+opened under each of the five, under each of the four names an earlier open shipped,
+and under one more, all settle the same way — the attempt spends its whole budget
+and its offer names no address. So no headless run can say one set of names is
+better than another, and a supply change must not be chased as the reason a pairing
+failed; only a real browser, on a network that reaches a candidate, can tell.
+
 ### D8 — the field keeps what the player typed, and the key stays a key
 
 The address the player types is the only field the browser itself feeds, and two

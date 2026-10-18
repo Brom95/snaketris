@@ -62,6 +62,9 @@ check(seen.joined === false && seen.paired === false, `the page is not seen as j
 check(seen.qrWidth === 0, `and it paints no QR of a link it does not hold (${seen.qrWidth} modules wide while link ${JSON.stringify(seen.link)})`)
 check(!seen.warnText.includes('?ice='), `and the line it shows names this way, not the other one's server: ${JSON.stringify(seen.warnText)}`)
 check(seen.flow === 'local', `the page knows the way it opened under: flow ${JSON.stringify(seen.flow)}`)
-await browser.close()
 report('the page a phone opens at a host link', failureCount())
+// Closing the browser is not awaited: a peer connection that never resolves keeps
+// its request open, so awaiting close waits for a request no network ever answers.
+// The verdict above is what decides the exit.
 if (failureCount()) process.exitCode = 1
+process.exit(process.exitCode ?? 0)
