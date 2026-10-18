@@ -38,6 +38,17 @@ Boxes may only be checked after their verification gate passes.
   - Verify: a harness asserts two different pages of the same flow report
   different ports, and that each port appears in that page's own local
   description.
+- [x] 3.2 Carry the port the page reads later onto the line it shows, so a peer
+  opening that line joins on a port the line names rather than one it never
+  names, and a page whose line already carries every value it holds keeps it.
+  - Verify: `scripts/verify-network-local.mjs` asserts the line the page shows
+  names the port the page read and differs from the line published without it;
+  `tests/netplay.test.js` asserts a page that had read no port publishes a line
+  naming none, and that refreshing it once the port lands names that port.
+  - Measured (2026-10-18T02:36:27Z): the host page read its own port and its
+  refreshed line carried it — the guest opened at that line and reports its peer
+  as `100.107.90.10:40165`, the port the host read — so a player copying the
+  line the page shows joins on a port the line names.
 
 ## 4. Each local-flow page offers the peer its own candidate
 
@@ -263,6 +274,30 @@ Boxes may only be checked after their verification gate passes.
   browser refuses an answer whose media line it did not write (InvalidStateError,
   measured) and reads no port from its own description, so no harness here can
   stand the second socket in — the user verifies on their own network.
+
+## 19. The port the host read reaches the link it shows
+
+- [x] 19.1 Build the pairing link in one step both the publish and a later refresh share,
+      so the line names the address and the port the page knows by then.
+  - Verify: tests/netplay.test.js (a page whose port lands after its publish shows the link
+    carrying it; a page that never reads a port keeps the link without one).
+- [x] 19.2 Refresh the link on the pairing tick once the port arrives.
+  - Verify: scripts/verify-network-local.mjs (the host's published link names its own port,
+    not only its address; the page opened at that line reports the same port as its peer).
+- [ ] 19.3 Re-check the claims this weakens.
+  - Verify: npm test green, scripts/verify-all.mjs whole sweep green.
+
+## 20. The lines the same-network way shows
+
+- [ ] 20.1 Paint no short readable code, no candidate line, and no candidate wait on the
+      same-network way: that way asks an address, never a server, and typed digits go to the
+      address field, so a code painted there is a value no player could type. The other way
+      keeps all three.
+  - Verify: scripts/verify-network-local.mjs (the host page on that way names no code and no
+    candidate line while it waits), scripts/verify-pairing-step.mjs (the other way still
+    paints its code with the affordance under it), scripts/verify-ice-preload.mjs.
+- [ ] 20.2 Re-check the claims this weakens.
+  - Verify: npm test green, scripts/verify-all.mjs whole sweep green.
 
 ## 11. User-verified-later (not a code gate)
 

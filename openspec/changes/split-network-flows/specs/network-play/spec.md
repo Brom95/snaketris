@@ -253,11 +253,62 @@ marker, so the peer learns it without typing. The link SHALL carry a port only o
 page has read one. The secret itself SHALL stay the offer the channel negotiates from, and
 SHALL stay within the pairing fragment cap so the link opens on a typed address.
 
+A value this page learns after it published SHALL still reach the link it shows: the port
+a page reads out of its own description lands later than the first publish, and the link
+another page opens SHALL name it by then.
+
 #### Scenario: An address travels where a supply would not
 
 - **GIVEN** a local-flow page publishes its link
 - **THEN** the link names the address it was given and stays within the
   pairing fragment cap
+
+#### Scenario: The port is read after the page published
+
+- **GIVEN** a local-flow page published its link before it had read a port
+- **WHEN** a later moment reads the port out of its own description
+- **THEN** the link the page shows names that port beside the address, so a page
+    opened at it connects where the address alone would not say
+
+### Requirement: The same-network way offers no short code
+
+The local flow's pairing step SHALL paint no short readable code, and no copy
+affordance for one: that way brings the peer over a link the player opens, and
+its own page spends typed digits on the address field, so a code painted there
+would be a value no player could type. The anywhere-network way keeps its code
+beside its link.
+
+#### Scenario: A local page paints only lines a player can act on
+
+- **GIVEN** a page of the local flow published its offer
+- **THEN** it paints its link, its QR, and its address lines
+- **AND** it paints no short readable code and no copy affordance for one
+
+#### Scenario: The other way keeps its code
+
+- **GIVEN** a page of the global flow published its offer
+- **THEN** it paints its short readable code beside its link, with a copy
+    affordance under it
+
+### Requirement: The same-network way paints no short code
+
+The local flow's pairing step SHALL paint no short readable code, and no copy
+affordance for one: that way brings the peer over a link the player opens, and a
+page on that way spends typed digits on the address field, so a code painted
+there would be a value no player could type. The anywhere-network way keeps its
+code beside its link.
+
+#### Scenario: A local page paints only lines a player can act on
+
+- **GIVEN** a page of the local flow whose offer is published
+- **THEN** the page paints its link, its QR, and its address lines
+- **AND** it paints no short readable code and no copy affordance for one
+
+#### Scenario: The other way keeps its code
+
+- **GIVEN** a page of the global flow whose offer is published
+- **THEN** it paints its short readable code beside its link, with a copy
+    affordance under it
 
 ### Requirement: The local way names no candidate line
 

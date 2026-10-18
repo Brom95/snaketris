@@ -300,6 +300,65 @@ page's candidate attempt ran under the way it had picked, the switch also lets
 go of that way's channel and runs its open again under the new one — a measured
 probe saw a fresh connection and a fresh attempt, and saw the new way publish.
 
+### D14 — the link is rebuilt when a value it names arrives late
+
+Measured: a local-flow page published `?flow=local&a=<address>` with no port, while its own
+port field read a number two rows later. The link is built inside the publish, and the publish
+runs only while the page holds no offer — so the moment that learns the port (the description
+grows the candidate line only once ICE gathers) has no way to put it into the line a peer opens.
+
+The decision: the link line is one function of what the page knows now — its own address, the
+port it read, the flow it runs under, and the secret it published. Extract that building into
+one step both the publish and a later refresh call, and let the pairing tick refresh the link
+whenever a value arrives after the publish. A link rebuilt this way carries the same secret, so
+a page that already opened at the older line is unaffected; the refreshed line is for whoever
+opens next.
+
+## D10: the line a peer opens is rebuilt once the port lands
+
+Why: the page published its pairing line before it had read its own port — the
+port is the ICE gather step's to read, it appears in the page's own local
+channel only as the channels open, and `networkDuties` runs its local-flow port
+step every tick for that reason ([5b32ac92ade5] confirms publish runs while
+`port` is 0). The publish happens once, gated on the page having no offer yet,
+so after the port lands nothing writes the line again and the address-bearing
+link names an address with no port to join on. The port was read and kept
+([e6252c30eb6a] measured the host's own port land), only never republished.
+
+How: one link-building step shared by the publish and the refresh. `pageLink(secret, pageUrl)`
+returns the marked line, naming the way and the address, port and code it holds
+when they are known, and `publish` returns that line unchanged for the global
+flow. `refreshLink()` compares the line the page would build now against the one
+it published and replaces it when the two differ; `networkDuties` runs that step
+beside the announcement, every tick on the same-network flow, because the port
+lands on a later tick than the publish. `refreshLink` is a no-op until the page
+holds both an offer and a link, so a page that published nothing builds no line
+and a guest that opened at a marked URL rebuilds only its own.
+
+This replaces the whole line-building step in `publish`, and so its shape carries
+across the earlier decision about shortening the line (D2, whose cap was measured
+at 313 characters of the 255-byte cap) — the refreshed line carries the same two
+values plus the port. A local-flow page that publishes before it has read its port
+must not publish at all (measured), so the publish stays gated on the address and
+the refresh carries the port to the line afterwards.
+
+### D15 — the same-network way paints only lines its player can act on
+
+Why: the user opened the same-network way and asked, of the short code shown on
+it, where and why to enter it — there is no answer, because that way pairs over
+the line a player opens, not over a typed secret, and the page spends a typed
+digit on the address field instead. The two candidate lines are the same shape
+of dead end: that way asks no server, so a warning or a wait about candidates
+names something the way cannot act on, and a player reads it as an error to fix.
+
+How: `paintPairing` derives one `localFlow` and gates all three on it — the
+short code (and its copy affordance) is painted only off that flow, and both the
+candidate warning and the candidate wait are suppressed on it. Nothing else
+changes: the global way keeps all three lines, and the same-network way keeps its
+link, its QR, its address lines and the waiting line, which name what that way's
+player can still do. Retiring `LOCAL_WARN` leaves the copy file without an unused
+line, and `js/constants.js` stops re-exporting it.
+
 ## Risks and what they mean
 
 - **A real LAN needs the devices to reach each other.** A typed address that is

@@ -15,7 +15,7 @@ import {
   publish, sendFrame, sendPreparationMirror, answerOffer, acceptAnswer, onPeerClose,
   peerClosed, peerLeft, inboundReport, reportPeerState, localSeat, openGuestStream,
   guestStreamReport, setIceFallback, setIceOpen, startIceAttempt, carriesRemoteAddress,
-  lobby, noteFlowOfLink, notePeerAddress, noteOwnPort, announceOwn, pointAtPeer,
+  lobby, noteFlowOfLink, notePeerAddress, noteOwnPort, announceOwn, pointAtPeer, refreshLink,
 } from './netplay.js';
 import { gameOver } from './state.js';
 import { PEER_LEFT } from './rules.js';
@@ -234,6 +234,11 @@ function networkDuties() {
     const own = peerLink();
     const ownPc = own && own.transport && own.transport.connection;
     if (ownPc && ownPc.localDescription) noteOwnPort(ownPc.localDescription.sdp);
+    // The line a peer opens is rebuilt whenever a value it names arrives, because
+    // the page published before it had read its own port: a link that names only
+    // the address says no port to join on, and nothing republishes it once the
+    // page holds an offer.
+    refreshLink();
     announceOwn();
     // A page that holds the peer address its link named aims its own channel at
     // that address, whether or not the channel ever carried a report: a link is

@@ -8,7 +8,7 @@ import {
   GAME_CONTROL_PLAYER_MARKERS,
   PAIRING_TITLE, PAIRING_HINTS, PAIRING_LINK_LABEL, PAIRING_CODE_LABEL, PAIRING_WAITING,
   PAIRING_WARN_LOCAL, PAIRING_WARN_NONE, PAIRING_ICE_WAIT,
-  LOCAL_TITLE, LOCAL_HINTS, LOCAL_WARN, ADDRESS_LABEL, ADDRESS_HINTS, ADDRESS_BAD,
+  LOCAL_TITLE, LOCAL_HINTS, ADDRESS_LABEL, ADDRESS_HINTS, ADDRESS_BAD,
   COPY_LABEL, COPY_DENIED,
   DURATION_SCREEN_ITEMS, ROLE_SCREEN_ITEMS, MIRROR_TITLE, MIRROR_HINTS,
   twoPlayerOffered,
@@ -246,24 +246,26 @@ function paintPairing(pctx) {
   show(pairingQrEl, linkForm);
   if (pairingQrEl && !linkForm) pairingQrEl.width = 0;
   if (linkForm && pairingQrEl) paintQr(pairingQrEl, lobby.link);
-  // The short readable code is painted beside the link and the QR in every form,
-  // so a device that can neither scan nor open a link still holds a secret it can
-  // type on its own page.
-  const codeForm = published && lobby.code !== '';
+  // The short readable code is a way in for a device that can neither scan the
+  // QR nor open the link. The same-network way pairs on the address its line
+  // names, and a page on that way spends typed digits on the address field, so
+  // there is no code there to type and nothing to paint beside it.
+  const codeForm = published && lobby.code !== '' && !localFlow;
   show(pairingCodeEl, codeForm);
   if (pairingCodeEl) pairingCodeEl.textContent = codeForm ? PAIRING_CODE_LABEL + ': ' + lobby.code : '';
   show(pairingWaitingEl, !lobby.paired || preparationShown());
   if (pairingWaitingEl) pairingWaitingEl.textContent = PAIRING_WAITING;
-  // The preloader: the page's ICE attempt runs from the moment the page opens,
-  // so the step counts the seconds left in its budget. A slow network shows the
-  // wait instead of a link that pairs nobody.
-  const gathering = lobby.ice === 'gathering';
+  // The preloader counts the seconds left in the page's candidate attempt, which
+  // only the anywhere-network way runs: the same-network way asks no server, so
+  // a line about connecting to one would name something that way never does.
+  const gathering = lobby.ice === 'gathering' && !localFlow;
   show(pairingIceEl, gathering);
   if (pairingIceEl) pairingIceEl.textContent = gathering ? PAIRING_ICE_WAIT + ' — ' + lobby.iceLeft + 's' : '';
   // The step says what the published offer carries: a blob with no remote ICE
   // address pairs nobody outside this browser instance, and a page with no
-  // channel at all pairs nobody anywhere. The limit is on screen, not implied.
-  const warn = lobby.ice === 'none' ? PAIRING_WARN_NONE : (lobby.ice === 'local' ? localFlow ? LOCAL_WARN : PAIRING_WARN_LOCAL : '');
+  // channel at all pairs nobody anywhere. The same-network way asks no server
+  // for candidates, so it has nothing to warn about and says nothing.
+  const warn = localFlow ? '' : lobby.ice === 'none' ? PAIRING_WARN_NONE : lobby.ice === 'local' ? PAIRING_WARN_LOCAL : '';
   show(pairingWarnEl, warn !== '');
   if (pairingWarnEl) pairingWarnEl.textContent = warn;
   // A copy affordance sits beside the link and the code this page shows; the

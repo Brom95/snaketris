@@ -19,6 +19,7 @@ export const lobby = {
   offer: '',
   secret: '',
   link: '',
+  href: '', // the url `publish` was handed, kept so a refresh can rebuild the line
   code: '',
   form: '',
   seed: 0,
@@ -216,6 +217,22 @@ export function addressFieldOnPage() {
 // The host publishes its offer before the peer link exists, so the share link can
 // carry the secret the second page needs to answer. The page url is a supply: this
 // module never reads `location`.
+// The line a peer opens is one function of what this page knows now: its own address, the
+// port it read beside that address, the way it runs under, and the secret it published. The
+// publish and a later refresh both build it here, so a value that arrives after the first
+// publish (the port, which lands once ICE gathered) still reaches the line.
+function pageLink(secret, pageUrl) {
+  if (secret === '') return '';
+  const local = lobby.flow === 'local'
+    ? (lobby.address === '' ? '' : '&a=' + lobby.address)
+      + (lobby.port === 0 ? '' : '&p=' + lobby.port)
+    : '';
+  const marked = (lobby.flow === 'local' || lobby.flow === 'global') && !pageUrl.includes('flow=')
+    ? pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'flow=' + lobby.flow + local
+    : pageUrl;
+  return marked.split('#')[0] + '#' + encodeURIComponent(secret);
+}
+
 export function publish(offerSdp, seed, pageUrl) {
   // A same-network page publishes nothing while it waits for its own address:
   // the link it hands over is the only way that address reaches the other page,
@@ -230,21 +247,16 @@ export function publish(offerSdp, seed, pageUrl) {
   // The flow marker rides on the link, not in the secret: the whole fragment IS
   // the secret, and a line tagged onto the blob would reach setRemoteDescription.
   // The same-network flow adds the two values the other page cannot read on its
-  // own: this page's address and the port it read beside it.
-  const local = lobby.flow === 'local'
-    ? (lobby.address === '' ? '' : '&a=' + lobby.address)
-      + (lobby.port === 0 ? '' : '&p=' + lobby.port)
-    : '';
-  const marked = (lobby.flow === 'local' || lobby.flow === 'global') && !pageUrl.includes('flow=')
-    ? pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'flow=' + lobby.flow + local
-    : pageUrl;
+  // own: this page's address and the port it read beside it, whichever of them
+  // this page knows by the moment the line is built.
   if (blob.length <= PAIRING_FRAGMENT_CAP) {
     lobby.form = 'link';
     lobby.secret = blob;
     // The fragment must be escapable: an SDP carries CRLF, spaces and `=`, so
     // the bytes that travel in a link are the escaped form and `adopt` decodes
     // them back. The secret itself stays unescaped.
-    lobby.link = marked.split('#')[0] + '#' + encodeURIComponent(blob);
+    lobby.href = pageUrl;
+    lobby.link = pageLink(blob, pageUrl);
   } else {
     lobby.form = 'code';
     lobby.secret = lobby.code;
@@ -378,6 +390,22 @@ export function peerLink() {
 export function announceOwn() {
   if (lobby.flow !== 'local' || lobby.address === '' || lobby.port === 0) return false;
   return post('a', lobby.address + ':' + lobby.port);
+}
+
+export function refreshLink() {
+  // The port a page reads out of its own description lands later than the publish
+  // that built the line: ICE writes the candidate line only as it gathers, and the
+  // publish happens once, so a link that names only the address says no port to
+  // join on and nothing writes the line again. Rebuilding from the secret the page
+  // already holds changes nothing about the pair — a page that opened at an older
+  // line keeps its own secret — and the refreshed line is what the next page opens
+  // at. The url is the one `publish` was handed, kept on the page so this module
+  // still never reads `location` itself.
+  if (lobby.secret === '' || lobby.link === '' || lobby.href === '') return false;
+  const next = pageLink(lobby.secret, lobby.href);
+  if (next === '' || next === lobby.link) return false;
+  lobby.link = next;
+  return true;
 }
 
 // The transport carries bytes one way; the game reads its two verbs and never

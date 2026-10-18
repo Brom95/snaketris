@@ -107,6 +107,29 @@ async function hostPage(address) {
   check(picked.flow === 'local', 'picking the same-network way leaves the page on the local flow');
   const field = page.locator('#pairing-address');
   check(await field.evaluate((el) => el.checkVisibility()), 'the local flow shows an address field');
+  // This way asks an address and pairs over the line a player opens, so it paints
+  // neither the short code (typed digits go to the field, not the code) nor a line
+  // about a candidate supply (this way asks no server).
+  const painted = await page.evaluate(() => ({
+    code: document.getElementById('pairing-code')?.checkVisibility() ?? false,
+    codeCopy: document.getElementById('copy-pairing-code')?.checkVisibility() ?? false,
+    warn: document.getElementById('pairing-warn')?.checkVisibility() ?? false,
+  }));
+  check(!painted.code && !painted.codeCopy, 'the same-network way paints no short code and no copy for one');
+  check(!painted.warn, 'the same-network way paints no line about a candidate supply');
+  // This way asks an address and pairs over the line a player opens, so it paints
+  // no short code (a page on this way spends typed digits on the address field),
+  // no candidate wait, and no candidate warning: none of those is something this
+  // page's player could act on.
+  const step = await page.evaluate(() => ({
+    code: document.getElementById('pairing-code')?.checkVisibility() ?? false,
+    codeCopy: document.getElementById('copy-pairing-code')?.checkVisibility() ?? false,
+    warn: document.getElementById('pairing-warn')?.checkVisibility() ?? false,
+    iceWait: document.getElementById('pairing-ice')?.checkVisibility() ?? false,
+  }));
+  check(!step.code && !step.codeCopy, 'the same-network way paints no short code and no copy for one');
+  check(!step.warn, 'the same-network way paints no line about a candidate supply');
+  check(!step.iceWait, 'the same-network way makes no player wait on a candidate attempt');
   await typeAddress(page, address);
   await page.waitForTimeout(400);
   return { page, reads };
@@ -139,10 +162,16 @@ async function guestPage(link) {
 
 const host = await hostPage(HOST_ADDRESS);
 await waitFor(host.page, () => window.__netplay.link.includes('flow=local'), null, 20000);
+// The player copies the line the page shows once the page has read its own port:
+// the port lands on a later tick than the first publish, and the refresh puts it
+// on the line. A peer opened before that tick would join on no port at all.
+await waitFor(host.page, () => window.__netplay.port > 0 && window.__netplay.link.includes('&p='), null, 20000);
 const published = await local(host.page);
 check(published.link.includes('flow=local'), 'the published pairing link names the local flow');
 check(published.link.includes('a=' + HOST_ADDRESS), 'the published link carries the address the host typed');
 check(published.link.split('#').length === 2, 'the published link carries one pairing fragment');
+check(published.link.includes('&p=' + published.port),
+  'the line the page shows when a player copies it names the port it read');
 
 const guest = await guestPage(published.link);
 await typeAddress(guest, GUEST_ADDRESS);
@@ -169,6 +198,10 @@ check(hostNow.peerAddress === '' && hostNow.peerPort === 0,
   'the host stays waiting for the announcement that page never makes');
 check(hostNow.addressText.includes(HOST_ADDRESS),
   'the address line names the address this page typed, and no field for the peer address');
+check(hostNow.link.includes('&p=' + hostNow.port),
+  'the line the page shows names the port this page read, so a peer opens on that port');
+check(guestNow.peerPort === hostNow.port && guestNow.peerPort > 0,
+  'the guest learns the port its host read from the line it opened, so both pages aim at one port');
 check(guestNow.addressInput === GUEST_ADDRESS, 'the guest typed its own address into its own field');
 check(hostNow.typed === '' && guestNow.typed === '',
   'typing an address spends nothing on the short readable code');
