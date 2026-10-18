@@ -12,7 +12,7 @@
 import { chromium } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { BASE, check, freshPage, report, shown, waitFor, servePage, exposeGame } from './harness.mjs';
+import { BASE, check, freshPage, report, shown, waitFor, servePage, exposeGame, failureCount } from './harness.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
@@ -295,4 +295,9 @@ check(joined.typed === host.code, `the typed run is the code the page typed (${j
 check(joined.paired, 'typing the code on the second page reaches the paired state');
 check(joined.matches === 1, `typing the code schedules one match (${joined.matches})`);
 check(await waitFor(second, () => window.__game.screen.state === 'PAIRING', null, 500), 'the second page stays on the pairing step');
-await second.close();
+// The close is not awaited and the verdict decides the exit: a peer connection that
+// holds an unanswered request open keeps a browser close waiting for a request no
+// network ever answers, which swallowed this run's verdict.
+second.close();
+report('verify-pairing-step', failureCount());
+process.exit(failureCount() ? 1 : 0);
