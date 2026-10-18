@@ -25,7 +25,7 @@
 
 import { chromium } from '@playwright/test';
 import path from 'node:path';
-import { BASE, check, report, failureCount, exposeSingletons, freshPage, stateIs, waitFor } from './harness.mjs';
+import { BASE, check, report, failureCount, exposeSingletons, freshPage, stateIs, servePage, waitFor } from './harness.mjs';
 import { SELECT_WAY, PAIRING } from '../js/constants.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -226,19 +226,7 @@ const published = await hold(host);
 console.log('  the link the host published: ' + published.link.split('#')[0]);
 
 const guest = await context.newPage();
-await guest.route(BASE + '**', (route) => {
-  const requested = route.request().url().slice(BASE.length).split('#')[0].split('?')[0];
-  const file = path.join(ROOT, requested);
-  try {
-    return route.fulfill({
-      status: 200,
-      contentType: requested.endsWith('.html') ? 'text/html' : 'text/javascript',
-      body: (await import('node:fs')).readFileSync(file),
-    });
-  } catch {
-    return route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' });
-  }
-});
+await servePage(guest, ROOT);
 await guest.goto(published.link);
 await exposeSingletons(guest);
 await installTrace(guest);

@@ -79,6 +79,34 @@ test('the flow and the typed address ride in the pairing link once', async () =>
   assert.equal(netplay.lobby.link.includes('&p=3478'), true, 'the link carries the port this page read');
 });
 
+test('a port read after the page published reaches the line it shows', async () => {
+  netplay.pickFlow('local');
+  netplay.noteAddress('100.107.90.10');
+  netplay.lobby.port = 0;
+  netplay.publish('offer-blob', 0, 'https://example.com/snaketris.html');
+  assert.equal(
+    netplay.lobby.link.includes('&p='),
+    false,
+    'the line names no port while the page has not read one',
+  );
+  netplay.noteOwnPort('a=candidate:1 1 udp 1 100.107.90.10 3478 typ host');
+  assert.equal(
+    netplay.refreshLink(),
+    true,
+    'the refresh reports the line it rebuilt',
+  );
+  assert.equal(
+    netplay.lobby.link.includes('&p=3478'),
+    true,
+    'the refreshed line names the port the page read',
+  );
+  assert.equal(
+    netplay.refreshLink(),
+    false,
+    'a page whose line already names every value it holds is left alone',
+  );
+});
+
 test('the peer candidate names the address the peer announced', async () => {
   const calls = [];
   const pc = {
