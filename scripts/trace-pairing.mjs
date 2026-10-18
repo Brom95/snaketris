@@ -53,9 +53,10 @@ context.addInitScript(() => {
 
 // The stage vocabulary, most advanced last. A row is printed whenever a page's
 // stage changes, so the table reads as the path one page walked.
-async function installTrace(page, label) {
-  await page.evaluate(async ([label]) => {
+async function installTrace(page) {
+  await page.evaluate(async () => {
     const netplay = await import('/js/netplay.js');
+    const stateModule = await import('/js/state.js');
     const lobby = window.__netplay;
     window.__rows = [];
     let previous = '';
@@ -88,7 +89,7 @@ async function installTrace(page, label) {
           aimed: lobby.aimed,
           candidates: window.__ice.length,
           answer,
-          state: (await import('/js/state.js')).game.screen.state,
+          state: stateModule.game.screen.state,
         });
         previous = stage;
       }
@@ -99,16 +100,20 @@ async function installTrace(page, label) {
     };
     tick();
     loop();
-  }, [label]);
+  });
 }
 
-// A stand-in channel for both pages: each page writes what it sends into
-// storage the two pages share, and reads what its peer wrote on its own timer.
-// This is the duel harness's channel, kept here so the same pair can be read
-// with, and without, the hop that a browser bus cannot carry across devices.
+// A stand-in channel that keeps each page's REAL connection and carries only
+// the bytes: what a page sends is written to storage the two pages share, and
+// read back by its peer on a short timer, the way the duel's channel carries
+// a message in a few milliseconds. The connection stays the page's own so
+// pointing, offering and answering still run — only the hop between the pages
+// is stood in, which is exactly the hop a browser bus cannot carry.
 async function standIn(page, outKey, inKey) {
   await page.evaluate(async ([outKey, inKey]) => {
     const netplay = await import('/js/netplay.js');
+    const current = netplay.peerLink();
+    const carried = current && current.transport ? current.transport.connection : null;
     netplay.registerTransport(() => ({
       send: (message) => {
         localStorage.setItem(outKey, (localStorage.getItem(outKey) || '') + JSON.stringify(message) + '\n');
@@ -118,7 +123,7 @@ async function standIn(page, outKey, inKey) {
         window.__handler = handler;
         return true;
       },
-      connection: null,
+      connection: carried,
     }));
     const poll = () => {
       const raw = localStorage.getItem(inKey) || '';
@@ -138,14 +143,15 @@ async function standIn(page, outKey, inKey) {
   }, [outKey, inKey]);
 }
 
-async function pump(a, b, rounds = 6) {
+async function pump(a, b, rounds = 10) {
   for (let i = 0; i < rounds; i++) {
     await a.waitForTimeout(90);
     await b.waitForTimeout(90);
   }
 }
 
-// What a page holds at this moment — the same fields the table names.
+// What a page holds at this moment — the same fields the table names, plus the
+// rows its own recorder collected.
 async function hold(page) {
   return await page.evaluate(async () => {
     const netplay = await import('/js/netplay.js');
@@ -163,7 +169,8 @@ async function hold(page) {
       paired: lobby.paired,
       candidates: (window.__ice || []).map((c) => c.address).filter((s) => s.startsWith('candidate:')),
       answer: netplay.inboundReport().answer !== '',
-      state: (await import('/js/state.js')).game.screen.state,
+      state: netplay.lobby === undefined ? '' : (await import('/js/state.js')).game.screen.state,
+      rows: window.__rows,
     };
   });
 }
@@ -186,30 +193,37 @@ function printRows(label, rows) {
         ' state=' + row.state
     );
   });
+  if (rows.length > 0) {
+    const last = rows[rows.length - 1];
+    console.log('    last stage ' + last.stage + ': ' + (last.paired ? 'paired' : last.aimed ? 'aimed' : last.answer ? 'holds an answer' : last['peerAddress'] ? 'holds a peer address' : 'stopped at stage ' + last.stage));
+  }
 }
 
 // ---------- The host page: the way pick, then the address it types ----------
 
 const host = await freshPage(context, ROOT);
 await exposeSingletons(host);
-await installTrace(host, 'host');
+await installTrace(host);
 await stateIs(host, SELECT_WAY);
 
 await host.click('#menu-item-two-player');
 await stateIs(host, SELECT_WAY);
 await host.click('#way-item-network-local');
 await stateIs(host, PAIRING);
-await host.keyboard.type(HOST_ADDRESS);
+await host.evaluate(() => document.getElementById('pairing-address').focus());
+await host.keyboard.type(HOST_ADDRESS, { delay: 40 });
 
-// The same attempt the page runs from the moment it opens, printed rather than
-// skipped: a player who watches "no candidates" before typing is watching this.
+// The attempt runs its full budget here: the named servers resolve for no headless
+// page, and this route prints what the page does AFTER the attempt has settled,
+// which is when a local-flow page is allowed to publish at all.
 const attemptSettled = () => window.__netplay.ice !== '' && window.__netplay.ice !== 'gathering';
-check(await waitFor(host, attemptSettled, null, 30000), 'the host page runs its candidate attempt to an end');
+check(await waitFor(host, attemptSettled, 'the host page runs its candidate attempt to an end', null, 30000), 'the host page runs its candidate attempt to an end');
 
 // ---------- The guest page: opened at the link the host published ----------
 
 await waitFor(host, () => window.__netplay.link.includes('flow=local'), null, 20000);
 const published = await hold(host);
+console.log('  the link the host published: ' + published.link.split('#')[0]);
 
 const guest = await context.newPage();
 await guest.route(BASE + '**', (route) => {
@@ -219,7 +233,7 @@ await guest.route(BASE + '**', (route) => {
     return route.fulfill({
       status: 200,
       contentType: requested.endsWith('.html') ? 'text/html' : 'text/javascript',
-      body: await import('node:fs').then((fs) => fs.readFileSync(file)),
+      body: (await import('node:fs')).readFileSync(file),
     });
   } catch {
     return route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' });
@@ -227,15 +241,21 @@ await guest.route(BASE + '**', (route) => {
 });
 await guest.goto(published.link);
 await exposeSingletons(guest);
-await installTrace(guest, 'guest');
+await installTrace(guest);
+
+// The guest pays the same attempt as any page at an open; the countdown budget
+// is written down so the read finishes in seconds rather than a page's minutes.
+await guest.evaluate(() => { window.__netplay.iceLeft = 1; });
 
 // ---------- Route A: the route two real devices take ----------
 
-// Nothing is stood in: the only channel each page owns is its own, and a page
-// opened at a link shares no bus with the page that published it. The waits are
-// generous on purpose — the point is that these fields stay empty.
-await guest.keyboard.type(GUEST_ADDRESS);
-await guest.waitForTimeout(6000);
+await guest.evaluate(() => document.getElementById('pairing-address').focus());
+await guest.keyboard.type(GUEST_ADDRESS, { delay: 40 });
+check(
+  await waitFor(guest, () => window.__netplay.ice !== 'gathering' && window.__netplay.ice !== '', null, 30000),
+  'the guest page runs its own attempt to an end',
+);
+await guest.waitForTimeout(2500);
 
 const hostA = await hold(host);
 const guestA = await hold(guest);
@@ -248,7 +268,7 @@ printRows('guest', guestA.rows || []);
 
 check(guestA.peerAddress === HOST_ADDRESS, 'the guest holds the host address its link named');
 check(guestA.peerPort > 0, 'the guest holds the host port its link named');
-check(guestA.candidates.length > 0 && guestA.candidates[0].includes(HOST_ADDRESS),
+check(guestA.candidates.some((s) => s.includes(HOST_ADDRESS)),
   'the guest offers the candidate naming the address only its link carried');
 check(guestA.answer === false, 'the guest never received a channel report');
 check(hostA.peerAddress === '' && hostA.peerPort === 0,
@@ -257,13 +277,13 @@ check(hostA.aimed === false, 'the host never aimed, so it waits on an announceme
 
 // ---------- Route B: the same pair with the hop stood in ----------
 
-// The channel a working pair really has: the bytes cross, so the guest's
-// announcement reaches the host page, which then holds the guest address, aims,
-// and the pair completes. Standing the channel in is the only thing this pair
-// lacks, and it is the one hop a browser bus cannot carry across devices.
+// Both pages have run their attempts by now, so standing the bytes-carrying
+// channel in cannot replace a mid-rebuild the attempt is about to make: the
+// duel learned that standing in first leaves the attempt's own rebuild to
+// swallow the next message.
 await standIn(host, 'wire-host', 'wire-guest');
 await standIn(guest, 'wire-guest', 'wire-host');
-await pump(host, guest, 10);
+await pump(host, guest, 20);
 
 const hostB = await hold(host);
 const guestB = await hold(guest);
@@ -273,19 +293,9 @@ console.log('Route B — the same pages with the hop the bus cannot carry stood 
 printRows('host', hostB.rows || []);
 printRows('guest', guestB.rows || []);
 
-console.log('');
-console.log('  host last row: ice ' + hostB.ice + ' aimed ' + hostB.aimed + ' paired ' + hostB.paired + ' candidates ' + hostB.candidates.length);
-console.log('  guest last row: ice ' + guestB.ice + ' aimed ' + guestB.aimed + ' paired ' + guestB.paired + ' candidates ' + guestB.candidates.length);
-console.log('  the stage route A stopped at: the host waits for an announcement no device sends');
-console.log('  the stage route B reached: both pages aimed and paired');
-
 check(hostB.peerAddress === GUEST_ADDRESS, 'with the hop stood in, the host reads the guest address');
-check(hostB.aimed && hostB.candidates.length > 0, 'the host aims its channel once it holds an address');
+check(hostB.aimed && hostB.candidates.some((s) => s.includes(GUEST_ADDRESS)), 'the host aims its channel at the address the stood-in hop carried');
 check(hostB.paired && guestB.paired, 'the pair completes once the hop that cannot travel is stood in');
 
-const hostStages = hostA.rows.length;
-const guestStages = guestA.rows.length;
-console.log('  host walked ' + hostStages + ' stages, guest walked ' + guestStages + ' stages');
-
-report('trace-pairing', 0);
+report('trace-pairing', failureCount());
 await browser.close();

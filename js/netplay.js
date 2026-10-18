@@ -201,8 +201,9 @@ export async function copyValue(field) {
 // from the link it opens, so it never types the flow itself.
 export function noteFlowOfLink(url) {
   const flow = /[?&]flow=([a-z]+)/.exec(url);
-  if (flow === null || flow[1] !== 'local') return;
-  lobby.flow = 'local';
+  if (flow === null) return;
+  if (flow[1] !== 'local' && flow[1] !== 'global') return;
+  lobby.flow = flow[1];
 }
 
 // Whether this page asks its own player for an address: the same-network way does,
@@ -234,8 +235,8 @@ export function publish(offerSdp, seed, pageUrl) {
     ? (lobby.address === '' ? '' : '&a=' + lobby.address)
       + (lobby.port === 0 ? '' : '&p=' + lobby.port)
     : '';
-  const marked = lobby.flow === 'local' && !pageUrl.includes('flow=')
-    ? pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'flow=local' + local
+  const marked = (lobby.flow === 'local' || lobby.flow === 'global') && !pageUrl.includes('flow=')
+    ? pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'flow=' + lobby.flow + local
     : pageUrl;
   if (blob.length <= PAIRING_FRAGMENT_CAP) {
     lobby.form = 'link';

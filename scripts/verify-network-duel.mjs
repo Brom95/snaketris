@@ -84,6 +84,37 @@ async function pump(a, b, rounds = 6) {
   }
 }
 
+// Each page records the piece column its own view holds, keyed by the tick that
+// view names, and keeps every tick it lives through. The pair promises the same
+// piece at the same tick rather than a piece the two pages happen to show at the
+// same wall-clock moment, so the two records are compared at the ticks they both
+// name; reading both pages a few frames apart answers whether the two clocks
+// were close together when the harness sampled them, which changes with the load
+// on the machine and not with the pair. The entry for a tick keeps the last frame
+// it sees, so both views name the finished state of a tick rather than the frame
+// where that tick was only halfway through its move.
+async function installTickTrace(page) {
+  await page.evaluate(async () => {
+    const g = window.__game;
+    window.__tickTrace = [];
+    const step = () => {
+      const piece = g.play.pieces[0];
+      const tick = g.play.tick;
+      if (piece && tick != null) {
+        const last = window.__tickTrace[window.__tickTrace.length - 1];
+        if (!last || last[0] !== tick) window.__tickTrace.push([tick, piece.col]);
+        else last[1] = piece.col;
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+async function tickTrace(page) {
+  return await page.evaluate(async () => (window.__tickTrace || []).slice(-60));
+}
+
 async function live(page) {
   return await page.evaluate(async () => {
     const netplay = await import('/js/netplay.js');
@@ -155,6 +186,7 @@ const published = await host.evaluate(async (url) => {
 }, BASE + 'snaketris.html');
 check(published.form === 'link', 'the host page publishes a pairing link');
 check(published.link.startsWith(BASE) && published.link.includes('#'), 'the link carries the secret in the fragment');
+check(published.link.includes('flow=global'), 'and names the way the host page waits under');
 check((await live(host)).seat === 1, 'the published pairing seats this page as the host');
 
 // ---------- The guest page, opened from that link ----------
@@ -171,6 +203,8 @@ await standIn(guest, 'wire-guest', 'wire-host');
 const adopted = await live(guest);
 check(adopted.seat === 2 && adopted.side === 'guest',
   'the second page adopts the secret its url carries and seats itself as the guest');
+const guestWay = await guest.evaluate(() => window.__netplay.flow);
+check(guestWay === 'global', 'and runs under the way that link named: ' + JSON.stringify(guestWay));
 check(adopted.networkMode && adopted.state === 'PAIRING',
   'the second page opens the pairing step from the link, not the menu');
 
@@ -375,6 +409,8 @@ let shiftHost = 0;
 let shiftGuest = 0;
 let pagesAgree = false;
 let appliedSeen = 0;
+await installTickTrace(host);
+await installTickTrace(guest);
 for (let attempt = 0; attempt < 24 && shiftHost === 0; attempt++) {
   await pump(host, guest, 1);
   // The shift has to land on a piece that still has room where it goes: the
@@ -389,12 +425,6 @@ for (let attempt = 0; attempt < 24 && shiftHost === 0; attempt++) {
     const row = Math.floor(piece.row);
     return gd.getCell(row, piece.col + 1) === 0 && gd.getCell(row + 1, piece.col + 1) === 0;
   });
-  const beforeRow = await host.evaluate(async () => {
-    const st = await import('/js/state.js');
-    const piece = st.game.play.pieces[0];
-    if (!piece || !piece.row) return false;
-    return piece.row;
-  });
   await guest.evaluate(async () => {
     const input = await import('/js/input.js');
     const event = { key: 'ArrowRight' };
@@ -408,36 +438,30 @@ for (let attempt = 0; attempt < 24 && shiftHost === 0; attempt++) {
     const st = await import('/js/state.js');
     const np = await import('/js/netplay.js');
     const piece = st.game.play.pieces[0];
-    if (!piece || !piece.col) return { delta: 0, applied: 0 };
+    if (!piece || !piece.col) return { delta: 0, applied: 0, tick: st.game.play.tick };
     const before = piece.col;
     for (let frame = 0; frame < 40; frame++) {
       await new Promise((next) => requestAnimationFrame(next));
       if (np.guestStreamReport().applied > seen) break;
     }
-    return { delta: piece.col - before, applied: np.guestStreamReport().applied };
+    return { delta: piece.col - before, applied: np.guestStreamReport().applied, tick: st.game.play.tick };
   }, [appliedSeen]);
   appliedSeen = measured.applied;
   if (measured.delta === 0) continue;
-  // The guest page paints the frame the host page produced from that shift, so
-  // its piece sits the same number of cells along.
-  let hostBoard = null;
-  let guestBoard = null;
-  // The guest page paints the frame the host page produced from the shift a
-  // frame or two later, so the two pages are read a few frames apart.
-  await host.waitForTimeout(60);
-  await guest.waitForTimeout(60);
-  for (let round = 0; round < 8; round++) {
-    hostBoard = await snapshot(host);
-    guestBoard = await snapshot(guest);
-    if (hostBoard && guestBoard && Math.abs(hostBoard.tick - guestBoard.tick) <= 2 &&
-        Math.abs(hostBoard.piece.row - beforeRow) < 6 &&
-        Math.abs(guestBoard.piece.row - beforeRow) < 6) break;
+  // The window is widened behind the tick the shift landed on so both views
+  // bracket the move rather than starting at it, and a couple of pump rounds
+  // give the lagging page the ticks ahead of the mark before they are read.
+  await pump(host, guest, 3);
+  const hostMarks = (await tickTrace(host)).filter((s) => s[0] >= measured.tick - 6 && s[0] <= measured.tick + 2);
+  const guestAt = new Map(await tickTrace(guest));
+  const window = hostMarks.filter((s) => guestAt.has(s[0]));
+  const disagree = window.filter((s) => guestAt.get(s[0]) !== s[1]);
+  const guestMove = window.length > 1 ? guestAt.get(window[window.length - 1][0]) - guestAt.get(window[0][0]) : 0;
+  if (window.length >= 4 && disagree.length === 0 && guestMove === measured.delta) {
+    shiftHost = measured.delta;
+    shiftGuest = guestMove;
+    pagesAgree = true;
   }
-  if (!hostBoard || !guestBoard || Math.abs(hostBoard.tick - guestBoard.tick) > 2) continue;
-  if (hostBoard.piece.col !== guestBoard.piece.col) continue;
-  shiftHost = measured.delta;
-  shiftGuest = guestBoard.piece.col - (hostBoard.piece.col - measured.delta);
-  pagesAgree = true;
 }
 check(pagesAgree && shiftHost !== 0 && shiftHost === shiftGuest,
   'a shift by the Tetris-role player moves the piece the same amount on both pages');
