@@ -93,6 +93,8 @@ const dom = await page.evaluate(() => ({
   addressFieldWidth: (document.getElementById('pairing-address') || {}).getBoundingClientRect().width,
 }))
 check(dom.linkCopy === '' && dom.codeCopy === '', `the page shows no offer of the way it left: link copy ${JSON.stringify(dom.linkCopy)} code copy ${JSON.stringify(dom.codeCopy)}`, (m) => failures = m)
+const waiting = await page.evaluate(() => document.getElementById('pairing-waiting')?.textContent ?? '')
+check(waiting.includes('Waiting for'), `the page whose offer was taken back shows its waiting line plainly, with no offer beside it: ${JSON.stringify(waiting.trim())}`, (m) => failures = m)
 check(dom.addressFieldHidden, `the re-picked way asks nothing of the player as an address: the field is not on the page (rect width ${dom.addressFieldWidth}, address line width ${dom.addressLineWidth})`, (m) => failures = m)
 
 // The re-picked way runs its open to the end: the attempt settles, the page

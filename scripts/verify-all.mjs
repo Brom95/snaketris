@@ -24,6 +24,7 @@ const SCRIPTS = [
   'verify-network-local.mjs',
   'verify-opened-link.mjs',
   'verify-way-switch.mjs',
+  'verify-pairing-step.mjs',
 ];
 
 function run(script) {

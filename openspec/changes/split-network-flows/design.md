@@ -113,6 +113,16 @@ offer, so the blob has to travel anyway. The channel carries messages before
 negotiation, so the chicken-and-egg the earlier draft reasoned from does not
 exist here.
 
+**The link names the way it waits under, for either flow (measured at 06:19).**
+`publish` appends the flow this page runs under — `flow=global` or `flow=local`
+— to the url it hands over, and `noteFlowOfLink` reads either name back, so a
+page opened at a global-flow link runs under the global way and paints the step
+that way asks. A page opened at such a link arrived with no flow at all before
+this, and the line it showed asked about an address while its own way never wants
+one. The local flow's marker and address values stay as they were: the address-
+bearing link is byte-identical besides the name, since the name is a query
+parameter and the fragment stays the secret.
+
 ### D4 — the copy affordance is one element per copyable value
 
 Each copyable value (link, code, address) gets a sibling element whose click
@@ -222,7 +232,7 @@ Re-running the open also re-runs the candidate search, because the offer one way
 warmed came from that way's channel; a page navigating from the menu pays the search
 twice, which costs nothing for a local way that searches nothing.
 
-### D9.5 — a page opened at a link paints only what it holds itself
+### D11 — a page opened at a link paints only what it holds itself
 
 A page opened at a link inherits the host's secret, so the short readable code it
 shows repeats the one the host showed; that is the link's own proof. It holds no
@@ -235,7 +245,7 @@ to the global flow, and the same-network flow names the address it waits on inst
 because a player who reads the other sentence types a server this flow never asks
 for.
 
-### D10 — the address in a link is used, not only read
+### D12 — the address in a link is used, not only read
 
 A page opened at a local-flow link already holds what its host published:
 `lobby.peerAddress` and `lobby.peerPort`, read out of `?a=` and `?p=`. Nothing
@@ -258,6 +268,37 @@ records the connection it pointed and re-points only when the channel rebuilds.
 The candidate line is dropped from this way rather than reworded again: a local
 page asks an address, never a server, so a line about candidates names something
 the way cannot act on and reads like a failure the player cannot fix.
+
+### D13 — what a page shows, what it holds, and what a key belongs to
+
+Three things a player found on a real page, all about the same pairing step.
+
+**A digit typed into the address field went missing.** The page reads keys
+itself, and the alphabet it accepts for the short readable code carries digits —
+so a digit on the pairing page was spent on the code and never reached the field
+the browser was typing into. The field is the one native input on this step; the
+code is painted text. Only the same-network page asks for an address, so on that
+page a digit and a dot belong to the field and are not spent on the code; the
+code keeps its letters, which no address uses. A measured probe typed the whole
+address one character at a time and read the field back: before the fix it held
+one digit and the page never opened its pairing step, because the code the page
+chose for itself had not been typed either.
+
+**The field held what the page had already accepted.** The page reads the field
+back every frame and answers as though its own player typed the address, so on a
+page that does not ask for one the digits a previous player left there came back
+as an address — the anywhere-network page showed a share line naming an address
+it had never asked for. The reading is gated to the page that asks. The line
+beside the field is painted from what is typed, even half-typed, so a player who
+stops at `100.` sees that text and the shape the page wants.
+
+**The way stuck on a page that changed its mind.** The way was meant to hold for
+a page's whole life, and that decision is kept only while pairing has not
+started: until a page has paired with anyone it may pick the other way on the
+same page, and the switch takes back what the first way published. Because a
+page's candidate attempt ran under the way it had picked, the switch also lets
+go of that way's channel and runs its open again under the new one — a measured
+probe saw a fresh connection and a fresh attempt, and saw the new way publish.
 
 ## Risks and what they mean
 

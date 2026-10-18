@@ -225,6 +225,45 @@ Boxes may only be checked after their verification gate passes.
 - [ ] 16.4 Re-check the gates on this tree: `npm test`, the full verify sweep,
     and `quality_delta`; then name what a two-device pair still lacks.
 
+## 17. The link names the way it waits under
+
+- [ ] 17.1 The link a page publishes names the way that page waits under, for
+  either flow, and a page opened at such a link runs under the way the link names
+  — today a global link names nothing and its page arrives with no way, so the
+  line it shows asks about an address while its own way never wants one.
+- [ ] 17.2 Checks: the link a global page publishes names the way it waits under,
+  and the page opened at that link runs under the way it names; the same-network
+  link keeps its address values unchanged beside the name.
+  - Verify: scripts/verify-network-duel.mjs, scripts/verify-opened-link.mjs
+- [ ] 17.3 Re-check every claim this weakens once the way is named: the way a page
+  opens under is its host's choice, while a page still alone may re-choose until
+  it pairs (14.3's re-open), and a page that paired keeps its way.
+
+## 18. The field, the page and the key agree about one address
+
+- [x] 18.1 Spend a digit and a dot on the address field while it is on the page,
+  not on the code — Verify: tests/devices.test.js (a digit on a same-network page
+  reaches no intent, a letter still spells the code), scripts/verify-network-local
+  .mjs (typing the whole address one character at a time leaves the field holding
+  it and the page's own code unspent).
+- [x] 18.2 Keep the field's own value while the page asks, and paint the line from
+  what is typed — Verify: scripts/verify-network-local.mjs (an over-one-byte group
+  names the shape and keeps no address), scripts/verify-ice-preload.mjs (the
+  anywhere-network page shows no address line).
+- [x] 18.3 Re-open the way choice until the page pairs, take the published offer
+  back on the switch, and run the open again under the new way — Verify: tests/
+  netplay.test.js (the re-pick and its refusal once paired), scripts/verify-way-
+  switch.mjs (the page publishes under the first way, the switch clears offer/link/
+  code/address, a fresh connection runs the second way's attempt to its own publish
+  ).
+- [x] 18.4 Re-check the claims this weakens — Verify: scripts/verify-network-duel
+  .mjs, scripts/verify-ice-preload.mjs, scripts/verify-all.mjs (whole sweep green,
+  18 harnesses), npm test (302 pass).
+- [ ] 18.5 The pair across two devices on one network stays unverified here: this
+  browser refuses an answer whose media line it did not write (InvalidStateError,
+  measured) and reads no port from its own description, so no harness here can
+  stand the second socket in — the user verifies on their own network.
+
 ## 11. User-verified-later (not a code gate)
 
 - [ ] 11.1 Two real devices on one network pair through the local flow in the
