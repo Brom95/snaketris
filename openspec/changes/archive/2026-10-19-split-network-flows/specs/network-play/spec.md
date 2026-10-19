@@ -127,30 +127,38 @@ it cannot name.
   does not have
 - **THEN** neither page reports an open channel and both keep waiting
 
-### Requirement: The peer's address travels with the answer the channel carries
+### Requirement: The same-network pair carries one line by hand
 
-The local flow SHALL carry each page's own address and port over the channel
-the pairing already uses, beside the answer that page produced, rather
-than through a second hop the player has to carry. A page SHALL announce only
-what it has read: a page that reads no port announces nothing and stays
-waiting. The first page SHALL complete once that address arrives, and SHALL NOT
-ask its player to type an address the second page painted.
+The local flow SHALL carry one value by hand per pair: a page SHALL offer a field
+that takes the peer's `address:port` line, SHALL paint it only while the page
+holds nothing to point at, and SHALL hide it once a value lands so it never asks a
+second time. A page SHALL NOT require a value to travel over a channel the pair
+has not joined, since an unjoined channel carries nothing between devices. A page
+SHALL accept the line in the same shape it copies beside its own address, SHALL
+reject a value that does not spell an address and a port, and SHALL point at the
+peer it read the moment the line lands. A page that opened a link already naming
+its peer's address and port SHALL read that half without asking for it again.
 
-#### Scenario: The second page sends its address with its answer
+#### Scenario: The page asks only while it has nothing to point at
 
-- **GIVEN** the second page opened the first page's link
-- **THEN** it sends its own address and port beside the answer over the channel
+- **GIVEN** a local-flow page that holds no peer address
+- **THEN** it paints a field for one peer line and a line saying what to carry
+- **AND** its own line is already copied by the affordance beside its own address
 
-#### Scenario: The first page completes on what the channel carries
+#### Scenario: The field hides itself once a value lands
 
-- **GIVEN** the first page waits for the peer's address
-- **WHEN** the channel carries the peer's address
-- **THEN** the first page offers its candidate beside the address it read
+- **GIVEN** that page receives a line that spells an address and a port
+- **THEN** the field is no longer painted and the page points at the peer it read
 
-#### Scenario: A page with no port to read announces nothing
+#### Scenario: A line that does not spell a pair is refused
 
-- **GIVEN** a local-flow page whose own description carries no port
-- **THEN** it announces nothing and the peer stays waiting for that copy
+- **GIVEN** a page whose field holds a value that is not an address and a port
+- **THEN** the page keeps waiting and never points at the value
+
+#### Scenario: A page that opened a link carrying its peer names nothing to type
+
+- **GIVEN** a local-flow page opened at a link that names its peer's address and port
+- **THEN** the page reads that half without asking and paints no field for it
 
 ### Requirement: Every copyable element carries a copy affordance
 

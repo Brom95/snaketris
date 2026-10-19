@@ -133,13 +133,17 @@ export function noteAddress(text) {
 // line libwebrtc allocates for the page's own DTLS socket. The page never types
 // it, and no other page needs it typed either.
 export function noteOwnPort(sdp) {
-  for (const line of sdp.split('\r\n')) {
+  // The candidate line is `a=candidate:<id> <proto> <family> <priority>
+  // <address> <port> `: the port is the sixth field, and the address in
+  // front of it is libwebrtc's own name, not a value to show. A line that
+  // names port 0 names no socket at all — a placeholder, not this page's
+  // address — so it is skipped, and the search keeps looking. Descriptions
+  // are split on either line ending, since an answer and an offer are not
+  // guaranteed to carry the same one.
+  for (const line of sdp.split(/\r?\n/)) {
     if (!line.startsWith('a=candidate:')) continue;
     const fields = line.split(' ');
-    // The candidate line is `a=candidate:<id> <proto> <family> <priority>
-    // <address> <port> …`: the port is the sixth field, and the address in
-    // front of it is libwebrtc's own unresolvable name, not a value to show.
-    if (fields.length > 5 && /^\d+$/.test(fields[5])) {
+    if (fields.length > 5 && /^\d+$/.test(fields[5]) && Number(fields[5]) > 0) {
       lobby.port = Number(fields[5]);
       return;
     }

@@ -283,6 +283,10 @@
       <input id="pairing-address" class="view" type="text" autocomplete="off" spellcheck="false" placeholder="192.168.4.10">
       <p id="pairing-address-line" class="view"></p>
       <p id="copy-pairing-address" class="view" tabindex="-1">📑</p>
+      <!-- The line the other player carries: js/ui.js reads it into the page's
+           peer address and port, and the value arrives pasted, never typed. -->
+      <p id="pairing-peer-line" class="view"></p>
+      <input id="pairing-peer" class="view" type="text" autocomplete="off" spellcheck="false" placeholder="192.168.4.10:12345">
       <!-- The guest page's read-only mirrors of the host page's preparation
            sub-menus: js/ui.js paints them from the mirror the host sends, so the
            guest sees the other device choosing without offering a pick itself. -->

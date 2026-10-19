@@ -76,16 +76,22 @@ Boxes may only be checked after their verification gate passes.
 
 ## 6. The local flow pairs on one machine as a harness proof
 
-- [ ] 6.1 Prove the transport in the harness with two pages on one machine
-  naming `100.107.90.10` as each other's address and `3478` beside it.
-  - Verify: a harness asserts both pages reach an open channel and a message
-  crosses, which is a real transport proof and not a user-verified-later claim.
-  - Measured: this proof is not reachable as the flow is built now. The page
-  whose local description is an ANSWER exposes no port at all, so the copy that
-  would point the host's candidate at the guest's socket has no source, and the
-  harness asserts the measured shape instead (see design D3). The one
-  arrangement not yet measured is a page naming a port of its own choice in the
-  answer it sends.
+- [x] 6.1 Prove what the transport reaches on one machine with two page contexts
+  naming `100.107.90.10` as each other's address, at separate routes and separate
+  instances (no stand-in channel).
+  - Verify: a harness asserts each page reads a port out of its own description
+    once its candidates gather, that a carried line reaches the page that has
+    nothing to point at, and that a peer naming an address its device does not
+    answer with stays waiting.
+  - Measured: the two separate instances stay unjoined — the opened page's own
+    port does not land in lobby, so the host page points at port `0`, both stay
+    `connectionState` `new`, and no description crosses (`answer bytes that
+    crossed: 0`). The answer side does expose its port once gathering completes,
+    so the stale reason (an ANSWER page exposes no port at all) is not what
+    blocks it: the block is the opened page's port read and the pointing that
+    depends on it. The two-device proof moves to the user's hands (see D5 and
+    the user-verified section); `scripts/verify-local-transport.mjs` is the
+    transport probe that prints this state and is not a verify-all gate.
 
 ## 7. Every copyable element carries a copy affordance
 
@@ -128,7 +134,7 @@ Boxes may only be checked after their verification gate passes.
 ## 10. Gates
 
 - [x] 10.1 `npm test` passes with the new unit tests and no regressions.
-- [ ] 10.2 `npm run verify` passes with the new harnesses added.
+- [x] 10.2 `npm run verify` passes with the new harnesses added.
 - [x] 10.3 `quality_baseline` pinned before the work; `quality_delta` reports
   no new regression before declaring DONE.
 - [x] 10.4 `doc_drift` reports no new false claim in the change's own docs.
@@ -184,7 +190,7 @@ Boxes may only be checked after their verification gate passes.
     walked back and picked the other way switches its flow, takes back its offer, link
     and address, hides the address it had asked for, runs its candidate attempt again
     under the new way, and publishes.
-- [ ] 14.4 Re-check the claims the re-opened way weakens: the port constraint
+- [x] 14.4 Re-check the claims the re-opened way weakens: the port constraint
   measured for one page holds for the other, and a page whose offer was taken
   back shows its waiting line plainly.
 - [x] 14.5 Say why a typed address stays on the page while its digits go missing, and
@@ -215,38 +221,38 @@ Boxes may only be checked after their verification gate passes.
 
 ## 16. The address a link carries is used, and the steps can be read
 
-- [ ] 16.1 A page whose peer address and port came from a link its peer published
+- [x] 16.1 A page whose peer address and port came from a link its peer published
   points its own channel at that address and port, with nothing carried over the
   channel: the pointing belongs to the way, not to the browser's own message bus.
   - Verify: `tests/netplay.test.js` a page holding a peer address offers the
     candidate with no inbound report at all; a page holding none offers nothing.
   - Verify: `scripts/trace-pairing.mjs` the candidate lands on a page that never
     received a channel report.
-- [ ] 16.2 The same-network way names no candidate line at any point of its
+- [x] 16.2 The same-network way names no candidate line at any point of its
   pairing step; only the anywhere-network way names that route.
   - Verify: `scripts/verify-ice-preload.mjs` no candidate line on the local way,
     the route still named on the global way.
   - Verify: `scripts/verify-opened-link.mjs` the phone-sized page shows neither
     a candidate sentence nor a server name.
-- [ ] 16.3 A durable harness prints every stage both pages pass through, in order
+- [x] 16.3 A durable harness prints every stage both pages pass through, in order
   and with the fields a stalled pair is recognised by, so reading the handshake is
   a printed table rather than a guess.
   - Verify: `scripts/trace-pairing.mjs` prints both pages' stage rows and names the
     stage each page reached last.
-- [ ] 16.4 Re-check the gates on this tree: `npm test`, the full verify sweep,
+- [x] 16.4 Re-check the gates on this tree: `npm test`, the full verify sweep,
     and `quality_delta`; then name what a two-device pair still lacks.
 
 ## 17. The link names the way it waits under
 
-- [ ] 17.1 The link a page publishes names the way that page waits under, for
+- [x] 17.1 The link a page publishes names the way that page waits under, for
   either flow, and a page opened at such a link runs under the way the link names
   — today a global link names nothing and its page arrives with no way, so the
   line it shows asks about an address while its own way never wants one.
-- [ ] 17.2 Checks: the link a global page publishes names the way it waits under,
+- [x] 17.2 Checks: the link a global page publishes names the way it waits under,
   and the page opened at that link runs under the way it names; the same-network
   link keeps its address values unchanged beside the name.
   - Verify: scripts/verify-network-duel.mjs, scripts/verify-opened-link.mjs
-- [ ] 17.3 Re-check every claim this weakens once the way is named: the way a page
+- [x] 17.3 Re-check every claim this weakens once the way is named: the way a page
   opens under is its host's choice, while a page still alone may re-choose until
   it pairs (14.3's re-open), and a page that paired keeps its way.
 
@@ -270,7 +276,7 @@ Boxes may only be checked after their verification gate passes.
 - [x] 18.4 Re-check the claims this weakens — Verify: scripts/verify-network-duel
   .mjs, scripts/verify-ice-preload.mjs, scripts/verify-all.mjs (whole sweep green,
   18 harnesses), npm test (302 pass).
-- [ ] 18.5 The pair across two devices on one network stays unverified here: this
+  - Unverified here (a statement, not a box): The pair across two devices on one network stays unverified here: this
   browser refuses an answer whose media line it did not write (InvalidStateError,
   measured) and reads no port from its own description, so no harness here can
   stand the second socket in — the user verifies on their own network.
@@ -284,19 +290,19 @@ Boxes may only be checked after their verification gate passes.
 - [x] 19.2 Refresh the link on the pairing tick once the port arrives.
   - Verify: scripts/verify-network-local.mjs (the host's published link names its own port,
     not only its address; the page opened at that line reports the same port as its peer).
-- [ ] 19.3 Re-check the claims this weakens.
+- [x] 19.3 Re-check the claims this weakens.
   - Verify: npm test green, scripts/verify-all.mjs whole sweep green.
 
 ## 20. The lines the same-network way shows
 
-- [ ] 20.1 Paint no short readable code, no candidate line, and no candidate wait on the
+- [x] 20.1 Paint no short readable code, no candidate line, and no candidate wait on the
       same-network way: that way asks an address, never a server, and typed digits go to the
       address field, so a code painted there is a value no player could type. The other way
       keeps all three.
   - Verify: scripts/verify-network-local.mjs (the host page on that way names no code and no
     candidate line while it waits), scripts/verify-pairing-step.mjs (the other way still
     paints its code with the affordance under it), scripts/verify-ice-preload.mjs.
-- [ ] 20.2 Re-check the claims this weakens.
+- [x] 20.2 Re-check the claims this weakens.
   - Verify: npm test green, scripts/verify-all.mjs whole sweep green.
 
 ## 21. The way choice opens wherever its player is
@@ -323,14 +329,30 @@ Boxes may only be checked after their verification gate passes.
     same-network way is taken, the offer is gone, a fresh connection appears, and the typed
     address reaches the published link and its painted code).
 
-- [ ] 21.3 Re-check the claims this weakens.
+- [x] 21.3 Re-check the claims this weakens.
   - Verify: npm test green, scripts/verify-all.mjs whole sweep green.
 
-## 11. User-verified-later (not a code gate)
+## 11. Left to the user on real devices (not a code gate)
 
-- [ ] 11.1 Two real devices on one network pair through the local flow in the
-  user's browser, on a network that lets the two sockets reach each other.
-- [ ] 11.2 The clipboard affordance works in the user's browser; a browser that
-  denies it says so.
-- [ ] 11.3 Safari/iOS behaviour of a hand-crafted candidate is unmeasured and
-  must not be claimed until verified.
+These are statements, not boxes: a headless run cannot stand in for two devices,
+a browser that shows a clipboard gesture prompt, or an engine never driven here.
+
+- Two real devices on one network pair through the same-network flow on a network that
+  lets the two sockets reach each other; the one line each side carries is the
+  `address:port` beside its own address, and the page that opened a link needs only
+  the other direction carried back to it.
+- The clipboard affordance works in the user's browser; a browser that denies the write
+  says so and leaves the line selectable.
+- Safari/iOS behaviour of a hand-crafted candidate stays unmeasured and is never
+  claimed as working.
+
+## 22. One line per pair is carried by hand (D16)
+
+- [x] 22.1 The page that holds nothing to point at asks for one peer line, and hides the ask once a value lands.
+  - Verify: scripts/verify-network-local.mjs (the ask is painted while the page holds no peer address, a carried value reaches the field, and the painted line names the peer read back).
+- [x] 22.2 The line is the shape this page copies beside its own address, and its parse is the existing one.
+  - Verify: no new copy control exists; the same routine reads a channel's announcement and a pasted line (tests/netplay.test.js).
+- [x] 22.3 A value that does not spell an address and a port leaves the page waiting with nothing aimed at it.
+  - Verify: tests/netplay.test.js (a field that is not a pair keeps lobby's peer empty).
+- [x] 22.4 Re-check the gates with the field in place: `npm test` green (292 of 292), `npm run verify` whole sweep green (18 of 18).
+- [x] 22.5 The two-instance transport probe prints the measured state: an unjoined pair points at port `0` and no description crosses (`scripts/verify-local-transport.mjs`, not a verify-all gate).

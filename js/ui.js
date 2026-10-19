@@ -9,6 +9,7 @@ import {
   PAIRING_TITLE, PAIRING_HINTS, PAIRING_LINK_LABEL, PAIRING_CODE_LABEL, PAIRING_WAITING,
   PAIRING_WARN_LOCAL, PAIRING_WARN_NONE, PAIRING_ICE_WAIT,
   LOCAL_TITLE, LOCAL_HINTS, ADDRESS_LABEL, ADDRESS_HINTS, ADDRESS_BAD,
+  PEER_LABEL, PEER_HINTS,
   COPY_LABEL, COPY_DENIED,
   DURATION_SCREEN_ITEMS, ROLE_SCREEN_ITEMS, MIRROR_TITLE, MIRROR_HINTS,
   twoPlayerOffered,
@@ -17,6 +18,7 @@ import { game, remainingSeconds } from './state.js';
 import { recordLines } from './highscores.js';
 import { SCREENS, SCREEN_BY_ID, itemForStep, controlModelAssigned } from './screens.js';
 import { lobby, guestPage, noteAddress } from './netplay.js';
+import { learnPeerAnnouncement } from './netplay.js';
 import { paintQr } from './qr.js';
 import { createLayout } from '../engine/js/layout.js';
 import { createInterface } from '../engine/js/interface.js';
@@ -60,6 +62,9 @@ let pairingAddressLineEl = null;
 let copyLinkEl = null;
 let copyCodeEl = null;
 let copyAddressEl = null;
+let pairingPeerLineEl = null;
+let pairingPeerEl = null;
+let peerLineCarried = '';
 let mirrorDurationEl = null;
 let mirrorRoleEl = null;
 let mirrorTitleEl = null;
@@ -110,6 +115,8 @@ export function initUi() {
   copyLinkEl = lookup('copy-pairing-link');
   copyCodeEl = lookup('copy-pairing-code');
   copyAddressEl = lookup('copy-pairing-address');
+  pairingPeerLineEl = lookup('pairing-peer-line');
+  pairingPeerEl = lookup('pairing-peer');
   mirrorDurationEl = lookup('mirror-duration-items');
   mirrorRoleEl = lookup('mirror-role-items');
   mirrorTitleEl = lookup('mirror-title');
@@ -284,6 +291,14 @@ function paintLocalPairing(localFlow) {
   // The field the flow shows is the field typing goes into: a player who opened
   // the page types straight away, with no click to land on an empty box first.
   if (localFlow && pairingAddressEl) pairingAddressEl.focus({ preventScroll: true });
+  // The line the other player carries lands in its own field: a channel this
+  // page has never joined carries nothing, so the peer's address and port arrive
+  // as a pasted value. The page reads it only when the value changes, so a
+  // carried line points once instead of on every paint.
+  if (localFlow && pairingPeerEl && pairingPeerEl.value !== peerLineCarried) {
+    peerLineCarried = pairingPeerEl.value;
+    if (peerLineCarried !== '') learnPeerAnnouncement(peerLineCarried);
+  }
   show(pairingAddressLineEl, localFlow);
   if (pairingAddressLineEl) {
     pairingAddressLineEl.textContent = lobby.addressBad ? ADDRESS_BAD :
@@ -292,6 +307,17 @@ function paintLocalPairing(localFlow) {
         (lobby.port === 0 ? '' : ' · port ' + lobby.port));
   }
   show(copyAddressEl, localFlow && lobby.address !== '' && !lobby.addressBad);
+  // The peer line: while the page holds nothing to point at, the field is on the
+  // page and the line names what its player has to carry; once the values arrive
+  // the field goes away and the line names what the page points at. A page opened
+  // at a link that already names its peer keeps nothing to ask.
+  show(pairingPeerLineEl, localFlow);
+  if (pairingPeerLineEl) {
+    pairingPeerLineEl.textContent = lobby.peerAddress === '' ? PEER_HINTS :
+      PEER_LABEL + ': ' + lobby.peerAddress +
+      (lobby.peerPort === 0 ? '' : ' · port ' + lobby.peerPort);
+  }
+  show(pairingPeerEl, localFlow && lobby.peerAddress === '');
   if (lobby.copy === 'denied') {
     show(pairingWaitingEl, true);
     pairingWaitingEl.textContent = COPY_DENIED;

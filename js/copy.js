@@ -85,6 +85,12 @@ export const ADDRESS_LABEL = 'Your address';
 export const ADDRESS_HINTS = 'Type the numbers your device uses, like 192.168.4.10. The port beside it belongs to this page — you never type it.';
 export const ADDRESS_BAD = 'An address is four numbers with dots between, each from 0 to 255, like 192.168.4.10 — a name or a link is not an address.';
 
+// The line the other player carries: the same-network pair points at each other,
+// and a channel that has never been joined carries nothing, so the port the page
+// read travels on a value the other player copies and pastes back here.
+export const PEER_LABEL = 'Their line';
+export const PEER_HINTS = 'Paste what the other page copies beside its own address: four numbers, a colon, their port. This page asks only while it has nothing to point at.';
+
 // The copy affordance: a click puts the value beside it on the clipboard, so a
 // player never retypes a link or an address. A browser that refuses the copy
 // says so, and the value stays selectable by hand.
