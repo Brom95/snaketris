@@ -17,13 +17,23 @@ export function pieceTicksPerCell() {
   return 1 / currentFallSpeed();
 }
 
-// Cells a falling piece currently occupies, clipped to the grid.
-export function pieceCells(p) {
+// Where this page draws a falling piece, one row above the cell the rules read,
+// advanced by the fraction the piece's own row already carries (design D2, D3):
+// the drawn cell sits inside the two rows the piece moved through and never
+// sinks into the block below the row it occupies, which is what makes a piece
+// read level as it lands. The column comes from the page's own slide record,
+// so a shift slides and a refused shift stays put. Only a cell this page has
+// left fully above the field is dropped: a straddling cell shows its visible
+// part, and the canvas clip cuts it without touching the field's top margin.
+function pieceDrawCells(p, motion) {
+  const row = Math.floor(p.row);
+  const phase = p.row - row;
+  const col = motion.pieceCol(p);
   const cells = [];
   for (const [dr, dc] of p.shape) {
-    const r = Math.floor(p.row + dr);
-    const c = p.col + dc;
-    if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+    const r = motion.step(row + dr - 1, row + dr, phase);
+    const c = col + dc;
+    if (r > -1 && r < ROWS && c > -1 && c < COLS) {
       cells.push({ r, c });
     }
   }
@@ -33,10 +43,10 @@ export function pieceCells(p) {
 // The piece painter, run by the engine canvas pass. It asks the canvas owner
 // for the 2d context and the cell primitive, so it needs no module-level canvas.
 export function paintPieces(pctx) {
-  const g = pctx.field.context();
-  g.fillStyle = COLORS.edible;
+  const motion = pctx.motion;
+  pctx.field.context().fillStyle = COLORS.edible;
   for (const p of game.play.pieces) {
-    for (const cell of pieceCells(p)) pctx.field.drawCell(cell.r, cell.c);
+    for (const cell of pieceDrawCells(p, motion)) pctx.field.drawCell(cell.r, cell.c);
   }
 }
 
