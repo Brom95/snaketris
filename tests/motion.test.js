@@ -4,6 +4,7 @@ import { installDomStub } from './helpers/dom-stub.js';
 
 const stub = installDomStub();
 const state = await import('../js/state.js');
+const pieceRules = await import('../js/pieces.js');
 const render = await import('../js/render.js');
 const C = await import('../js/constants.js');
 const grid = await import('../js/grid.js');
@@ -349,6 +350,32 @@ test('a hop over the bottom edge is drawn at both edges', () => {
   }
 });
 
+test('a turn at a wrapped edge is drawn leaving and entering, never through the middle', () => {
+  stage([[5, C.COLS - 1], [6, C.COLS - 1]], [], 900);
+  const snake = staged.snake;
+  // The head was going up the last column and now goes right, wrapping into the
+  // first column: the corner it turns at sits on the edge, so the leg of that
+  // turn is a wrap and stays drawn as the two edge copies.
+  step(snake, { r: 5, c: 0 });
+  state.game.play.tick = 924;
+  paint();
+  const first = painted(HEAD);
+  assert.deepEqual(first, [{ x: (C.COLS - 1) * CELL + 1, y: 5 * CELL + 1 }], 'the turn starts with the head at the corner cell on the edge');
+  for (const atHalf of [930, 936]) {
+    state.game.play.tick = atHalf;
+    paint();
+    const cells = painted(HEAD);
+    assert.equal(cells.length, 2, 'the wrapped leg paints a leaving square and an entering one, never a smear across the row');
+    for (const cell of cells) {
+      assert.ok(cell.x >= (C.COLS - 1) * CELL || cell.x <= 0, 'the square stays at one of the two edges, so nothing is invented in the middle of the row');
+      assert.equal(cell.y, 5 * CELL + 1, 'the crossing keeps the corner row: the leg is a wrap, not a diagonal through the board');
+    }
+    for (const body of painted(BODY)) {
+      assert.equal(body.x, (C.COLS - 1) * CELL + 1, 'the segment behind keeps the column it crawls up, so the bend composes with the wrap');
+    }
+  }
+});
+
 test('a requested shift slides the piece over a fixed duration', () => {
   const p = piece(8, 4, SQUARE);
   stage([], [p], 600);
@@ -362,7 +389,7 @@ test('a requested shift slides the piece over a fixed duration', () => {
   for (const cell of cells) {
     assert.equal(cell.c > 4 && cell.c < 6, true, 'the piece is caught mid-slide between the columns');
   }
-  state.game.play.tick = 614;
+  state.game.play.tick = 619;
   paint();
   for (const cell of drawnPieces()) {
     assert.equal(cell.c === 5 || cell.c === 6, true, 'the slide ends at the column the rules hold, not past it');
@@ -370,7 +397,9 @@ test('a requested shift slides the piece over a fixed duration', () => {
 });
 
 test('a shift the stack refuses leaves the piece put', () => {
-  const p = piece(8, 4, SQUARE);
+  // A row no other test has left a record on: a fresh piece, so this frame
+  // invents no slide from a piece that has since landed.
+  const p = piece(14, 4, SQUARE);
   stage([], [p], 700);
   for (let tick = 701; tick < 712; tick += 1) {
     state.game.play.tick = tick;
@@ -381,7 +410,7 @@ test('a shift the stack refuses leaves the piece put', () => {
   }
 });
 
-test('a rotation stays instant and does not slide the piece', () => {
+test('a shape that is not a quarter turn of the shape it carries restarts the record and sweeps nothing', () => {
   const shape = [[0, 0], [0, 1], [1, 0], [1, 1]];
   const p = piece(8, 4, shape);
   stage([], [p], 800);
@@ -457,10 +486,217 @@ test('shifts asked in quick succession still seat at the columns the rules hold'
   for (const c of cols) {
     assert.equal(c >= 3 && c <= 6, true, 'caught between the columns it crossed, never past the newest');
   }
-  state.game.play.tick = 1209;
+  state.game.play.tick = 1214;
   paint();
   for (const c of drawnPieces().map((cell) => cell.c)) {
     assert.equal(c === 5 || c === 6, true, 'the last slide ends at the newest column the rules hold');
+  }
+});
+
+
+// A bend and a spin (the smooth-turns-and-spins change). The chain the snake is
+// drawn along is the body's own path, so a turn is read at a corner the way the
+// coarse grid used to read it, and a tetromino turns by walking its cells about
+// the centre of the box the rules turn that shape about.
+
+test('a bend is drawn along the body, so no segment cuts a block diagonally', () => {
+  stage([[10, 3], [9, 3], [8, 3]], [], 1400);
+  const snake = staged.snake;
+
+  // The head was going up the column and now goes right: the corner cell it
+  // turned at is (10, 3).
+  step(snake, { r: 10, c: 4 });
+  state.game.play.tick = 1424;
+  paint();
+  assert.deepEqual(painted(HEAD), [{ x: 3 * CELL + 1, y: 10 * CELL + 1 }], 'the turn starts with the head at the corner cell it turned from');
+
+  for (const fraction of [6, 12, 18]) {
+    state.game.play.tick = 1424 + fraction;
+    paint();
+    const cells = painted(HEAD).concat(painted(BODY));
+    assert.equal(cells.length, 3, 'one square per segment, none invented at the bend');
+    for (const cell of cells) {
+      const r = (cell.y - 1) / CELL;
+      const c = (cell.x - 1) / CELL;
+      assert.ok(Number.isInteger(r) !== Number.isInteger(c), 'a segment at a bend travels one axis at a time, so it never sits in the middle of a block');
+    }
+    const head = painted(HEAD)[0];
+    assert.equal(head.y, 10 * CELL + 1, 'the head keeps the row of the corner cell while it crosses into the next column');
+  }
+
+  state.game.play.tick = 1448;
+  paint();
+  assert.deepEqual(painted(HEAD), [{ x: 4 * CELL + 1, y: 10 * CELL + 1 }], 'at the crossing the head lands in the cell it entered');
+});
+
+test('a change this page did not watch the middle of is seated, not travelled', () => {
+  stage([[6, 2], [6, 1]], [], 1500);
+
+  // Not a step: the mover is held somewhere else the page cannot have seen the
+  // middle of, so no drawing may run through it.
+  state.game.play.snake = [{ r: 12, c: 9 }, { r: 12, c: 8 }];
+  state.game.play.tick = 1501;
+  paint();
+  const head = painted(HEAD);
+  assert.equal(head.length, 1, 'one square at the seat, never a smear across the field');
+  assert.deepEqual(head, [{ x: 9 * CELL + 1, y: 12 * CELL + 1 }], 'the head sits at the cell the rules hold');
+});
+
+test('a grown snake keeps its squares apart through the interval', () => {
+  stage([[10, 3], [11, 3]], [], 1600);
+  const snake = staged.snake;
+
+  // Growth: the head advances and nothing is dropped from the tail.
+  snake.unshift({ r: 9, c: 3 });
+  state.game.play.tick = 1624;
+  paint();
+  state.game.play.tick = 1636;
+  paint();
+  const cells = painted(HEAD).concat(painted(BODY));
+  assert.equal(cells.length, 3, 'one square for each segment, none invented beyond the tail');
+  const rows = cells.map((cell) => (cell.y - 1) / CELL).sort((a, b) => a - b);
+  assert.ok(rows.every((r) => r >= 9 && r <= 11), 'no square is drawn past the cell it travels to, nor behind the new tail');
+  assert.ok(rows[1] - rows[0] >= 0.5 && rows[2] - rows[1] >= 0.5, 'the gap along the body stays at least half a cell, the grow risk the design names, so no two squares fold onto one another');
+
+  state.game.play.tick = 1648;
+  paint();
+  const landed = painted(HEAD).concat(painted(BODY)).map((cell) => (cell.y - 1) / CELL).sort((a, b) => a - b);
+  assert.deepEqual(landed, [9, 10, 11], 'at the crossing every square sits at its own cell, a cell apart');
+});
+
+// The spin: the cells a piece sweeps through are read off the shape the piece
+// carries, so the renderer needs no knowledge of the rules' own legality.
+function tetromino(type, col, row, state) {
+  return { type, state, col, row, shape: C.TETROMINOES[type][state].map((cell) => cell.slice()) };
+}
+
+// Where the piece painter draws a shape for the rules state a piece is in: one
+// row above the row the rules read, plus the fraction of the interval the piece
+// has already crossed (design D2, D3).
+function rulesCells(p) {
+  return p.shape.map(([dr, dc]) => ({
+    r: Math.round((p.row - 1 + dc * 0 + dr) * CELL) / CELL,
+    c: p.col + dc,
+  }));
+}
+
+test('a quarter turn is answered for as the turn this piece took, not as a new shape', () => {
+  const p = tetromino('T', 4, 7.4, 0);
+  stage([], [p], 1700);
+  const before = p.shape.map((cell) => cell.slice());
+
+  // The rules turn it clockwise about the centre of its box.
+  p.shape = pieceRules.turnedShape(before, true, 'T');
+  p.state = 1;
+  state.game.play.tick = 1704;
+  paint();
+  const rec = render.motion.pieceRecs[0];
+  assert.equal(rec.cw, true, 'the matcher read the new shape as a quarter turn of the shape it had');
+  assert.equal(rec.turnTick, 1704, 'the turn is timed from the frame the page saw it on');
+  assert.deepEqual(rec.beforeShape, before, 'the piece kept its own record, remembering the shape it turned from');
+
+  state.game.play.tick = 1706;
+  paint();
+  const mid = drawnPieces();
+  assert.equal(mid.length, 4, 'the shape is painted whole through the turn, no cell lost to the sweep');
+  assert.ok(mid.some((cell) => !Number.isInteger(cell.r) || !Number.isInteger(cell.c)), 'the turn is caught mid-sweep, not seated at a state on either side');
+
+  state.game.play.tick = 1708;
+  paint();
+  assert.deepEqual(drawnPieces(), rulesCells(p), 'at the end of the window the piece sits where its own fall and the turned shape put it');
+});
+
+test('a spin walks every cell round the pivot on its own arc, never beyond it', () => {
+  const p = tetromino('T', 4, 11.4, 0);
+  stage([], [p], 1800);
+  const before = p.shape.map((cell) => cell.slice());
+  p.shape = pieceRules.turnedShape(before, true, 'T');
+  p.state = 1;
+  state.game.play.tick = 1804;
+  paint();
+  const rec = render.motion.pieceRecs[0];
+  const mid = (C.PIECE_BOX[p.type] - 1) / 2;
+  const radii = before.map(([dr, dc]) => Math.hypot(dc - mid, dr - mid));
+
+  for (let tick = 1804; tick < 1809; tick += 1) {
+    state.game.play.tick = tick;
+    paint();
+    const phase = (tick - rec.turnTick) / 4;
+    const pivotRow = rec.beforeRow - 1 + mid + (p.row - 1 - (rec.beforeRow - 1)) * phase;
+    const pivotCol = rec.beforeCol + mid + (p.col - rec.beforeCol) * phase;
+    const cells = drawnPieces();
+    assert.equal(cells.length, 4, 'the shape stays whole through the sweep');
+    for (let i = 0; i < cells.length; i += 1) {
+      const cell = cells[i];
+      const away = Math.hypot(cell.c - pivotCol, cell.r - pivotRow);
+      assert.ok(away <= 1.75, 'a swept cell never leaves the box its own cell fills on either side of the turn');
+      assert.ok(radii.some((radius) => Math.abs(away - radius) <= 0.05), 'every swept cell stays on the arc its own distance from the pivot draws, no further');
+    }
+    void radii;
+  }
+});
+
+test('a turn taken while the piece slides carries both travels', () => {
+  const p = tetromino('T', 4, 15.4, 0);
+  stage([], [p], 1900);
+  const before = p.shape.map((cell) => cell.slice());
+
+  // The same frame turns the piece and moves it one column along.
+  p.shape = pieceRules.turnedShape(before, true, 'T');
+  p.state = 1;
+  p.col = 5;
+  state.game.play.tick = 1904;
+  paint();
+  const rec = render.motion.pieceRecs[0];
+  assert.equal(rec.cw, true, 'the turn is still read as this piece turning');
+  assert.equal(rec.prevCol, 4, 'and the slide is still read as this piece sliding, from the column it left');
+
+  state.game.play.tick = 1906;
+  paint();
+  const cols = drawnPieces().map((cell) => cell.c);
+  assert.ok(cols.every((c) => c >= 4 && c <= 7), 'the piece is caught between the columns it crossed while it turned, inside the box its cells fill on either side');
+
+  state.game.play.tick = 1916;
+  paint();
+  const seated = drawnPieces().map((cell) => cell.c).sort((a, b) => a - b);
+  assert.deepEqual(seated, [6, 6, 6, 7], 'once both windows are over the piece seats in the columns the turned shape holds at the column the rules hold');
+});
+
+test('a spin whose shape never changed never sweeps', () => {
+  const p = tetromino('T', 2, 3.4, 0);
+  stage([], [p], 2000);
+  for (let tick = 2001; tick < 2010; tick += 1) {
+    state.game.play.tick = tick;
+    paint();
+    const cols = drawnPieces().map((cell) => cell.c).sort((a, b) => a - b);
+    assert.deepEqual(cols, [2, 3, 3, 4], 'a piece that never turned stays in the columns it holds: the sweep answers only to a shape that changed');
+  }
+});
+
+test('the slide now runs over twelve ticks, half of it read at the middle column', () => {
+  const p = piece(8, 4, SQUARE);
+  stage([], [p], 2100);
+  p.col = 5;
+  state.game.play.tick = 2104;
+  paint();
+  const rec = render.motion.pieceRecs[0];
+  assert.equal(rec.colTick, 2104, 'the slide is timed from the frame the page saw the shift on');
+
+  state.game.play.tick = 2110;
+  paint();
+  const half = drawnPieces().map((cell) => cell.c);
+  assert.ok(half.every((c) => c > 4 && c < 6), 'half way through the window the piece is caught between the columns');
+  assert.ok(half.every((c) => Math.abs(c - 4.5) < 1 / CELL || Math.abs(c - 5.5) < 1 / CELL), 'and exactly half way across at the half window');
+
+  state.game.play.tick = 2115;
+  paint();
+  const still = drawnPieces().map((cell) => cell.c);
+  assert.ok(still.every((c) => c > 4 && c < 6), 'a tick short of the window it is still travelling: the slide is twelve ticks, not the seven it used to be');
+
+  state.game.play.tick = 2116;
+  paint();
+  for (const c of drawnPieces().map((cell) => cell.c)) {
+    assert.ok(c === 5 || c === 6, 'the slide ends at the column the rules hold, one full window after the shift');
   }
 });
 
@@ -589,4 +825,162 @@ test('a real game painted at an uneven cadence never paints a cell the mover doe
       }
     }
   }
+});
+
+test('a page driven only by whole frames turns and bends like the page that ran the rules', async () => {
+  const encodeFrame = network.encodeFrame;
+  const applyFrame = network.applyFrame;
+
+  // The host page: it runs the ticks, ships the frame it reached, and remembers
+  // what it painted at that tick.
+  startIn('PLAYING', 'snake');
+  grid.initGrid();
+  render.initRender(canvas);
+  let guestSweepFrames = 0;
+  let guestBendFrames = 0;
+  const shipped = [];
+  const hostDrawn = [];
+  for (let tick = 0; tick < 160; tick += 1) {
+    // A piece with something to turn, put in flight where the rules already hold
+    // one and built the way spawnPiece builds one, so the replay carries a
+    // rotation as well as the bend below and the crawl the bot drives.
+    if (tick === 20 && state.game.play.pieces.length === 1) {
+      state.game.play.pieces.push({ type: 'T', state: 0, row: 6, col: 4,
+        shape: C.TETROMINOES.T[0].map((cell) => cell.slice()) });
+    }
+    if ((tick === 40 || tick === 70 || tick === 100) && state.game.play.pieces.length === 2) {
+      const victim = state.game.play.pieces[1];
+      pieceRules.setPieceState(victim, (victim.state + 1) % 4);
+    }
+    // A change of direction for the snake to travel round.
+    if (tick === 30 || tick === 60 || tick === 90) {
+      const dir = state.game.play.dir;
+      const headCell = state.game.play.snake[0];
+      const picks = dir.r === 0 ? [{ r: 1, c: 0 }, { r: -1, c: 0 }] : [{ r: 0, c: 1 }, { r: 0, c: -1 }];
+      for (const pick of picks) {
+        const nr = headCell.r + pick.r, nc = headCell.c + pick.c;
+        if (nr >= 0 && nr < C.ROWS && nc >= 0 && nc < C.COLS) {
+          state.game.play.nextDir = pick;
+          break;
+        }
+      }
+    }
+    app.update();
+    shipped.push(encodeFrame());
+    hostDrawn.push(drawnFrame());
+  }
+
+  // The guest page: it runs no tick of its own, it only applies the frames that
+  // arrived and paints what its own observation of them lets it see.
+  startIn('PLAYING', 'snake');
+  grid.initGrid();
+  render.initRender(canvas);
+  for (let tick = 0; tick < shipped.length; tick += 1) {
+    assert.ok(applyFrame(shipped[tick]), 'the frame arrived as the fourteen fields it ships');
+    const seen = drawnFrame();
+    const host = hostDrawn[tick];
+    assert.deepEqual(seen.snake, host.snake, 'the guest paints the travel the host painted at tick ' + tick);
+    assert.deepEqual(seen.pieces, host.pieces, 'the guest seats the pieces where the host painted them at tick ' + tick);
+    if (state.game.play.pieces.some((q) => render.motion.rotation(q))) guestSweepFrames += 1;
+    const gmr = render.motion.snakeRec;
+    if (gmr && gmr.from && (gmr.from[0].r !== state.game.play.snake[0].r
+      || gmr.from[0].c !== state.game.play.snake[0].c)) guestBendFrames += 1;
+  }
+  // The replay has to carry both new movers, or the equality above is a walk
+  // over the crawl alone.
+  assert.ok(guestSweepFrames > 0, 'the replayed frames carry a rotation the guest swept: ' + guestSweepFrames);
+  assert.ok(guestBendFrames > 0, 'the replayed frames carry a bend the guest travelled: ' + guestBendFrames);
+});
+
+test('a real game painted at an uneven cadence with a turn never paints a cell a mover does not occupy', async () => {
+  const game = startIn('PLAYING', 'snake');
+  grid.initGrid();
+  render.initRender(canvas);
+  let sweptFrames = 0;
+  let bentFrames = 0;
+
+  for (let tick = 0; tick < 240; tick += 1) {
+    // The game has to carry a change of direction and a rotation, or a sweep over
+    // the straight crawl the bot drives would answer for the whole of it. The
+    // staged piece is built the way spawnPiece builds one, where the rules hold.
+    if (tick === 20 && game.play.pieces.length === 1) {
+      game.play.pieces.push({ type: 'T', state: 0, row: 6, col: 4,
+        shape: C.TETROMINOES.T[0].map((cell) => cell.slice()) });
+    }
+    if ((tick === 40 || tick === 70 || tick === 100 || tick === 130 || tick === 160)
+      && game.play.pieces.length === 2) {
+      pieceRules.setPieceState(game.play.pieces[1], (game.play.pieces[1].state + 1) % 4);
+    }
+    if (tick % 30 === 10 && game.play.snake.length > 0) {
+      const dir = game.play.dir;
+      const headCell = game.play.snake[0];
+      const picks = dir.r === 0 ? [{ r: 1, c: 0 }, { r: -1, c: 0 }] : [{ r: 0, c: 1 }, { r: 0, c: -1 }];
+      for (const pick of picks) {
+        const nr = headCell.r + pick.r, nc = headCell.c + pick.c;
+        if (nr >= 0 && nr < C.ROWS && nc >= 0 && nc < C.COLS) {
+          game.play.nextDir = pick;
+          break;
+        }
+      }
+    }
+    app.update();
+    const frames = tick % 3 === 0 ? 1 : 2;
+    for (let frame = 0; frame < frames; frame += 1) {
+      rec.rects.length = 0;
+      rec.lines.length = 0;
+      rec.strokes.length = 0;
+      render.render();
+
+      const snakeInk = rec.rects.filter(([style]) => SNAKE_INK.includes(style));
+      const drawnSnake = snakeInk.map(([, x, y]) => ({ r: (y - 1) / CELL, c: (x - 1) / CELL }));
+      const heldSnake = game.play.snake.map((cell) => ({ r: cell.r, c: cell.c }));
+      // The cell each segment left at also names a cell the mover occupied, and
+      // the spec allows either side of the travel.
+      const motionRec = render.motion.snakeRec;
+      if (motionRec && motionRec.from && (motionRec.from[0].r !== heldSnake[0].r
+        || motionRec.from[0].c !== heldSnake[0].c)) bentFrames += 1;
+      const legalSnake = heldSnake.concat(motionRec ? motionRec.from.map((cell) => ({ r: cell.r, c: cell.c })) : []);
+      assert.equal(drawnSnake.length >= heldSnake.length, true, 'segments painted ' + drawnSnake.length + ' of ' + heldSnake.length + ' held at tick ' + tick + ': ' + JSON.stringify([drawnSnake, heldSnake]));
+      assert.equal(drawnSnake.length <= 2 * heldSnake.length, true, 'at most the edge copy of a wrapped hop is added');
+      assert.ok(honestAgainst(drawnSnake, legalSnake), 'a snake cell painted away from its own cells: ' + JSON.stringify([tick, drawnSnake, legalSnake]));
+
+      const ruleCells = [];
+      let boxes = [];
+      for (const p of game.play.pieces) {
+        for (const [dr, dc] of p.shape) ruleCells.push({ r: Math.floor(p.row + dr), c: p.col + dc });
+        const sweep = render.motion.rotation(p);
+        if (sweep) {
+          // A turn is honest inside the box the turn fills: the cells it left and
+          // the cells it enters. Sweeping about the centre cuts no single cell
+          // through, so a hug of one cell cannot answer for a mid-turn frame.
+          const box = { top: Infinity, bottom: -Infinity, left: Infinity, right: Infinity };
+          const grow = (r, c) => {
+            if (r < box.top) box.top = r;
+            if (r > box.bottom) box.bottom = r;
+            if (c < box.left) box.left = c;
+            if (c > box.right) box.right = c;
+          };
+          for (const [dr, dc] of sweep.shape) grow(sweep.row + dr, sweep.col + dc);
+          for (const [dr, dc] of p.shape) grow(p.row - 1 + dr, p.col + dc);
+          boxes.push(box);
+        }
+      }
+      const drawnPiece = painted(EDIBLE);
+      const drawnCoords = drawnPiece.map((cell) => ({ r: cell.y / CELL - 1 / CELL, c: cell.x / CELL - 1 / CELL }));
+      assert.equal(drawnPiece.length <= ruleCells.length, true, 'travel never paints more cells than a shape holds');
+      if (boxes.length > 0) {
+        sweptFrames += 1;
+        assert.ok(drawnCoords.every((cell) => boxes.some((b) => cell.r >= b.top - EPS && cell.r <= b.bottom + EPS
+          && cell.c >= b.left - EPS && cell.c <= b.right + EPS)
+          || honestAgainst([cell], ruleCells)),
+          'a swept cell left the box the turn fills before and after: ' + JSON.stringify([tick, drawnCoords, boxes, ruleCells]));
+      } else {
+        assert.ok(honestAgainst(drawnCoords, ruleCells),
+          'a falling piece was drawn sunk past the row it occupies: ' + JSON.stringify([tick, drawnCoords, ruleCells]));
+      }
+    }
+  }
+  // The sweep has to run over the travel this change adds, not only the crawl.
+  assert.ok(sweptFrames > 0, 'the sweep reads a rotation: ' + sweptFrames + ' frames with a cell sweeping');
+  assert.ok(bentFrames > 0, 'the sweep reads a change of direction: ' + bentFrames + ' frames travelling round a bend');
 });

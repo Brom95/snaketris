@@ -11,6 +11,10 @@
 //        (verify-network-local, verify-local-transport) still stand with the
 //        change in place.
 //
+//   4.2  two reads the follow-on change (smooth-turns-and-spins) asks for: while
+//        the head travels a turn, the cell it pivots on keeps a drawn square, and
+//        a rotation is caught mid-sweep in a handful of frames rather than none.
+//
 // The palette rule is the sharp end of the claim: every pixel is one of the
 // palette colours or a grid mark, so the travel is snapped to whole pixels
 // (design D7) and nothing arrives with a soft edge.
@@ -34,6 +38,8 @@ const PALETTE = [
 const BG = PALETTE[0];
 const HEAD = asRgb(COLORS.snakeHead);
 const PIECE = asRgb(COLORS.edible);
+const SNAKE_INK = [HEAD, asRgb(COLORS.snakeBody), asRgb(COLORS.tierBlue),
+  asRgb(COLORS.tierPurple), asRgb(COLORS.tierGold)];
 
 // One pass over the buffer: classify every pixel, and note where a mover square
 // sits (its top and left edge, in whole pixels).
@@ -140,6 +146,65 @@ function offCell(edge) {
   return edge !== null && (edge - 1) % CELL !== 0;
 }
 
+// One run of paired reads: the centre pixel of every cell, the edges of
+// the snake head and of the piece, and the rules' own head and pieces, all taken in
+// the same instant so a claim can pair what the page painted with what the rules hold.
+async function travel(page, samples, gap) {
+  return await page.evaluate(async (wanted) => {
+    const cv = document.querySelector('#game');
+    const ctx = cv.getContext('2d');
+    const w = cv.width, h = cv.height;
+    const out = [];
+    const INK = wanted.snakeInk, EDIBLE = wanted.edible;
+    let img = null;
+    const match = (p, colour) => img[p] === colour[0] && img[p + 1] === colour[1] && img[p + 2] === colour[2];
+    for (let s = 0; s < wanted.n; s += 1) {
+      const g = window.__game;
+      img = ctx.getImageData(0, 0, w, h).data;
+      const head = g.play.snake && g.play.snake.length ? [g.play.snake[0].r, g.play.snake[0].c] : null;
+      const ink = [];
+      for (let r = 0; r < wanted.rows; r += 1) {
+        for (let c = 0; c < wanted.cols; c += 1) {
+          const p = ((r * wanted.cell + wanted.cell / 2) * w + (c * wanted.cell + wanted.cell / 2)) * 4;
+          let v = 0;
+          for (let k = 0; k < INK.length; k += 1) {
+            if (match(p, INK[k])) { v = 1; break; }
+          }
+          if (v === 0 && match(p, EDIBLE)) v = 2;
+          ink.push(v);
+        }
+      }
+      let headTop = null, headLeft = null, pieceLeft = null, pieceRight = null;
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+          const p = (y * w + x) * 4;
+          if (match(p, wanted.head)) {
+            if (headTop === null) headTop = y;
+            if (headLeft === null || x < headLeft) headLeft = x;
+          } else if (match(p, EDIBLE)) {
+            if (pieceLeft === null || x < pieceLeft) pieceLeft = x;
+            if (pieceRight === null || x > pieceRight) pieceRight = x;
+          }
+        }
+      }
+      out.push({
+        tick: g.play.tick, head: head, ink: ink, headTop: headTop, headLeft: headLeft,
+        pieceLeft: pieceLeft, pieceRight: pieceRight,
+        pieces: (g.play.pieces || []).map((pp) => [pp.type, pp.state, pp.col, Math.floor(pp.row)]),
+      });
+      if (s + 1 < wanted.n) await new Promise((done) => setTimeout(done, wanted.gap));
+    }
+    return out;
+  }, { n: samples, gap: gap, cell: CELL, cols: COLS, rows: ROWS, snakeInk: SNAKE_INK, edible: PIECE, head: HEAD });
+}
+
+// The centre pixel of one cell, as the paired reads report it: 1 for snake ink,
+// 2 for a falling piece, 0 for the field.
+function cellInk(sample, r, c) {
+  return sample.ink[r * COLS + c];
+}
+
+
 const browser = await chromium.launch();
 const context = await browser.newContext();
 
@@ -191,6 +256,100 @@ if (started.ok) {
   console.log('  head edges (first 12): ' + headY.slice(0, 12) + ' / x ' + headX.slice(0, 12));
   console.log('  piece bottom edges (first 12): ' + pieceBottom.slice(0, 12));
   await started.page.close();
+}
+
+
+// Two reads this change asks for (tasks 4.2 of smooth-turns-and-spins), each on
+// the page that owns the mover it reads: the player steers a bend on a snake page
+// and turns a piece on a tetris page, so the frames that follow are known rather
+// than hoped for.
+const steered = await playRole(context, 'snake', ROOT);
+check(steered.ok, 'a snake-role game reached PLAYING on the page');
+if (steered.ok) {
+  const livePage = steered.page;
+  const shots = [];
+  // One press right, one press down: the head bends at the cell it last held,
+  // and the reads that follow cover the tick that travel crosses.
+  for (let round = 0; round < 3; round += 1) {
+    await livePage.keyboard.press('ArrowRight');
+    for (const row of await travel(livePage, 10, 14)) shots.push(row);
+    await livePage.keyboard.press('ArrowDown');
+    for (const row of await travel(livePage, 10, 14)) shots.push(row);
+  }
+  const heads = [];
+  const corners = [];
+  let turns = 0;
+  let cornerFrames = 0;
+  for (const sample of shots) {
+    for (let i = corners.length - 1; i >= 0; i -= 1) {
+      const watch = corners[i];
+      const travelling = offCell(sample.headTop) || offCell(sample.headLeft);
+      if (travelling && cellInk(sample, watch.r, watch.c) === 1) cornerFrames += 1;
+      watch.left -= 1;
+      if (watch.left <= 0) corners.splice(i, 1);
+    }
+    const head = sample.head;
+    if (head !== null && (heads.length === 0
+      || heads[heads.length - 1][0] !== head[0] || heads[heads.length - 1][1] !== head[1])) {
+      heads.push(head);
+      const n = heads.length;
+      if (n >= 3) {
+        const a = heads[n - 3], b = heads[n - 2], c = heads[n - 1];
+        const dr1 = b[0] - a[0], dc1 = b[1] - a[1];
+        const dr2 = c[0] - b[0], dc2 = c[1] - b[1];
+        const single = (dr, dc) => Math.abs(dr) + Math.abs(dc) === 1;
+        if (single(dr1, dc1) && single(dr2, dc2) && dr1 !== dr2 || dc1 !== dc2) {
+          turns += 1;
+          corners.push({ r: b[0], c: b[1], left: 6 });
+        }
+      }
+    }
+  }
+  check(turns >= 1, 'the steered snake bent its direction during the reads: ' + turns + ' turn(s)');
+  check(cornerFrames >= 3, 'the corner it turned on keeps a drawn square while the head travels: '
+    + cornerFrames + ' frame(s)');
+  console.log('  bends: ' + turns + ', corner frames: ' + cornerFrames);
+  await livePage.close();
+}
+
+const turned = await playRole(context, 'tetris', ROOT);
+check(turned.ok, 'a tetris-role game reached PLAYING on the page');
+if (turned.ok) {
+  const livePage = turned.page;
+  // Wait for a piece the page actually shows, and one that is not an O: an O
+  // turns into the cells it already holds, so it has nothing to sweep.
+  const visible = await waitFor(livePage, (probe) => {
+    const g = window.__game;
+    return g.screen.state === 'PLAYING' && g.play.pieces.some((p) => p.row > 2 && p.type !== 'O');
+  }, null, 30000);
+  check(visible, 'a piece that can turn came down into the field while the page ran');
+  const shots = [];
+  let rotations = 0;
+  let sweepFrames = 0;
+  const watches = [];
+  let previous = null;
+  for (let round = 0; round < 8; round += 1) {
+    await livePage.keyboard.press('s');
+    for (const row of await travel(livePage, 10, 14)) shots.push(row);
+    const seen = shots[shots.length - 10];
+    if (previous !== null && seen.pieces.length === 1 && previous.length === 1
+      && previous[0][0] === seen.pieces[0][0] && previous[0][1] !== seen.pieces[0][1]) {
+      rotations += 1;
+      watches.push(6);
+    }
+    for (const sample of shots.slice(shots.length - 10)) {
+      if (watches.length > 0 && sample.pieces.length === 1 && offCell(sample.pieceLeft)) sweepFrames += 1;
+      for (let i = watches.length - 1; i >= 0; i -= 1) {
+        watches[i] -= 1;
+        if (watches[i] <= 0) watches.splice(i, 1);
+      }
+    }
+    previous = seen.pieces;
+  }
+  check(rotations >= 1, 'the piece the player owns turned during the reads: ' + rotations + ' turn(s)');
+  check(sweepFrames >= 3, 'a turn is caught mid-sweep, its edge off the column grid: ' + sweepFrames + ' frame(s)');
+  console.log('  turns asked: 8, rotations answered: ' + rotations + ', sweep frames: ' + sweepFrames);
+  await livePage.close();
 }
 
 await idle.close();

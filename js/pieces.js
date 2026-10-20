@@ -26,6 +26,10 @@ export function pieceTicksPerCell() {
 // left fully above the field is dropped: a straddling cell shows its visible
 // part, and the canvas clip cuts it without touching the field's top margin.
 function pieceDrawCells(p, motion) {
+  const sweep = motion.rotation(p);
+  if (sweep) {
+    return sweptCells(p, sweep, motion);
+  }
   const row = Math.floor(p.row);
   const phase = p.row - row;
   const col = motion.pieceCol(p);
@@ -35,6 +39,37 @@ function pieceDrawCells(p, motion) {
     const c = col + dc;
     if (r > -1 && r < ROWS && c > -1 && c < COLS) {
       cells.push({ r, c });
+    }
+  }
+  return cells;
+}
+
+// A piece mid-turn: the cells the piece stood on when the turn started, walked
+// through a quarter turn about the centre of the box the rules turn that shape
+// about (task 2.2, design D2), and slid by whatever the turn, a wall kick, or the
+// fall moved the box alongside it (task 2.3, design D5), so a turn that kicked
+// carries its kick and a turn taken while the piece still slides keeps both
+// travels. The angle is derived from the phase every frame and never stored, and
+// each position is pixel-snapped once by the render layer so the coarse grid stays
+// whole under a turning piece (task 2.4).
+
+
+function sweptCells(p, sweep, motion) {
+  const size = PIECE_BOX[p.type];
+  const mid = (size - 1) / 2;
+  const angle = (sweep.cw ? 1 : -1) * sweep.phase * Math.PI / 2;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const centreRow = sweep.row + (p.row - 1 - sweep.row) * sweep.phase;
+  const centreCol = sweep.col + (p.col - sweep.col) * sweep.phase;
+  const cells = [];
+  for (const [dr, dc] of sweep.shape) {
+    const x = dc - mid;
+    const y = dr - mid;
+    const r = centreRow + mid + (x * sin + y * cos);
+    const c = centreCol + mid + (x * cos - y * sin);
+    if (r > -1 && r < ROWS && c > -1 && c < COLS) {
+      cells.push({ r: motion.snap(r), c: motion.snap(c) });
     }
   }
   return cells;

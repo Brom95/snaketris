@@ -1,7 +1,7 @@
 // Rendering. The engine owns the drawing buffer, its size and the cell primitive;
 // this module owns what the game paints: the grid, the solid blocks, the snake.
 import {
-  COLS, ROWS, CELL, BOARD_W, BOARD_H, SOLID, COLORS, TIER_WIDTH,
+  COLS, ROWS, CELL, BOARD_W, BOARD_H, SOLID, COLORS, TIER_WIDTH, PIECE_BOX,
 } from './constants.js';
 import { game } from './state.js';
 import { getGrid } from './grid.js';
@@ -72,7 +72,16 @@ function drawGrid() {
 // page rebuilds every mover out of the frame it received and object identity
 // there is a new object every frame. prune is the reset path: a tick that went
 // backwards is a new game.
-const SHIFT_TRAVEL_TICKS = 7;
+const SHIFT_TRAVEL_TICKS = 12;
+// A slide runs a fixed window of ticks rather than the player's own interval:
+// measured, mashing would stretch the travel and make shifts lag. Twelve ticks
+// is about 200 ms, roughly 120 px/s against a crawl of about 63 px/s, so the
+// slide stops finishing before the hand does while still outrunning the crawl
+// (task 3.1, design D6; the number stays retunable as one constant).
+const ROTATION_TRAVEL_TICKS = 4;
+// A turn runs a fixed handful of ticks too: about 67 ms, three to four rendered
+// frames at 60 Hz, fast enough that the next input is never late and slow enough
+// that the sweep can be watched (task 2.2, design D3).
 
 export const motion = {
   tick: 0,
@@ -92,6 +101,16 @@ export const motion = {
       return motion.snakeRec;
     }
     if (sameCells(rec.to, cells)) return rec;
+    if (!snakeStepped(rec.to, cells)) {
+      // The cells differ by more than a step this page watched, so this record
+      // does not describe the mover: a new game, or a mover that arrived. Nothing
+      // may travel through it, so the record seats at what the rules hold (task 1.3,
+      // design D1: a bend is drawn along the body's own path, never a chord).
+      rec.from = cells;
+      rec.to = cells;
+      rec.movedTick = game.play.tick;
+      return rec;
+    }
     const gap = game.play.tick - rec.movedTick;
     if (gap > 0) rec.intervalTicks = gap;
     rec.from = rec.to;
@@ -105,43 +124,72 @@ export const motion = {
     return shape.map(([dr, dc]) => dr + ',' + dc).join(';');
   },
   // A falling piece answered for by the record whose cells it stood nearest to
-  // a frame ago, within the one column a shift and the fraction of a fall a
-  // frame can carry. A shape that reads different is a rotation or a bitten
-  // cell, and the piece gets a record of its own rather than a slide through it.
-  observePieces(list) {
+  // a frame ago, within the one column a shift and the fraction of a fall a frame
+  // can carry. A shape that reads different is answered for both as it stands and
+  // as it came from a quarter turn about the centre of its box, within the two
+  // columns and two rows an SRS kick can carry, so a turn keeps the piece's record
+  // rather than restarting it (task 2.1, design D4). A shape that is no quarter
+  // turn is a bitten cell or a new piece: the record drops its sweep instead.
+  observePieces(pieces) {
     const prev = motion.pieceRecs;
-    const taken = prev.map(() => false);
     const next = [];
-    const frame = new Map();
-    for (const p of list) {
+    const taken = prev.map(() => false);
+    const frameRecords = new Map();
+    for (const p of pieces) {
+      const size = PIECE_BOX[p.type];
       const key = motion.shapeKey(p.shape);
-      let bestAt = -1;
+      let rec = null;
       let bestGap = Infinity;
-      for (let i = 0; i < prev.length; i += 1) {
-        const rec = prev[i];
-        if (taken[i] || rec.key !== key) continue;
-        const gap = Math.abs(p.col - rec.colSeen) + Math.abs(p.row - rec.row);
-        if (Math.abs(p.col - rec.colSeen) > 1 || Math.abs(p.row - rec.row) > 2.5) continue;
-        if (gap < bestGap) {
-          bestGap = gap;
-          bestAt = i;
-        }
+      let bestCw = null;
+      for (let i = 0; i < prev.length; i = i + 1) {
+        const other = prev[i];
+        if (other.type !== p.type || taken[i]) continue;
+        const dCol = Math.abs(other.colSeen - p.col);
+        const dRow = Math.abs(other.row - p.row);
+        const same = other.key === key;
+        const cw = same ? null : turnBetween(other.shape, size, key);
+        if (!same && cw === null) continue;
+        const wide = cw === null ? 1 : 2;
+        const tall = cw === null ? 2.5 : 2;
+        if (dCol > wide || dRow > tall) continue;
+        const gap = dCol + dRow;
+        if (gap < bestGap) { rec = other; bestGap = gap; bestCw = cw; taken[i] = true; }
       }
-      const rec = bestAt >= 0 ? prev[bestAt] : { prevCol: p.col, colSeen: p.col, colTick: game.play.tick, row: p.row, key };
-      if (bestAt >= 0) {
-        taken[bestAt] = true;
-        if (rec.colSeen !== p.col) {
-          rec.prevCol = rec.colSeen;
-          rec.colTick = game.play.tick;
+      if (!rec) {
+        next.push({ type: p.type, colSeen: p.col, prevCol: p.col, colTick: game.play.tick, row: p.row, shape: p.shape.slice(), key, cw: null, turnTick: -1, beforeRow: p.row, beforeCol: p.col, beforeShape: null });
+        frameRecords.set(p, next[next.length - 1]);
+        continue;
+      }
+      // Where this frame already draws the piece, before anything about it
+      // changes: the seam a turn shares with the fall and shift drawings (task 2.3).
+      const drawnCol = motion.step(rec.prevCol, p.col, motion.phaseSince(rec.colTick, SHIFT_TRAVEL_TICKS));
+      if (rec.colSeen !== p.col) { rec.prevCol = rec.colSeen; rec.colTick = game.play.tick; }
+      if (rec.key !== key) {
+        if (bestCw !== null) {
+          // The turn this page watched this piece take, and the state it was drawn
+          // in when the turn started (task 2.1, design D4).
+          rec.beforeRow = rec.row;
+          rec.beforeCol = drawnCol;
+          rec.beforeShape = rec.shape;
+          rec.cw = bestCw;
+          rec.turnTick = game.play.tick;
+        } else {
+          // A shape this quarter turn does not explain: a bitten cell, or a mover
+          // that arrived, so nothing may sweep through it.
+          rec.cw = null;
+          rec.turnTick = -1;
+          rec.beforeShape = null;
         }
       }
       rec.colSeen = p.col;
       rec.row = p.row;
+      rec.shape = p.shape.slice();
+      rec.key = key;
       next.push(rec);
-      frame.set(p, rec);
+      frameRecords.set(p, rec);
     }
     motion.pieceRecs = next;
-    motion.frameRecords = frame;
+    motion.frameRecords = frameRecords;
   },
   // The column this page draws a piece at: the column it left at the point of
   // the slide it answered into (task 4.1, design D4). The slide runs a fixed
@@ -150,6 +198,30 @@ export const motion = {
     const rec = motion.frameRecords.get(p);
     const phase = motion.phaseSince(rec ? rec.colTick : game.play.tick, SHIFT_TRAVEL_TICKS);
     return motion.step(rec ? rec.prevCol : p.col, p.col, phase);
+  },
+  // A position rounded once, in pixels, so the +1 inset and the cell - 2 size the
+  // engine draws stay integers while the position still moves (the archived design
+  // D7, kept for the swept cells of task 2.2).
+  snap(value) {
+    return Math.round(value * CELL) / CELL;
+  },
+  // The turn this page draws a piece through, or nothing at all when the piece is
+  // not mid-turn: the phase of design D3/D5 (task 2.2) read off the same shipped
+  // tick every other mover reads its phase off, over ROTATION_TRAVEL_TICKS, plus
+  // the cells the piece stood on when the turn started and which way it turned.
+  rotation(p) {
+    const rec = motion.frameRecords.get(p);
+    if (!rec || rec.cw === null || rec.beforeShape === null) return null;
+    let phase = (game.play.tick - rec.turnTick) / ROTATION_TRAVEL_TICKS;
+    if (phase < 0) {
+      phase = 0;
+    }
+    if (phase >= 1) return null;
+    // The centre the piece is drawn about when the turn starts, so the sweep and
+    // the fall/shift drawing agree at both ends of the window (task 2.3, design
+    // D5): a piece is drawn at the row above the one the rules hold plus the
+    // fraction it has crossed, and this row and column are that already.
+    return { phase, cw: rec.cw, shape: rec.beforeShape, row: rec.beforeRow - 1, col: rec.beforeCol };
   },
   phaseSince(movedTick, intervalTicks) {
     if (!intervalTicks) return 0;
@@ -163,15 +235,21 @@ export const motion = {
     const p = phase < 0 ? 0 : phase > 1 ? 1 : phase;
     return Math.round(from * CELL + (to - from) * CELL * p) / CELL;
   },
-  // A hop at the point it is through: the cells to hand drawCell. An adjacent
-  // hop is one cell between the cell it left and the one it entered; a hop that
-  // went round the board is drawn at both edges so the canvas clip cuts each end
-  // and nothing smears across the field (design D6); any other hop is one this
-  // page cannot see the middle of, so it seats at the cell it reached.
+  // A leg of a mover's polyline at the point through: the cells to hand drawCell.
+  // A leg between neighbours is one cell walked from the cell it left to the one it
+  // entered; a leg of zero length is a segment that stayed put; a leg that went
+  // round the board is drawn at both edges so the canvas clip cuts each end and
+  // nothing smears across the field, its direction read by the modular short-way
+  // (the archived design D6, kept by task 1.2). A turn is no longer a hop whose
+  // ends differ on both axes, so the last line is a leg a body's polyline cannot
+  // make: it seats so a mismatched record cannot crash the drawing (task 1.3).
   travelCells(from, to, phase) {
     const dr = to.r - from.r;
     const dc = to.c - from.c;
-    if (dr * dr + dc * dc === 1) {
+    if (dr === 0 && dc === 0) {
+      return [{ r: from.r, c: from.c }];
+    }
+    if (Math.abs(dr) + Math.abs(dc) === 1) {
       return [{ r: motion.step(from.r, to.r, phase), c: motion.step(from.c, to.c, phase) }];
     }
     if (Math.abs(dr) === ROWS - 1) {
@@ -210,6 +288,67 @@ function sameCells(a, b) {
   return true;
 }
 
+// The quarter turn a shape takes about the centre of the box its type names, as
+// text, so a frame that rebuilt the shape array still answers for the shape it
+// carries. This mirrors the map the rules turn shapes by, turnOffset at
+// js/pieces.js:110 (task 2.1, design D4: the matcher compares the turned shape
+// so a rotation keeps the piece's record rather than restarting it).
+function turnedKey(shape, size, cw) {
+  return shape.map(([dr, dc]) => (cw ? dc : size - 1 - dc) + ',' + (cw ? size - 1 - dr : dr)).join(';');
+}
+function turnBetween(shape, size, key) {
+  if (turnedKey(shape, size, true) === key) return true;
+  if (turnedKey(shape, size, false) === key) return false;
+  return null;
+}
+// The step this page may draw: the body shifted one place back along itself, with
+// or without a new tail where it grew, and a head one cell from where it was - whole
+// cells, or wrapped round an edge. Anything else is not a step the page watched, so
+// no drawing may travel through it (task 1.3: a turn is drawn along the body's own
+// path, and a change it cannot see the middle of is seated).
+function snakeStepped(from, to) {
+  if (!from.length || to.length < from.length || to.length > from.length + 1) return false;
+  for (let i = 1; i < to.length; i = i + 1) {
+    if (to[i].r !== from[i - 1].r || to[i].c !== from[i - 1].c) return false;
+  }
+  const dr = to[0].r - from[0].r;
+  const dc = to[0].c - from[0].c;
+  return Math.abs(dr) + Math.abs(dc) === 1 || Math.abs(dr) === ROWS - 1 || Math.abs(dc) === COLS - 1;
+}
+// The drawn body of a snake as a chain of squares CELL apart along the polyline
+// of the body's own travel: the cells it holds now, extended by the cell its tail
+// left. Arclength along that polyline never shortcuts, so a bend is drawn at the
+// corner cell the rules bend at rather than as a chord across the turn (task 1.1,
+// design D1; on a straight run this resolves to the same positions the per-slot
+// lerp of the archived change produced).
+function snakeChain(from, to, phase) {
+  const drawn = [];
+  if (!to.length) return drawn;
+  const last = to.length - 1;
+  const back = from && from.length === to.length ? from[last] : to[last];
+  const path = to.concat([back]);
+  for (let i = 0; i <= last; i += 1) {
+    const dr = path[i + 1].r - path[i].r;
+    const dc = path[i + 1].c - path[i].c;
+    const step = dr === 0 && dc === 0;
+    const walk = Math.abs(dr) + Math.abs(dc) === 1;
+    const wrap = Math.abs(dr) === ROWS - 1 || Math.abs(dc) === COLS - 1;
+    if (!(step || walk || wrap)) {
+      // A leg that is neither a step the page watched nor a wrap is a record that
+      // does not describe this body, so nothing here may travel: the caller draws
+      // the cells the rules hold (task 1.3).
+      return null;
+    }
+  }
+  for (let i = 0; i < to.length; i += 1) {
+    const d = i + 1 - phase;
+    const k = Math.min(Math.floor(d), last);
+    const u = d - k;
+    drawn.push(motion.travelCells(path[k], path[k + 1], u < 0 ? 0 : u > 1 ? 1 : u));
+  }
+  return drawn;
+}
+
 // The painters in js/pieces.js read the same bookkeeping through the paint
 // context, so no module has to import this one and no cycle appears.
 paintCtx.motion = motion;
@@ -231,18 +370,20 @@ function paintField(pctx) {
   }
 }
 
-// The body painter: one cell per segment, head colour first, then the tier
-// colour the current overflow reaches at that index.
+// The body painter: a chain of squares CELL apart along the polyline of the body's
+// own travel (task 1.1), head colour first, then the tier colour the current
+// overflow reaches at that index. A snake that has not stepped, or whose step's
+// interval has run out, is drawn at the cells the rules hold.
 function paintSnake(pctx) {
   const snake = game.play.snake;
   const rec = pctx.motion.snakeRec;
-  const phase = rec ? pctx.motion.phaseSince(rec.movedTick, rec.intervalTicks) : 0;
-  const from = rec ? rec.from : null;
+  const moving = rec && rec.intervalTicks && !sameCells(rec.from, snake);
+  const phase = moving ? pctx.motion.phaseSince(rec.movedTick, rec.intervalTicks) : 1;
+  const chain = moving ? snakeChain(rec.from, snake, phase) : null;
   for (let i = 0; i < snake.length; i++) {
-    const cur = snake[i];
-    const prev = from && i < from.length ? from[i] : cur;
     ctx.fillStyle = bodyColor(i);
-    for (const cell of pctx.motion.travelCells(prev, cur, phase)) {
+    const cells = chain ? chain[i] : [snake[i]];
+    for (const cell of cells) {
       field.drawCell(cell.r, cell.c);
     }
   }
