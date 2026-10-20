@@ -25,7 +25,7 @@ export const CONTROL_SCREEN_ITEMS = ['P1 Select', 'P2 Select', 'Start'];
 // page, or each player plays on their own device. Page order matches the way
 // sub-menu's items.
 export const WAY_ITEMS = ['Same computer', 'Network'];
-export const WAY_SCREEN_ITEMS = ['Same computer', 'Network (anywhere)', 'Network (same network)', 'Back'];
+export const WAY_SCREEN_ITEMS = ['Same computer', 'Network (same network)', 'Back'];
 export const WAY_TITLE = 'Choose how two players meet';
 export const WAY_HINTS = 'Up / Down — choose · Enter — confirm · Escape — back';
 
@@ -63,18 +63,6 @@ export const PAIRING_CODE_LABEL = 'Or type this code';
 export const PAIRING_WAITING = 'Waiting for the other device';
 export const PAIRING_JOIN = 'Pair';
 
-// The preloader line the pairing step paints while the page's own ICE attempt
-// runs: the attempt starts when the page opens, and the step counts the seconds
-// left in its budget, so a slow network shows the wait rather than a link that
-// pairs nobody.
-export const PAIRING_ICE_WAIT = 'Connecting to STUN servers';
-
-// What the pairing step says when the offer carries no remote ICE address. The
-// fallback blob reaches only another tab in the same browser instance, so the
-// step names the limit it leaves instead of painting a link that pairs nobody.
-export const PAIRING_WARN_LOCAL = 'No candidate supply reached this page — on one network, name the same supply in both addresses with ?ice=stun:your-server; otherwise this pairing has no channel';
-export const PAIRING_WARN_NONE = 'This browser cannot open a peer connection — network play is unavailable';
-
 // The same-network flow: each peer types the one value the browser cannot read
 // on its own — its own address — and the page reads its own port. The lines name
 // that value, reject a value that names a scheme instead of a network address,
@@ -90,6 +78,11 @@ export const ADDRESS_BAD = 'An address is four numbers with dots between, each f
 // read travels on a value the other player copies and pastes back here.
 export const PEER_LABEL = 'Their line';
 export const PEER_HINTS = 'Paste what the other page copies beside its own address: four numbers, a colon, their port. This page asks only while it has nothing to point at.';
+
+// A step taller than its pane is scrolled, and a touch screen draws no bar a player can
+// see: the line says the gesture, and js/ui.js paints it only while the step
+// really runs past.
+export const PAIRING_SCROLL_HINT = 'The step runs past the screen — swipe inside it, or scroll, to reach the lines below.';
 
 // The copy affordance: a click puts the value beside it on the clipboard, so a
 // player never retypes a link or an address. A browser that refuses the copy

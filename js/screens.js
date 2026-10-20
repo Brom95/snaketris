@@ -19,7 +19,7 @@ import {
   COPY_LABEL, COPY_DENIED,
   twoPlayerOffered,
 } from './constants.js';
-import { attemptPair, guestPage, pickFlow, copyValue } from './netplay.js';
+import { attemptPair, guestPage, copyValue } from './netplay.js';
 
 // The transitions an item can ask for. The screen system is the only module
 // that interprets them; no input module branches on a screen.
@@ -106,7 +106,7 @@ export const SCREENS = [
         requiresWide: true,
       },
       {
-        id: 'way-item-network-global',
+        id: 'way-item-network-local',
         label: WAY_SCREEN_ITEMS[1],
         marker: null,
         hints: null,
@@ -114,16 +114,8 @@ export const SCREENS = [
         opens: PAIRING,
       },
       {
-        id: 'way-item-network-local',
-        label: WAY_SCREEN_ITEMS[2],
-        marker: null,
-        hints: null,
-        action: TRANSITIONS['pick-way'],
-        opens: PAIRING,
-      },
-      {
         id: 'way-back',
-        label: WAY_SCREEN_ITEMS[3],
+        label: WAY_SCREEN_ITEMS[2],
         marker: null,
         hints: null,
         action: TRANSITIONS['back-menu'],
@@ -593,8 +585,9 @@ const HANDLERS = {
   [TRANSITIONS['two-player']]: (item, intent) => {
     // The entry is offered at every viewport width and always opens the way
     // sub-menu. A narrow viewport has no second pad on this device, so the
-    // shared-page way is the item the sub-menu hides there and the player still
-    // chooses between the two network flows. The way itself arms the duel.
+    // shared-page way is the item the sub-menu hides there and the player
+    // chooses between that page and the one network way. The way itself arms
+    // the duel.
     game.screen.twoPlayerMode = true;
     gotoScreen(SELECT_WAY);
     return true;
@@ -604,7 +597,6 @@ const HANDLERS = {
     if (item.opens === PAIRING) {
       game.screen.networkMode = true;
       game.screen.twoPlayerMode = true;
-      pickFlow(item.id === 'way-item-network-local' ? 'local' : 'global');
     } else {
       game.screen.networkMode = false;
       game.screen.twoPlayerMode = true;

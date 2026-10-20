@@ -23,19 +23,18 @@ await page.route(BASE + '**', (route) => {
   }
 })
 
-const HOST = `${BASE}snaketris.html?flow=local&a=100.107.90.10&p=3478#snaketris-pair-7Q4KX&n=173692584013044551&s=208882205317269869`
+const HOST = `${BASE}snaketris.html?a=100.107.90.10&p=3478#snaketris-pair-7Q4KX&n=173692584013044551&s=208882205317269869`
 await page.goto(HOST, { waitUntil: 'load' })
 await exposeSingletons(page)
-// The link puts the page into the pairing step at once, so the wait is for the
-// ICE attempt, not for the step to appear.
-await page.waitForFunction(() => window.__netplay.ice !== '' && window.__netplay.ice !== 'gathering', { timeout: 45000 })
+// The link puts the page into the pairing step at once, and nothing waits for a
+// candidate supply any more: the wait is for the step's own lines to be painted.
+await page.waitForFunction(() => document.getElementById('pairing-title')?.checkVisibility(), { timeout: 45000 })
 
 const seen = await page.evaluate(() => {
   const id = (name) => document.getElementById(name)
   const display = (name) => { const e = id(name); return e ? getComputedStyle(e).display : 'missing' }
   return {
     state: window.__game.screen.state,
-    flow: window.__netplay.flow,
     link: window.__netplay.link,
     code: window.__netplay.code,
     joined: window.__netplay.joined,
@@ -43,10 +42,9 @@ const seen = await page.evaluate(() => {
     offer: window.__netplay.offer,
     peerAddress: window.__netplay.peerAddress,
     peerPort: window.__netplay.peerPort,
-    ice: window.__netplay.ice,
     rebuilt: window.__netplay.rebuilt,
-    warnText: id('pairing-warn')?.textContent ?? '(no warn element)',
-    warnShown: display('pairing-warn'),
+    warnLine: id('pairing-warn') !== null,
+    iceLine: id('pairing-ice') !== null,
     linkShown: display('pairing-link'),
     qrShown: display('pairing-qr'),
     qrWidth: id('pairing-qr')?.width ?? 0,
@@ -60,8 +58,8 @@ console.log(JSON.stringify(seen, null, 1))
 check(seen.peerAddress === '100.107.90.10', `the host's address arrived: ${JSON.stringify(seen.peerAddress)} port ${JSON.stringify(seen.peerPort)}`)
 check(seen.joined === false && seen.paired === false, `the page is not seen as joined or paired: joined ${JSON.stringify(seen.joined)} paired ${JSON.stringify(seen.paired)}`)
 check(seen.qrWidth === 0, `and it paints no QR of a link it does not hold (${seen.qrWidth} modules wide while link ${JSON.stringify(seen.link)})`)
-check(!seen.warnText.includes('?ice='), `and the line it shows names this way, not the other one's server: ${JSON.stringify(seen.warnText)}`)
-check(seen.flow === 'local', `the page knows the way it opened under: flow ${JSON.stringify(seen.flow)}`)
+check(!seen.iceLine && !seen.warnLine, `no candidate wait and no supply warning exist on this way: ${JSON.stringify([seen.iceLine, seen.warnLine])}`)
+check(seen.peerPort === 3478, `the page read the port its link named: ${JSON.stringify(seen.peerPort)}`)
 report('the page a phone opens at a host link', failureCount())
 // Closing the browser is not awaited: a peer connection that never resolves keeps
 // its request open, so awaiting close waits for a request no network ever answers.

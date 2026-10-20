@@ -127,9 +127,8 @@
       align-items: center;
     }
     #pairing-title { font-size: 24px; margin: 0; }
-    #pairing-hints, #pairing-waiting, #pairing-ice { font-size: 14px; color: #8899aa; }
+    #pairing-hints, #pairing-waiting { font-size: 14px; color: #8899aa; }
     #pairing-link, #pairing-code, #pairing-address-line { font-size: 14px; word-break: break-all; margin: 0; }
-    #pairing-warn { font-size: 14px; color: #d9534f; }
     /* The same-network flow types one value per peer, so the field is a real
        input: a phone has no hardware keyboard otherwise. The copy affordances
        sit beside the values a player would carry. */
@@ -177,6 +176,15 @@
     }
     /* UI_STACK_MAX_WIDTH (js/constants.js): on narrow viewports the field
        already fills the width, so the interface stacks above it. */
+    /* A step taller than its pane runs past the bezel, and body clips the rest: the
+       pairing step scrolls on its own axis instead, so the lines below the fold stay
+       reachable in every layout, not only the stacked one. */
+    #pairing-view.on { max-height: 100vh; overflow-y: auto; }
+    /* js/ui.js marks the step tall while its content passes its pane, and a tall step
+       starts at its title instead of centring — a centred column would push the first
+       line above the scroll track. */
+    #pairing-view.tall { justify-content: flex-start; }
+
     @media (max-width: 760px) {
       body {
         flex-direction: column-reverse;
@@ -248,7 +256,6 @@
       <p id="way-hints">Up / Down — choose · Enter — confirm · Escape — back</p>
       <ul id="way-items">
         <li id="way-item-local" tabindex="-1">Same computer</li>
-        <li id="way-item-network-global" tabindex="-1">Network (anywhere)</li>
         <li id="way-item-network-local" tabindex="-1">Network (same network)</li>
         <li id="way-back" tabindex="-1">Back</li>
       </ul>
@@ -269,6 +276,9 @@
          match can start before a peer is paired. -->
     <div id="pairing-view" class="view">
       <h2 id="pairing-title">Pair with another device</h2>
+      <!-- A step taller than its pane is scrolled, and js/ui.js says so beside the
+           title: a touch screen draws no bar a player can see. -->
+      <p id="pairing-scroll-line" class="view"></p>
       <p id="pairing-hints" class="view"></p>
       <p id="pairing-link" class="view"></p>
       <p id="copy-pairing-link" class="view" tabindex="-1">📑</p>
@@ -278,8 +288,6 @@
       <p id="pairing-waiting" class="view"></p>
       <!-- The preloader line: js/netplay.js starts the page's ICE attempt when the
            page opens, and js/ui.js counts its seconds left down here. -->
-      <p id="pairing-ice" class="view"></p>
-      <p id="pairing-warn" class="view"></p>
       <input id="pairing-address" class="view" type="text" autocomplete="off" spellcheck="false" placeholder="192.168.4.10">
       <p id="pairing-address-line" class="view"></p>
       <p id="copy-pairing-address" class="view" tabindex="-1">📑</p>

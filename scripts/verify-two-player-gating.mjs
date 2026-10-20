@@ -15,7 +15,7 @@
 import { chromium } from '@playwright/test';
 import path from 'node:path';
 import { check, freshPage, report, waitFor, shown, exposeSingletons } from './harness.mjs';
-import { MENU_ITEMS, MENU, SELECT_WAY, PAIRING } from '../js/constants.js';
+import { MENU_ITEMS, MENU, SELECT_WAY, SELECT_DURATION, PAIRING } from '../js/constants.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const browser = await chromium.launch();
@@ -56,8 +56,8 @@ const wideWay = await page.evaluate(() => {
 });
 check((await page.evaluate(() => window.__game.screen.state)) === SELECT_WAY,
   'confirming the entry on a wide viewport opens the way sub-menu');
-check(wideWay.labels.join('|') === 'Same computer|Network (anywhere)|Network (same network)|Back',
-  'the way sub-menu lists the shared-page way, both network flows and its Back control');
+check(wideWay.labels.join('|') === 'Same computer|Network (same network)|Back',
+  'the way sub-menu lists the shared-page way, the one network way and its Back control');
 check(wideWay.highlighted.length === 1, 'exactly one way is highlighted as the current selection');
 await page.close();
 
@@ -87,8 +87,8 @@ const narrowWay = await page.evaluate(() => {
 });
 check(narrowWay.state === SELECT_WAY,
   'the narrow layout opens the way sub-menu straight from the "Two Players" entry');
-check(narrowWay.shown.join('|') === 'Network (anywhere)|Network (same network)|Back',
-  'the narrow way sub-menu offers both network flows and Back, and nothing else');
+check(narrowWay.shown.join('|') === 'Network (same network)|Back',
+  'the narrow way sub-menu offers the one network way and Back, and nothing else');
 check(!narrowWay.sharedShown,
   'the shared-page way is the wide-only item the narrow layout hides');
 
@@ -97,38 +97,37 @@ await waitFor(page, (wanted) => window.__game.screen.state === wanted, PAIRING, 
 const jumped = await page.evaluate(() => ({
   state: window.__game.screen.state,
   networkMode: window.__game.screen.networkMode,
-  flow: window.__netplay.flow,
+  iceLine: document.getElementById('pairing-ice') !== null,
   pairingShown: document.getElementById('pairing-title').checkVisibility(),
   fieldShown: document.getElementById('game').checkVisibility(),
 }));
 check(jumped.state === PAIRING,
   'the narrow layout reaches the pairing step from a network way');
 check(jumped.networkMode, 'the network way is the way in play on the narrow layout');
-check(jumped.flow === 'local', 'the narrow layout keeps the flow the way item names');
+check(!jumped.iceLine, 'the one network way leaves no candidate-countdown line on the page');
 check(jumped.pairingShown, 'the pairing step is on screen');
 check(!jumped.fieldShown, 'no play field is shown before a peer is paired');
 await page.close();
 
-// Both network ways are reachable by pointer as well as by key, and the flow
-// each one picks is the flow its label names. A fresh page per way: a page
-// keeps the first flow pick it makes, so a second pick on one page is ignored.
-for (const [item, flow] of [['#way-item-network-global', 'global'],
-                            ['#way-item-network-local', 'local']]) {
+// Every way item is reachable by pointer as well as by key, and each opens the
+// screen its label names. A fresh page per item: one page walks one entry.
+for (const [item, screen] of [['#way-item-local', SELECT_DURATION],
+                              ['#way-item-network-local', PAIRING]]) {
   const picker = await freshPage(context, ROOT);
   await picker.waitForTimeout(200);
   await exposeSingletons(picker);
   await picker.click('#menu-item-two-player');
   await waitFor(picker, (wanted) => window.__game.screen.state === wanted, SELECT_WAY, 5000);
   await picker.click(item);
-  await waitFor(picker, (wanted) => window.__game.screen.state === wanted, PAIRING, 5000);
+  await waitFor(picker, (wanted) => window.__game.screen.state === wanted, screen, 5000);
   const picked = await picker.evaluate(() => ({
     state: window.__game.screen.state,
     networkMode: window.__game.screen.networkMode,
-    flow: window.__netplay.flow,
   }));
-  check(picked.state === PAIRING && picked.networkMode,
-    `a pointer click on a way item opens the pairing step (${flow})`);
-  check(picked.flow === flow, `the pointer click picks the flow its label names (${flow})`);
+  check(picked.state === screen,
+    `a pointer click on a way item opens the screen it names (${item})`);
+  check(!picked.networkMode || screen === PAIRING,
+    `only the network way arms network play (${item})`);
   await picker.close();
 }
 

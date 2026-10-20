@@ -7,9 +7,9 @@ import {
   FIELD_V_GAP, FIELD_V_GAP_MOBILE, BOARD_W, BOARD_H, UI_STACK_MAX_WIDTH, UI_COLUMN_MIN,
   GAME_CONTROL_PLAYER_MARKERS,
   PAIRING_TITLE, PAIRING_HINTS, PAIRING_LINK_LABEL, PAIRING_CODE_LABEL, PAIRING_WAITING,
-  PAIRING_WARN_LOCAL, PAIRING_WARN_NONE, PAIRING_ICE_WAIT,
   LOCAL_TITLE, LOCAL_HINTS, ADDRESS_LABEL, ADDRESS_HINTS, ADDRESS_BAD,
   PEER_LABEL, PEER_HINTS,
+  PAIRING_SCROLL_HINT,
   COPY_LABEL, COPY_DENIED,
   DURATION_SCREEN_ITEMS, ROLE_SCREEN_ITEMS, MIRROR_TITLE, MIRROR_HINTS,
   twoPlayerOffered,
@@ -55,14 +55,14 @@ let pairingLinkEl = null;
 let pairingCodeEl = null;
 let pairingQrEl = null;
 let pairingWaitingEl = null;
-let pairingIceEl = null;
-let pairingWarnEl = null;
 let pairingAddressEl = null;
 let pairingAddressLineEl = null;
 let copyLinkEl = null;
 let copyCodeEl = null;
 let copyAddressEl = null;
 let pairingPeerLineEl = null;
+let pairingScrollLineEl = null;
+let pairingViewEl = null;
 let pairingPeerEl = null;
 let peerLineCarried = '';
 let mirrorDurationEl = null;
@@ -108,15 +108,15 @@ export function initUi() {
   pairingCodeEl = lookup('pairing-code');
   pairingQrEl = lookup('pairing-qr');
   pairingWaitingEl = lookup('pairing-waiting');
-  pairingIceEl = lookup('pairing-ice');
-  pairingWarnEl = lookup('pairing-warn');
   pairingAddressEl = lookup('pairing-address');
   pairingAddressLineEl = lookup('pairing-address-line');
   copyLinkEl = lookup('copy-pairing-link');
-  copyCodeEl = lookup('copy-pairing-code');
   copyAddressEl = lookup('copy-pairing-address');
+  copyCodeEl = lookup('copy-pairing-code');
   pairingPeerLineEl = lookup('pairing-peer-line');
   pairingPeerEl = lookup('pairing-peer');
+  pairingScrollLineEl = lookup('pairing-scroll-line');
+  pairingViewEl = lookup('pairing-view');
   mirrorDurationEl = lookup('mirror-duration-items');
   mirrorRoleEl = lookup('mirror-role-items');
   mirrorTitleEl = lookup('mirror-title');
@@ -130,6 +130,9 @@ export function initUi() {
   // order. Registration is name-keyed, so a second initUi cannot paint twice.
   registerPagePainter('views', paintViews);
   registerPagePainter('pairing', paintPairing);
+  // The scroll check runs after the pairing step is painted, because it reads
+  // the height the step's own lines ended up with.
+  registerPagePainter('pairingScroll', paintPairingScroll);
   registerPagePainter('score', paintScore);
   registerPagePainter('status', paintStatus);
   registerPagePainter('placeScore', placeScore);
@@ -231,18 +234,32 @@ function paintScore(pctx) {
 // same link for a device that cannot copy text. The waiting line names what the
 // other device still has to do. This step paints no play field: its row declares
 // none, so the field stays hidden and no match can exist before a peer is paired.
+function paintPairingScroll() {
+  if (game.screen.state !== PAIRING) return;
+  // A step taller than its pane is scrolled by the page's own rule, and a touch
+  // screen draws no bar to point at, so the step names the gesture itself — but
+  // only while its content really passes the pane, never on a step that fits.
+  // The line is blanked before the height is read, so the line cannot talk
+  // itself into the very overflow it then names.
+  if (!pairingViewEl) return;
+  if (pairingScrollLineEl) pairingScrollLineEl.textContent = '';
+  const over = pairingViewEl.scrollHeight > pairingViewEl.clientHeight;
+  show(pairingScrollLineEl, over);
+  if (over && pairingScrollLineEl) pairingScrollLineEl.textContent = PAIRING_SCROLL_HINT;
+  // A tall step starts at its title instead of centring, so the first line stays
+  // on screen while the rest scrolls into view.
+  pairingViewEl.classList.toggle('tall', over);
+}
 function paintPairing(pctx) {
   if (game.screen.state !== PAIRING) return;
-  const localFlow = lobby.flow === 'local';
-  // The same-network flow's address is typed into a real field by the player,
-  // so the page reads what they typed each time it paints the step. A page that
-  // names no address has no field to read, and a field a player filled before
-  // they changed the way still holds that value: reading it on another way would
-  // hand back the address of the way this page left.
-  if (localFlow && pairingAddressEl) noteAddress(pairingAddressEl.value);
-  if (pairingTitleEl) pairingTitleEl.textContent = localFlow ? LOCAL_TITLE : PAIRING_TITLE;
+  // The network way's address is typed into a real field by the player, so the
+  // page reads what they typed each time it paints the step. A page whose field
+  // is empty is still waiting: the copy affordance beside it stays hidden, and
+  // nothing downstream invents an address to stand in.
+  if (pairingAddressEl) noteAddress(pairingAddressEl.value);
+  if (pairingTitleEl) pairingTitleEl.textContent = LOCAL_TITLE;
   show(pairingHintsEl, true);
-  if (pairingHintsEl) pairingHintsEl.textContent = localFlow ? LOCAL_HINTS : PAIRING_HINTS;
+  if (pairingHintsEl) pairingHintsEl.textContent = LOCAL_HINTS;
   // A link this page holds of its own is what a second device opens, so its text
   // and its QR are painted together — never a QR of the empty string, which a
   // scanner reads as a link to nowhere while the page says it is sharing one.
@@ -254,32 +271,18 @@ function paintPairing(pctx) {
   if (pairingQrEl && !linkForm) pairingQrEl.width = 0;
   if (linkForm && pairingQrEl) paintQr(pairingQrEl, lobby.link);
   // The short readable code is a way in for a device that can neither scan the
-  // QR nor open the link. The same-network way pairs on the address its line
-  // names, and a page on that way spends typed digits on the address field, so
-  // there is no code there to type and nothing to paint beside it.
-  const codeForm = published && lobby.code !== '' && !localFlow;
+  // QR nor open the link: it exists only when the offer was too large to ride
+  // in a link, and that choice is the publish's own call.
+  const codeForm = published && lobby.form === 'code';
   show(pairingCodeEl, codeForm);
   if (pairingCodeEl) pairingCodeEl.textContent = codeForm ? PAIRING_CODE_LABEL + ': ' + lobby.code : '';
   show(pairingWaitingEl, !lobby.paired || preparationShown());
   if (pairingWaitingEl) pairingWaitingEl.textContent = PAIRING_WAITING;
-  // The preloader counts the seconds left in the page's candidate attempt, which
-  // only the anywhere-network way runs: the same-network way asks no server, so
-  // a line about connecting to one would name something that way never does.
-  const gathering = lobby.ice === 'gathering' && !localFlow;
-  show(pairingIceEl, gathering);
-  if (pairingIceEl) pairingIceEl.textContent = gathering ? PAIRING_ICE_WAIT + ' — ' + lobby.iceLeft + 's' : '';
-  // The step says what the published offer carries: a blob with no remote ICE
-  // address pairs nobody outside this browser instance, and a page with no
-  // channel at all pairs nobody anywhere. The same-network way asks no server
-  // for candidates, so it has nothing to warn about and says nothing.
-  const warn = localFlow ? '' : lobby.ice === 'none' ? PAIRING_WARN_NONE : lobby.ice === 'local' ? PAIRING_WARN_LOCAL : '';
-  show(pairingWarnEl, warn !== '');
-  if (pairingWarnEl) pairingWarnEl.textContent = warn;
   // A copy affordance sits beside the link and the code this page shows; the
   // same-network flow's own lines and their affordances are the helper's job.
   show(copyLinkEl, linkForm);
   show(copyCodeEl, codeForm);
-  paintLocalPairing(localFlow);
+ paintLocalPairing(true);
   paintMirrors();
 }
 

@@ -128,27 +128,6 @@ const realFetch = globalThis.fetch;
 const realLocation = globalThis.location;
 const netplay = await import('../js/netplay.js');
 
-test('an open with no supply in its address hands the shipped list and reads nothing', async () => {
-  let reads = 0;
-  globalThis.fetch = () => {
-    reads += 1;
-    return { ok: true, text: async () => 'stun:answers.now:443\n' };
-  };
-  try {
-    const first = await app.iceSupplyForOpen();
-    const second = await app.iceSupplyForOpen();
-    assert.equal(reads, 0, 'no open reads a candidate list from a remote source');
-    assert.deepEqual(first.map((entry) => entry.urls[0]), app.ICE_SERVERS.map((entry) => entry.urls[0]),
-      'an open hands the shipped named servers and nothing else');
-    assert.equal(second.length, first.length, 'two opens hand a supply of the same size');
-    assert.equal(first.length, 5, 'the shipped supply names five servers');
-    assert.ok(first.every((entry) => /^(stuns?|turn):/.test(entry.urls[0])), 'every entry carries a scheme');
-    assert.ok(first.some((entry) => entry.urls[0] === 'stun:stun1.l.google.com:19302'), 'the supply names the first Google host');
-    assert.ok(first.some((entry) => entry.urls[0] === 'stun:stun.stunprotocol.org:3478'), 'the supply names the protocol server');
-  } finally {
-    globalThis.fetch = realFetch;
-  }
-});
 
 test('a same-network page names no supply at all', async () => {
   netplay.lobby.flow = 'local';
@@ -160,29 +139,3 @@ test('a same-network page names no supply at all', async () => {
   }
 });
 
-test('a link that names its own supply replaces the shipped list, and a raw address names no candidate', async () => {
-  let reads = 0;
-  globalThis.fetch = () => {
-    reads += 1;
-    return { ok: true, text: async () => 'stun:public.now:443\n' };
-  };
-  try {
-    globalThis.location = { href: 'https://duel.test/snaketris.html?ice=stun%3Asubnet.host%3A443#secret' };
-    const named = await app.iceSupplyForOpen();
-    assert.equal(reads, 0, 'a link that names its supply never reads a public list');
-    assert.deepEqual(named, [{ urls: ['stun:subnet.host:443'] }], 'the guest receives the supply the link carries');
-
-    reads = 0;
-    globalThis.location = { href: 'https://duel.test/snaketris.html?peer=100.107.90.10:3478#secret' };
-    const raw = await app.iceSupplyForOpen();
-    assert.ok(raw.every((entry) => !entry.urls[0].includes('100.107.90.10')),
-      'a raw address on the address bar is not offered as a candidate');
-    assert.deepEqual(raw.map((entry) => entry.urls[0]), app.ICE_SERVERS.map((entry) => entry.urls[0]),
-      'a link that names no supply falls back to the shipped list');
-    assert.equal(reads, 0, 'even a link that names no supply reads no list');
-  } finally {
-    globalThis.fetch = realFetch;
-    if ('location' in globalThis) globalThis.location = realLocation;
-    else delete globalThis.location;
-  }
-});

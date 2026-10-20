@@ -19,12 +19,10 @@ const SCRIPTS = [
   'verify-p2-constraint.mjs',
   'verify-two-player-gating.mjs',
   'verify-role-line.mjs',
-  'verify-network-duel.mjs',
-  'verify-ice-preload.mjs',
   'verify-network-local.mjs',
   'verify-opened-link.mjs',
-  'verify-way-switch.mjs',
   'verify-pairing-step.mjs',
+  'verify-pairing-scroll.mjs',
 ];
 
 function run(script) {

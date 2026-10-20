@@ -14,8 +14,8 @@ import {
   adopt, registerTransport, openLink, peerLink, duelOpen, guestPage, hostPage,
   publish, sendFrame, sendPreparationMirror, answerOffer, acceptAnswer, onPeerClose,
   peerClosed, peerLeft, inboundReport, reportPeerState, localSeat, openGuestStream,
-  guestStreamReport, setIceFallback, setIceOpen, startIceAttempt, carriesRemoteAddress,
-  lobby, noteFlowOfLink, notePeerAddress, noteOwnPort, announceOwn, pointAtPeer, refreshLink,
+  guestStreamReport, setIceFallback, setIceOpen, carriesRemoteAddress,
+  lobby, notePeerAddress, noteOwnPort, announceOwn, pointAtPeer, refreshLink,
 } from './netplay.js';
 import { gameOver } from './state.js';
 import { PEER_LEFT } from './rules.js';
@@ -23,7 +23,7 @@ import { initInput, fitCanvas, pollController, handleIntent } from './input.js';
 import { initRender, render } from './render.js';
 import { initUi, syncViews, interfaceBandHeight } from './ui.js';
 
-// The candidate supply every global-flow open ships: the ICE servers this
+// The candidate supply every network open ships: with no public supply built
 // project names, so an open needs no read of a remote list to have a supply.
 // An empty supply leaves only the `<uuid>.local` candidate, which reaches
 // another connection inside the same browser instance and never another device.
@@ -51,17 +51,15 @@ function isIceUrl(value) {
 // The candidate supply for one open, chosen per open rather than written back
 // into the page's constant. A link that names its own supply — the host endpoint
 // on the subnet — is that supply, and contacts no list at all. Otherwise the
-// open ships the named servers, and a local-flow page ships none: its candidate
+// here, no open ships any: the pair joins on candidates each page hands itself,
 // is the one it hand-crafts from the address its player typed. An attempt
 // reports what its offer carries, so a supply that answers nothing is a page
 // with no channel, never a silent pairing.
 export async function iceSupplyForOpen() {
-  // The same-network flow names no supply at all: its page hand-crafts the one
-  // candidate that matters, so a supply would only add noise.
-  if (lobby.flow === 'local') return [];
-  const named = iceServersFromUrl([]);
-  if (named.length > 0) return named;
-  return ICE_SERVERS.slice();
+  // No page asks a public supply: the pair joins on the address each player
+  // typed and the port each page read out of its own description, so the one
+  // candidate that matters is hand-crafted and nothing else is offered.
+  return [];
 }
 
 // The supply this open resolved, recorded so the channel this open builds reads
@@ -80,15 +78,12 @@ function buildChannel() {
   return createTransport(iceServersFromUrl(iceSupply));
 }
 
-// The step one open takes before its offer exists: choose the candidate supply,
-// and rebuild the channel with it when an earlier open already negotiated one.
-// The first open has no channel yet — the lobby builds it after this step runs,
-// and it reads the supply chosen here — so there is nothing to rebuild. A page
-// whose way choice changed does have one: the same-network way names no supply
-// and the anywhere way ships the named servers, so keeping the channel the first
-// way built would leave the page offering candidates that way chose. The
-// connection that channel negotiated is closed before its replacement takes its
-// place.
+// The step one open takes before its offer exists: resolve the candidate supply
+// (this way names none) and rebuild the channel with it when an earlier open
+// already negotiated one. The first open has no channel yet — the lobby builds it
+// after this step runs and reads the supply chosen here — so there is nothing to
+// rebuild. A page that re-opens the step does have one, and the connection that
+// channel negotiated is closed before its replacement takes its place.
 async function reopenIceChannel() {
   chooseIceSupply(await iceSupplyForOpen());
   const link = peerLink();
@@ -213,39 +208,32 @@ export function update() {
 // the channel, so it has nothing to publish.
 function networkDuties() {
   if (!game.screen.networkMode) return;
-  // The ICE attempt runs once per page open, before anything publishes: the
-  // address a peer connects to comes from the servers, and an offer published
-  // while the attempt is still waiting carries no address at all. The pairing
-  // step counts the wait down while it runs.
-  startIceAttempt();
-  // The wait only precedes pairing: while it runs the page publishes nothing and
-  // builds no channel, so the offer it hands over already carries the supply
-  // this open chose. A page whose peer is already paired keeps pumping — the
-  // link it holds was built after that open resolved, so a later wait costs the
-  // match nothing.
-  if (lobby.ice === 'gathering' && !duelOpen()) return;
+  // This way names no server, so there is nothing to gather before the page publishes:
+  // no candidate attempt runs and no wait stands above the duties. Measured, a page that
+  // opened a link kept its own port at zero and aimed nothing while its own description
+  // named a real port and its peer's values were already in hand — an unresolved wait
+  // and the seat branch both stood above that work, and the page that opened a link is
+  // exactly the page that has its own work to do.
   openLink();
-  // The same-network flow reads its own port out of its own local description
-  // and announces it every tick: the channel this page shares with its peer
-  // opens only once that peer's connection does, so a one-shot announcement
-  // could land before the channel is ready. The port is re-read each tick
-  // because the description grows the candidate line only as ICE gathers.
-  if (lobby.flow === 'local') {
-    const own = peerLink();
-    const ownPc = own && own.transport && own.transport.connection;
-    if (ownPc && ownPc.localDescription) noteOwnPort(ownPc.localDescription.sdp);
-    // The line a peer opens is rebuilt whenever a value it names arrives, because
-    // the page published before it had read its own port: a link that names only
-    // the address says no port to join on, and nothing republishes it once the
-    // page holds an offer.
-    refreshLink();
-    announceOwn();
-    // A page that holds the peer address its link named aims its own channel at
-    // that address, whether or not the channel ever carried a report: a link is
-    // the only route a second device has, so aiming belongs to this way and not
-    // to a report the browser's own bus cannot deliver across devices.
-    pointAtPeer();
-  }
+  // The same-network way reads its own port out of its own local description and announces
+  // it every tick: the channel this page shares with its peer opens only once that peer's
+  // connection does, so a one-shot announcement could land before the channel is ready.
+  // The port is re-read each tick because the description grows that candidate line only
+  // as ICE gathers.
+  const own = peerLink();
+  const ownPc = own && own.transport && own.transport.connection;
+  if (ownPc && ownPc.localDescription) noteOwnPort(ownPc.localDescription.sdp);
+  // The line a peer opens is rebuilt whenever a value it names arrives, because
+  // the page published before it had read its own port: a link that names only
+  // the address says no port to join on, and nothing republishes it once the
+  // page holds an offer.
+  refreshLink();
+  announceOwn();
+  // A page that holds the peer address its link named aims its own channel at
+  // that address, whether or not the channel ever carried a report: a link is
+  // the only route a second device has, so aiming belongs to this way and not
+  // to a report the browser's own bus cannot deliver across devices.
+  pointAtPeer();
   // The seat cannot gate the publish: the seat is a consequence of publishing
   // (`publish` names the host seat 1, `adopt` names the guest seat 2), so a gate
   // on it would leave the first offer unpublished forever and a bare page would
@@ -271,52 +259,24 @@ function networkDuties() {
 async function publishOffer() {
   const link = peerLink();
   const pc = link && link.transport && link.transport.connection;
-  if (!pc) {
-    lobby.ice = 'none';
-    return;
-  }
+  if (!pc) return;
   const href = typeof location === 'object' ? location.href : '';
   try {
-    // The page's own attempt already produced an offer and waited its servers
-    // out, so publishing that SDP is what carries the address they resolved. A
-    // page whose attempt rebuilt the channel holds no warmed offer and offers
-    // again over the rebuilt one.
+    // The page's own offer is what it hands over. A page whose earlier tick
+    // warmed an offer publishes that one instead of opening a second.
     let blob = lobby.warm;
     if (blob === '') {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       blob = pc.localDescription.sdp;
     }
-    // The same-network flow reads its own port out of the offer it just made,
-    // so the link it hands over can name the port the other page needs.
-    if (lobby.flow === 'local') noteOwnPort(blob);
-    if (carriesRemoteAddress(blob)) {
-      lobby.ice = 'remote';
-      publish(blob, 0, href);
-      return;
-    }
-    if (lobby.rebuilt) {
-      // Second pass over the rebuilt channel: an empty ICE list leaves libwebrtc
-      // the `<uuid>.local` candidate, which reaches another connection inside
-      // the same browser instance — the one-network form the step warns about.
-      publish(blob, 0, href);
-      return;
-    }
-    // The attempt found no address, so no remote peer exists to carry: rebuild
-    // the channel with an empty ICE list and publish on the next tick.
-    lobby.ice = 'local';
-    lobby.rebuilt = true;
-    lobby.warm = '';
-    try {
-      pc.close();
-    } catch (e) {
-      // A connection the channel already closed closes nothing.
-    }
-    registerTransport(() => createTransport([]));
+    // The port this page names in its own description is read here so the link
+    // it hands over can carry the port the other page joins on.
+    noteOwnPort(blob);
+    publish(blob, 0, href);
   } catch (e) {
-    // An offer the connection cannot produce leaves the pairing step on the
-    // code form; nothing else changes.
-    lobby.ice = 'none';
+    // An offer this page cannot make leaves it on the waiting line: nothing is
+    // handed over, and no peer is claimed.
   }
 }
 
@@ -339,10 +299,9 @@ export function frame(now) {
 // headless suite with no `location` at all, adopt nothing and stay on the menu.
 export function openPairingLink() {
   const fragment = typeof location === 'object' ? location.hash.slice(1) : '';
-  // The link a guest opened also names the flow the host picked, so the guest
+  // The link a guest opened names the host's address and port, so the guest
   // inherits the choice instead of typing it.
   if (typeof location === 'object') {
-    noteFlowOfLink(location.href);
     notePeerAddress(location.href);
   }
   if (!adopt(fragment)) return false;
@@ -390,7 +349,7 @@ export function init() {
   // not awaited: init must reach its first paint while the attempt still runs,
   // or the countdown it shows would never be on screen. The link is built later
   // than this open, so it already reads the supply this open resolved.
-  if (openPairingLink()) startIceAttempt();
+  openPairingLink();
   if (guestPage()) answerOffer();
   syncViews(null);
   fitField(true);

@@ -31,11 +31,8 @@ export const lobby = {
   prepScreen: '', // the preparation step the host page sits on
   prepIndex: -1, // the marker the host page left there, mirrored onto this page
   closed: '', // the reason the peer link closed, once it did
-  ice: '', // the ICE attempt: '' not started, 'gathering' the servers are being waited for, 'offer' published without waiting, 'remote' an address was resolved, 'local' none was, 'none' no connection at all
-  iceLeft: 0, // whole seconds of the ICE attempt still left, so the pairing step can count it down
   rebuilt: false, // this page already rebuilt its channel with an empty ICE list
   warm: '', // the offer SDP the page's own attempt produced, which the pairing step publishes instead of offering twice
-  flow: '', // the flow this page runs under: 'global' the public candidate supply, 'local' the same-network one; '' until the way pick or the opened link says, and re-chosen until the page pairs
   address: '', // the dotted-quad this page's own player typed as their device's address
   addressBad: false, // this page was handed a value that names no network address
   port: 0, // the DTLS port this page read from its own local description
@@ -69,38 +66,6 @@ export function codeOf(blob, length = PAIRING_CODE_LENGTH) {
     out += PAIRING_CODE_ALPHABET[h % PAIRING_CODE_ALPHABET.length];
   }
   return out;
-}
-
-// The way screen records which network flow the player picked. The choice is the
-// page's until it pairs, so re-picking the other network way switches the flow and
-// takes back what the first one published; a page that came over a link keeps its
-// host's flow.
-export function pickFlow(flow, localAddress = '') {
-  const page = lobby;
-  // A page that came over a link already belongs to one flow.
-  if (page.side === 'guest') return;
-  // Picking the way again while the page is still alone switches the flow it
-  // runs under, so a player who chose the wrong way can try the other one
-  // without reloading; a page that paired, or whose channel already carried an
-  // answer, is committed and keeps its flow.
-  if (page.joined || page.paired || page.closed !== '') return;
-  if (page.flow === flow) {
-    if (localAddress) page.address = localAddress;
-    return;
-  }
-  page.flow = flow;
-  // The address belongs to the flow, so switching takes the typed one back.
-  page.address = flow === 'local' ? localAddress : '';
-  page.peerAddress = '';
-  page.peerPort = 0;
-  // Whatever the first way published is taken back, so the page publishes a
-  // fresh offer under the way it just picked.
-  withdrawOffer();
-  // The offer an earlier way warmed came from that way's channel, so it is taken
-  // back as well: the page runs its open again under the new way, and only what
-  // that open's supply gave this device may travel to a peer.
-  page.warm = '';
-  page.rebuilt = false;
 }
 
 // A network address is four groups of numbers with dots between. A value that
@@ -202,57 +167,52 @@ export async function copyValue(field) {
     return false;
   }
 }
-// The marker a pairing link carries: the second page inherits the flow choice
-// from the link it opens, so it never types the flow itself.
-export function noteFlowOfLink(url) {
-  const flow = /[?&]flow=([a-z]+)/.exec(url);
-  if (flow === null) return;
-  if (flow[1] !== 'local' && flow[1] !== 'global') return;
-  lobby.flow = flow[1];
-}
-
-// Whether this page asks its own player for an address: the same-network way does,
-// the anywhere-network way does not. The keyboard reads this to decide which keys
-// belong to the address field and which spell the short readable code.
+// Whether this page asks its own player for an address: its one network way does,
+// on every layout and for every page that runs it. The keyboard reads this to decide
+// which keys belong to the address field and which spell the short readable code.
 export function addressFieldOnPage() {
-  return lobby.flow === 'local';
+  // One network way runs here, so a page on it is the page the duty runs for.
+  return true;
 }
 
 // The host publishes its offer before the peer link exists, so the share link can
 // carry the secret the second page needs to answer. The page url is a supply: this
 // module never reads `location`.
-// The line a peer opens is one function of what this page knows now: its own address, the
-// port it read beside that address, the way it runs under, and the secret it published. The
+// The line a peer opens is one function of what this page knows now: its own address
+// and the port it read beside that address, plus the secret it published. The
 // publish and a later refresh both build it here, so a value that arrives after the first
 // publish (the port, which lands once ICE gathered) still reaches the line.
 function pageLink(secret, pageUrl) {
   if (secret === '') return '';
-  const local = lobby.flow === 'local'
-    ? (lobby.address === '' ? '' : '&a=' + lobby.address)
-      + (lobby.port === 0 ? '' : '&p=' + lobby.port)
-    : '';
-  const marked = (lobby.flow === 'local' || lobby.flow === 'global') && !pageUrl.includes('flow=')
-    ? pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'flow=' + lobby.flow + local
-    : pageUrl;
-  return marked.split('#')[0] + '#' + encodeURIComponent(secret);
+  // The link names only what a peer needs to join: this page's own address and
+  // the port it read out of its own description. A page that opened a link
+  // carries the values it opened with, so they are taken back before this
+  // page's own are written — a link that repeated the page it opened would point
+  // both halves of a pair at one device.
+  const base = pageUrl.split('?')[0];
+  const parts = [];
+  if (lobby.address !== '') parts.push('a=' + lobby.address);
+  if (lobby.port !== 0) parts.push('p=' + lobby.port);
+  const query = parts.length === 0 ? '' : (base.includes('?') ? '&' : '?') + parts.join('&');
+  return base + query + '#' + encodeURIComponent(secret);
 }
 
 export function publish(offerSdp, seed, pageUrl) {
   // A same-network page publishes nothing while it waits for its own address:
   // the link it hands over is the only way that address reaches the other page,
   // so a value typed after publishing could never travel.
-  if (lobby.flow === 'local' && lobby.address === '') return;
+  if (lobby.address === '') return;
   const blob = trimmedOffer(offerSdp);
   lobby.offer = blob;
   lobby.seed = seed === 0 ? seedOf(blob) : seed;
   lobby.code = codeOf(blob, PAIRING_CODE_LENGTH);
   if (lobby.side !== 'guest') lobby.side = 'host';
   game.screen.seat = 1;
-  // The flow marker rides on the link, not in the secret: the whole fragment IS
+  // The secret rides beside the link, not inside it: the whole fragment IS
   // the secret, and a line tagged onto the blob would reach setRemoteDescription.
-  // The same-network flow adds the two values the other page cannot read on its
-  // own: this page's address and the port it read beside it, whichever of them
-  // this page knows by the moment the line is built.
+  // The line adds the two values the other page cannot read on its own: this
+  // page's address and the port it read beside it, whichever of them this page
+  // knows by the moment the line is built.
   if (blob.length <= PAIRING_FRAGMENT_CAP) {
     lobby.form = 'link';
     lobby.secret = blob;
@@ -298,24 +258,6 @@ export function attemptPair() {
   return true;
 }
 
-// Taking back what a page published before its way choice changed. The offer, the
-// secret behind it and the link carrying them are one page's own publication, so
-// clearing them leaves the page to publish a fresh one under the way it picked
-// next; the channel itself stays, since both ways move over the same machinery.
-// The flow itself, the seat and the screen the page walks through stay: this is
-// the same player choosing again.
-function withdrawOffer() {
-  lobby.offer = '';
-  lobby.secret = '';
-  lobby.form = '';
-  lobby.seed = 0;
-  lobby.link = '';
-  lobby.code = '';
-  // The way this page left aimed its channel at that way's peer; a page that
-  // switches way has nothing aimed until its new way names an address again.
-  lobby.aimed = false;
-  aimedPc = null;
-}
 
 // ---------- The peer link and the traffic that moves over it ----------
 // The engine owns the link, the streams and the resync policy; this module owns
@@ -392,7 +334,7 @@ export function peerLink() {
 // repeats it every tick and the copy that lands after the channel opens is
 // what carries the port the peer's candidate needs.
 export function announceOwn() {
-  if (lobby.flow !== 'local' || lobby.address === '' || lobby.port === 0) return false;
+  if (lobby.address === '' || lobby.port === 0) return false;
   return post('a', lobby.address + ':' + lobby.port);
 }
 
@@ -576,127 +518,8 @@ export function sendFrame() {
   return post('F', encodeFrame());
 }
 
-// The guest answers the offer its page url carries. The answer hop needs the
-// peer connection the transport carries; a channel object with no peer
-// connection behind it (a headless check's stand-in) carries the answer as
-// bytes only, which is all the link's pair call needs.
-// The ICE gathering budget, in whole seconds. The address a peer connects to
-// comes from the gathering, not from the offer: an answer built while gathering
-// is still 'new' carries `IN IP4 0.0.0.0`, which pairs nobody, and an offer
-// published that early warms nothing. A page waits, inside this budget, for its
-// servers to answer before it publishes or answers.
-export const ICE_GATHER_TIMEOUT_SECONDS = 15;
-
 async function sleep(ms) {
   await new Promise((done) => setTimeout(done, ms));
-}
-
-// Wait for a connection's ICE gathering, reporting the whole seconds left so the
-// pairing step can count the attempt down. 'complete' means the servers were
-// reached and answered; 'timeout' means the budget ran out over a slow or
-// unreachable network. Wall time, not the game clock: the attempt is a network
-// round trip, and no tick advances because of it.
-export async function gatherIce(connection, secondsLeft) {
-  const budgetMs = ICE_GATHER_TIMEOUT_SECONDS * 1000;
-  const started = Date.now();
-  while (Date.now() - started < budgetMs) {
-    if (connection.iceGatheringState === 'complete') return 'complete';
-    if (secondsLeft) secondsLeft(Math.ceil((budgetMs - (Date.now() - started)) / 1000));
-    await sleep(500);
-  }
-  return 'timeout';
-}
-
-// The page's own ICE attempt. A page that opens for a network game runs it at
-// open, before the pairing step publishes or answers anything: the address a
-// peer connects to comes from the servers, and the servers answer only once the
-// page has set a local description, so the attempt creates the page's offer,
-// waits out the gathering budget, and records what that offer carries. The
-// offer it produced is kept in the lobby, so the publish step never offers a
-// second time over the same connection.
-async function iceAttempt() {
-  const link = openLink();
-  const pc = link && link.transport && link.transport.connection;
-  if (!pc) {
-    lobby.ice = 'none';
-    return;
-  }
-  try {
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await gatherIce(pc, (left) => { lobby.iceLeft = left; });
-    const sdp = pc.localDescription.sdp;
-    if (carriesRemoteAddress(sdp)) {
-      lobby.ice = 'remote';
-      lobby.warm = sdp;
-      return;
-    }
-    // The servers gave this device no address, so no peer on any network is
-    // reachable. Rebuild the channel with an empty ICE list, which leaves
-    // libwebrtc the `<uuid>.local` candidate: the one-network form the
-    // pairing step warns about. That channel has no servers to wait for.
-    lobby.ice = 'local';
-    if (!lobby.rebuilt) {
-      lobby.rebuilt = true;
-      try {
-        pc.close();
-      } catch (e) {
-        // A connection the channel already closed closes nothing.
-      }
-      // The rebuild is the game layer's decision, so it comes as a supply the
-      // page handed over: registering that factory is what makes the next open
-      // build the channel with no servers.
-      if (iceFallback) registerTransport(iceFallback);
-    }
-  } catch (e) {
-    // An offer the connection cannot produce leaves the step on the code form.
-    lobby.ice = 'none';
-  }
-}
-
-// Start the page's attempt once per page open: the pairing step asks for it
-// every frame, and only the first ask starts the wait. The countdown starts at
-// the full budget so the step shows the wait before the first tick reports.
-export async function startIceAttempt() {
-  // One attempt per page open, and one more when the page changed the way it
-  // runs under: the way names the candidate supply before the attempt runs, so a
-  // finished attempt under another way is not the supply this page needs, and the
-  // page runs its open again over the new one. An attempt that is still waiting is
-  // kept as it is — a second over the same connection would answer the first with
-  // nothing — so a way pick made during the wait is settled on the next open.
-  if (iceRunning === null || (iceDone && iceFlow !== lobby.flow)) {
-    lobby.ice = 'gathering';
-    lobby.iceLeft = ICE_GATHER_TIMEOUT_SECONDS;
-    // The whole open is the attempt: choose the supply, then run the offer. The
-    // handle is set before the first await, so a publish or an answer that asks
-    // while the open is still resolving waits for this same open instead of
-    // racing past it and building the channel over the unresolved supply.
-    iceFlow = lobby.flow;
-    iceDone = false;
-    iceRunning = openIceAttempt();
-  }
-  return iceRunning;
-}
-
-// One page open's attempt: the supply the page resolved first, then the offer
-// that carries the addresses that supply gave this device.
-async function openIceAttempt() {
-  await iceOpen();
-  try {
-    return await iceAttempt();
-  } finally {
-    // The attempt has finished: the flow it ran under is then the supply the
-    // channel holds, and a page whose way has since changed runs its open again.
-    iceDone = true;
-  }
-}
-
-// Wait until the page's attempt has finished. A publish or an answer that ran
-// while the servers were still answering would carry no address at all, so the
-// hop waits for the attempt that is already running rather than starting a
-// second one over the same connection.
-export async function awaitIceAttempt() {
-  if (iceRunning) await iceRunning;
 }
 
 // Whether an SDP carries an address a peer outside this browser could reach:
@@ -714,7 +537,6 @@ export function carriesRemoteAddress(sdp) {
 }
 
 export async function answerOffer() {
-  await awaitIceAttempt();
   const link = openLink();
   if (!link || !lobby.secret) return false;
   const pc = link.transport && link.transport.connection;
@@ -729,25 +551,11 @@ export async function answerOffer() {
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     const sdp = pc.localDescription.sdp;
-    // The same-network flow names the peer by the address the other page's
-    // player typed and the port that page read, so the candidate points at a
-    // real device instead of at a list of public candidates.
-    if (lobby.flow === 'local') {
-      noteOwnPort(sdp);
-      craftPeerCandidate(pc);
-    }
-    if (carriesRemoteAddress(sdp)) {
-      lobby.ice = 'remote';
-      post('A', sdp);
-      if (!link.open) link.pair({ side: 'host', secret: lobby.secret });
-      lobby.paired = true;
-      return true;
-    }
-    // The attempt left this page no address to connect to, so the answer carries
-    // only libwebrtc's `<uuid>.local` candidate: it reaches another connection
-    // inside the same browser instance, and the step says so instead of implying
-    // a second device can be reached.
-    lobby.ice = 'local';
+    // The page reads the port it named in its own answer, then hands the peer a
+    // candidate at the address and port it holds: the pair joins on devices a
+    // player named rather than on a list of public candidates.
+    noteOwnPort(sdp);
+    craftPeerCandidate(pc);
     post('A', sdp);
     if (!link.open) link.pair({ side: 'host', secret: lobby.secret });
     lobby.paired = true;
@@ -772,7 +580,7 @@ export async function acceptAnswer() {
     // The same-network flow: the channel carried the other page's address and
     // port beside its answer, so this page points its candidate at that device
     // rather than at a public list it never reads.
-    if (lobby.flow === 'local' && inbound.addr !== '') learnPeerAnnouncement(inbound.addr);
+    if (inbound.addr !== '') learnPeerAnnouncement(inbound.addr);
     link.report('connection', pc.connectionState);
   }
   if (!link.open) link.pair({ side: 'guest', secret: lobby.secret });
@@ -821,7 +629,7 @@ export function craftPeerCandidate(pc) {
 // report, because a link is the only route a second device has. One connection
 // is aimed once, so a rebuilt channel is what makes a page aim again.
 export function pointAtPeer() {
-  if (lobby.flow !== 'local' || lobby.peerAddress === '' || lobby.peerPort === 0) return false;
+  if (lobby.peerAddress === '' || lobby.peerPort === 0) return false;
   const link = openLink();
   const pc = link.transport && link.transport.connection;
   if (!pc || pc === aimedPc) return false;

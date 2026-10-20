@@ -1,5 +1,5 @@
 // scripts/verify-local-transport.mjs
-// The same-network flow's transport proof, at the browser level.
+// The same-network way's transport proof, at the browser level.
 //
 // Run: node scripts/verify-local-transport.mjs
 //
@@ -22,7 +22,7 @@ import { resolve } from 'node:path';
 import { servePage, exposeGame, freshPage, stateIs } from './harness.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
-// The address a player tests this flow with: their own device's own quad. This
+// The address a player tests this way with: their own device's own quad. This
 // machine answers with two of them, so the harness uses one and leaves the
 // other for the negative case to miss.
 const HOST_ADDRESS = '100.107.90.10';
@@ -39,7 +39,7 @@ async function held(page) {
     let answerIn = -1;
     try { answerIn = (netplay.inboundReport().answer || '').length; } catch (e) { answerIn = -1; }
     return {
-      flow: lobby.flow,
+      form: lobby.form,
       address: lobby.address,
       port: lobby.port,
       peerAddress: lobby.peerAddress,
@@ -89,7 +89,7 @@ await host.keyboard.type(HOST_ADDRESS);
 await host.waitForTimeout(600);
 
 const published = await poll(host, (s) => s.port > 0 && s.link.includes('&p='), 25000);
-check(published.flow === 'local' && published.port > 0 && published.link.includes('&p='),
+check((published.form === 'link' || published.form === 'code') && published.port > 0 && published.link.includes('p='),
   'the host page runs the same-network way and names a port it read on the line it shares');
 
 // The page the other player opens: at the line the first page shared, so it
