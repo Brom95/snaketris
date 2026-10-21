@@ -6,6 +6,7 @@
 // this module owns what the game paints: the grid, the solid blocks, the snake.
 import {
   COLS, ROWS, CELL, BOARD_W, BOARD_H, SOLID, COLORS, TIER_WIDTH, PIECE_BOX,
+  SNAKE_EAT_FLOAT_SPEED, MAX_SNAKE_LEN, FLOAT_FADE_TICKS, PLAYING,
 } from './constants.js';
 import { game } from './state.js';
 import { getGrid } from './grid.js';
@@ -91,6 +92,14 @@ export const motion = {
   tick: 0,
   snakeRec: null,
   pieceRecs: [],
+  // The growth segments this page has seen the snake spawn this game: each is a
+  // { spawnTick, duration } pair (task 1.2). A list, not one slot, so several
+  // segments fly at once; prune() clears them when a new game starts.
+  floats: [],
+  // The snake length the page last saw, so a frame whose body grew by one is the
+  // only frame that may spawn a segment (task 1.2). -1 until the first frame, so
+  // the 3-segment snake afterReset installs spawns nothing.
+  prevSnakeLen: -1,
   // The records this frame hands the painters, rebuilt every frame from what the
   // page saw a frame ago rather than from which object a mover is: a guest page
   // rebuilds every mover out of the frame it received, so object identity there
@@ -232,6 +241,49 @@ export const motion = {
     const phase = (game.play.tick - movedTick) / intervalTicks;
     return phase < 0 ? 0 : phase > 1 ? 1 : phase;
   },
+  // The frame the snake's body grew by one is the only frame that may spawn a
+  // growth segment (task 1.2, design D8): body length only changes when it grows,
+  // so a rise from prevSnakeLen is the bite. Guarded to PLAYING so a paused or
+  // finished screen spawns nothing, and past the length cap so overflow spawns
+  // nothing; duration scales with the length so a longer snake flies a touch
+  // longer. Done once a frame off game.play.tick, so a segment already in flight
+  // keeps its fixed duration even if the snake keeps growing.
+  noteSnakeLength() {
+    const len = game.play.snake.length;
+    if (this.prevSnakeLen < 0) { this.prevSnakeLen = len; return; }
+    if (game.screen.state !== PLAYING) { this.prevSnakeLen = len; return; }
+    if (len > this.prevSnakeLen && len <= MAX_SNAKE_LEN) {
+      const duration = Math.max(1, Math.round(SNAKE_EAT_FLOAT_SPEED * len));
+      this.floats.push({ spawnTick: game.play.tick, duration });
+    }
+    this.prevSnakeLen = len;
+    // Drop segments that have finished flying and faded (task 1.2).
+    this.floats = this.floats.filter(
+      (f) => f.spawnTick + f.duration + FLOAT_FADE_TICKS > game.play.tick,
+    );
+  },
+  // The cell a growth segment holds at a frame: it starts at the head (phase 0)
+  // and travels to the tail (phase 1) along the body's own polyline, so it always
+  // reaches the tail as the tail moves. null once it has arrived.
+  floatPos(snake, spawnTick, duration, tick) {
+    const phase = (tick - spawnTick) / duration;
+    if (phase <= 0) return { r: snake[0].r, c: snake[0].c };
+    if (phase >= 1) return null;
+    const last = snake.length - 1;
+    if (last <= 0) return { r: snake[0].r, c: snake[0].c };
+    const d = phase * last;
+    let k = Math.floor(d);
+    if (k > last - 1) k = last - 1;
+    const u = d - k;
+    const a = snake[k];
+    const b = snake[k + 1];
+    if (Math.abs(b.r - a.r) === ROWS - 1 || Math.abs(b.c - a.c) === COLS - 1) {
+      // A segment crossing a wrap edge is drawn at the near cell so it does not
+      // smear across the field (task 1.2).
+      return a;
+    }
+    return { r: a.r + (b.r - a.r) * u, c: a.c + (b.c - a.c) * u };
+  },
   // One cell coordinate at the point of a hop: travel runs in pixels and is
   // rounded once, so the +1 inset and the cell - 2 size the engine draws stay
   // integers while the position still moves about one pixel a tick (design D7).
@@ -277,6 +329,8 @@ export const motion = {
     if (game.play.tick < motion.tick) {
       motion.snakeRec = null;
       motion.pieceRecs = [];
+      motion.floats = [];
+      motion.prevSnakeLen = -1;
     }
     motion.frameRecords = new Map();
     motion.tick = game.play.tick;
@@ -353,6 +407,52 @@ function snakeChain(from, to, phase) {
   return drawn;
 }
 
+// A growth segment drawn as a light energy core over the cell it holds: a white
+// inset so it is invisible to the edible-piece and snake-ink filters (task 1.2,
+// design D8: a flourish the integrity sweep never counts as a piece cell).
+function drawFloatCell(r, c) {
+  const inset = CELL * 0.2;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillRect(
+    c * CELL + 1 + inset,
+    r * CELL + 1 + inset,
+    CELL - 2 - 2 * inset,
+    CELL - 2 - 2 * inset,
+  );
+}
+
+// The growth segments this page is mid-flight on, drawn as light cores over the
+// body they travel (task 1.2, design D8). Each starts at the head and reaches the
+// tail by its duration; a segment that has just arrived fades over the tail
+// (FLOAT_FADE_TICKS) before it is pruned.
+function drawSnakeFloats() {
+  const snake = game.play.snake;
+  if (motion.floats.length === 0) return;
+  const now = game.play.tick;
+  for (let i = 0; i < motion.floats.length; i++) {
+    const f = motion.floats[i];
+    const cell = motion.floatPos(snake, f.spawnTick, f.duration, now);
+    if (cell === null) {
+      // The segment has arrived this frame: fade it over the tail (task 1.2).
+      const fadePhase = (now - f.spawnTick - f.duration) / FLOAT_FADE_TICKS;
+      if (fadePhase < 1) {
+        const alpha = 0.9 * (1 - fadePhase);
+        const tail = snake[snake.length - 1];
+        const inset = CELL * 0.2;
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctx.fillRect(
+          tail.c * CELL + 1 + inset,
+          tail.r * CELL + 1 + inset,
+          CELL - 2 - 2 * inset,
+          CELL - 2 - 2 * inset,
+        );
+      }
+      continue;
+    }
+    drawFloatCell(cell.r, cell.c);
+  }
+}
+
 // The painters in js/pieces.js read the same bookkeeping through the paint
 // context, so no module has to import this one and no cycle appears.
 paintCtx.motion = motion;
@@ -391,11 +491,18 @@ function paintSnake(pctx) {
       field.drawCell(cell.r, cell.c);
     }
   }
+  // The growth segments this game has spawned, drawn as light cores over the
+  // body they travel (task 1.2, design D8).
+  drawSnakeFloats();
 }
 
 // The engine per-frame canvas pass: every registered painter, in draw order.
 export function render() {
   motion.prune();
+  // A frame whose body grew by one is the only frame that may spawn a segment
+  // (task 1.2, design D8); done once a frame off game.play.tick, so a segment's
+  // flight is fixed-timestep and never outlives its duration.
+  motion.noteSnakeLength();
   // The page observes its movers once a frame, before any painter reads, so a
   // painter never has to know whether a move already happened.
   motion.observeSnake(game.play.snake.map((seg) => ({ r: seg.r, c: seg.c })));
