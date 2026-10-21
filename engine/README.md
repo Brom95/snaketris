@@ -31,7 +31,7 @@ Run it with `node --test engine/tests/boundary.test.js`.
 | `js/registry.js` | Systems run in the declared order. `init` runs once at load, `update` runs once per tick, `endTick` runs after every other system in that tick. The engine owns the tick counter and bumps `ctx.state.play.tick` once per `update`. |
 | `js/state.js` | Two containers, `play` and `screen`, filled from consumer tables. A reset clears one half and refills it from its table. The `afterReset` hook runs only on a reset. |
 | `js/grid.js` | A `rows × cols` cell array built from parameters. Cell identities are values the consumer supplies; the engine never reads one. |
-| `js/navigation.js` | Screen movement comes from a consumer row table and a consumer handler map. The engine owns seven intent verbs only: `menuUp`, `menuDown`, `confirm`, `select`, `toMenu`, `lockModel`, `startGame`. |
+| `js/navigation.js` | Screen movement comes from a consumer row table and a consumer handler map. The engine owns seven intent verbs only: `menuUp`, `menuDown`, `confirm`, `select`, `toMenu`, `lockModel`, `startGame`, so screen movement is the one thing the engine routes and a new screen action must become one of them rather than a side route. |
 | `js/present.js` | Painters run in registration order, in two passes: the canvas pass and the page pass. |
 | `js/interface.js` | One owner for page elements. Every id a registered row names is looked up once and handed to whoever paints or hit-tests it. |
 | `js/layout.js` | One viewport rule answers both the stacked-layout test and the field gap, so the band and the fit cannot drift apart. |
@@ -39,7 +39,7 @@ Run it with `node --test engine/tests/boundary.test.js`.
 | `js/records.js` | A reported batch persists exactly once, then clears. A writer that throws cannot report the same batch again. |
 | `js/source.js` | The next value from a seed and a call count. Two arguments answer one value, so a run that draws from one seed replays in the same order. The engine supplies no seed and reads no browser entropy. |
 | `js/stream.js` | An intent carries the tick it applies on and applies on that tick only. An intent whose tick already passed is dropped and counted, never applied. |
-| `js/link.js` | The link holds the state a peer connection has and fires the close event once, to every registered handler. A resync re-sends state and drops every buffered intent, so one simulation stays authoritative. |
+| `js/link.js` | The link holds the state a peer connection has and fires the close event once, to every registered handler, so a peer reacts to the same close only once. A resync re-sends state and drops every buffered intent, so one simulation stays authoritative. |
 
 The engine reads `document`, `window` and `localStorage` only inside called
 functions, never at module load. The engine suite therefore runs with no DOM,

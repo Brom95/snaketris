@@ -1,3 +1,7 @@
+// input.js — Input handling and intent normalization
+// Converts raw device input (keyboard, gamepad, pointer) into normalized intents
+// Imports: js/state, js/screens, js/constants
+
 // Input FLOW layer: the single state machine that consumes normalized intents
 // and drives one navigation path. The raw device adapters live in
 // js/devices.js; this module owns handleIntent (the collapsed nav path) +

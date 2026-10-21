@@ -6,23 +6,37 @@
 //
 // The engine owns the tick slot: it advances ctx.state.play.tick before the
 // first system runs, so no entry point increments it and no system has to.
-export function createEngine(systems) {
+export /**
+ * Create the game engine with a list of systems.
+ * @param {Array<Object>} systems - Ordered list of system objects with init/update/endTick methods.
+ * @returns {Object} Engine object with init(ctx), update(ctx), endTick(ctx) methods.
+ * 
+ * Systems run in declared order: init runs once at load, update runs once per tick,
+ * endTick runs after every other system in that tick.
+ */
+function createEngine(systems) {
   return {
-    init(ctx) {
-      for (const s of systems) s.init?.(ctx);
+    init(engineContext) {
+      for (const s of systems) s.init?.(engineContext);
     },
-    update(ctx) {
-      advanceTick(ctx);
-      for (const s of systems) s.update?.(ctx);
+    update(engineContext) {
+      advanceTick(engineContext);
+      for (const s of systems) s.update?.(engineContext);
     },
-    endTick(ctx) {
-      for (const s of systems) s.endTick?.(ctx);
+    endTick(engineContext) {
+      for (const s of systems) s.endTick?.(engineContext);
     },
   };
 }
 
-function advanceTick(ctx) {
-  const play = ctx.state?.play;
+/**
+ * Advance the game tick counter in the play state.
+ * @param {Object} ctx - The engine context containing state.
+ * 
+ * Increments play.tick by 1 if play state exists.
+ */
+function advanceTick(engineContext) {
+  const play = engineContext.state?.play;
   if (!play) return;
   play.tick = (play.tick ?? 0) + 1;
 }

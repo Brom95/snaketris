@@ -1,3 +1,7 @@
+// render.js — Canvas rendering layer
+// Paints the game state: grid, pieces, snake, UI overlays
+// Imports: js/constants, js/state, js/grid, js/pieces, engine/js/canvas, engine/js/present
+
 // Rendering. The engine owns the drawing buffer, its size and the cell primitive;
 // this module owns what the game paints: the grid, the solid blocks, the snake.
 import {

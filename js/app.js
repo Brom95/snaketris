@@ -1,3 +1,7 @@
+// app.js — Entry point and game loop controller
+// Wires all modules together, owns the canvas and game loop
+// Imports: engine/js/clock, engine/js/registry, js/state, js/netplay, js/input, js/render, js/ui
+
 // app.js — entry point. Wires every module, owns the game loop and the
 // canvas. Called once on module load (deferred `<script type="module">`),
 // so the DOM is parsed by the time it runs.
@@ -74,6 +78,12 @@ function chooseIceSupply(supply) {
 // The channel this page builds: the supply it resolved at the moment the channel
 // is built, so one registration covers every open of this page and a re-open
 // builds over the supply it just chose.
+/**
+ * Build the WebRTC transport for network play.
+ * @returns {Object} The transport object with send/onMessage methods.
+ * 
+ * Reads the ICE server supply and creates a transport with those servers.
+ */
 function buildChannel() {
   return createTransport(iceServersFromUrl(iceSupply));
 }
@@ -120,6 +130,14 @@ function iceServersFromUrl(fallback) {
   return urls.map((url) => ({ urls: [url] }));
 }
 
+/**
+ * Create a WebRTC transport for network play.
+ * @param {Array<{urls:string[]}>} iceServers - ICE server configuration.
+ * @returns {Object|null} Transport object with send/onMessage/connection, or null if RTCPeerConnection unavailable.
+ * 
+ * Creates an RTCPeerConnection with the provided ICE servers and a negotiated data channel.
+ * Returns an object with send(), onMessage(), and connection properties.
+ */
 function createTransport(iceServers) {
   if (typeof RTCPeerConnection !== 'function') return null;
   const pc = new RTCPeerConnection({ iceServers });
@@ -312,7 +330,13 @@ export function openPairingLink() {
 // Full setup: create/size the canvas, register input + render, seed state,
 // start the loop. The engine canvas owner sizes the buffer when the element
 // is attached, so the entry point names no board numbers.
-export function init() {
+export /**
+ * Initialize the game: wires up rendering, input, UI, and network transport.
+ * Called once on module load after DOM is parsed.
+ * 
+ * Sets up the engine system, registers network transport, and starts the game loop.
+ */
+function init() {
   const canvas = document.getElementById('game');
   initRender(canvas);
   initInput(canvas);

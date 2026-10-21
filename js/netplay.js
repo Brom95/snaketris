@@ -1,3 +1,7 @@
+// netplay.js — Network multiplayer layer
+// Exports: lobby state, transport registration, WebRTC pairing functions
+// Imports: engine/js/link, engine/js/stream, js/state, js/rules, js/netframe
+
 // Network play: the lobby that lives above every per-match reset.
 // One match resets js/state.js; the pairing between matches must survive that
 // reset, so the lobby is module state, not a play or screen field. The engine
@@ -94,9 +98,14 @@ export function noteAddress(text) {
   lobby.address = typed;
 }
 
-// The port this page read from its own local description: the `a=candidate:`
-// line libwebrtc allocates for the page's own DTLS socket. The page never types
-// it, and no other page needs it typed either.
+/**
+ * Extract DTLS port from SDP.
+ * @param {string} sdp - The page's own SDP string.
+ * @returns {number} The port number, or 0 if not found.
+ * 
+ * Scans for 'a=candidate:' lines first. If none found,
+ * falls back to parsing the 'm=' line (format: m=<media> <port> ...).
+ */
 export function noteOwnPort(sdp) {
   // The candidate line is `a=candidate:<id> <proto> <family> <priority>
   // <address> <port> `: the port is the sixth field, and the address in
@@ -113,6 +122,17 @@ export function noteOwnPort(sdp) {
       return;
     }
   }
+  // Fallback for ANSWER SDPs which may have no a=candidate lines: parse the
+  // m= line. Format: `m=<media> <port> <proto> <fmt> ...`
+  for (const line of sdp.split(/\r?\n/)) {
+    if (line.startsWith('m=')) {
+      const fields = line.split(' ');
+      if (fields.length > 1 && /^\d+$/.test(fields[1]) && Number(fields[1]) > 0) {
+        lobby.port = Number(fields[1]);
+        return;
+      }
+    }
+  }
 }
 
 // The address and port the other page named, read back from the link or the
@@ -121,16 +141,24 @@ export function noteOwnPort(sdp) {
 // neither page is asked to type what the other one painted. Reading it here is
 // the whole return trip: the candidate is offered as soon as both halves are
 // known, and only once this page holds a remote description to bind it to.
-export function learnPeerAnnouncement(text) {
+export /**
+ * Parse a peer's 'address:port' announcement and attempt to pair.
+ * @param {string} text - The peer's address and port (e.g. '192.168.1.10:3478').
+ * @returns {boolean} True if peer address/port was validated and candidate was added, false otherwise.
+ * 
+ * Validates the address part using isDottedByteQuad, sets lobby.peerAddress/peerPort,
+ * then opens a link and attempts to craft/add a peer ICE candidate.
+ */
+function learnPeerAnnouncement(text) {
   const parts = text.split(':');
   if (parts.length < 2 || !isDottedByteQuad(parts[0])) return false;
   lobby.peerAddress = parts[0];
   lobby.peerPort = Number(parts[1]);
   const link = openLink();
-  const pc = link.transport && link.transport.connection;
-  if (!pc) return false;
-  if (pc.localDescription) noteOwnPort(pc.localDescription.sdp);
-  return craftPeerCandidate(pc);
+  const peerConnection = link.transport && link.transport.connection;
+  if (!peerConnection) return false;
+  if (peerConnection.localDescription) noteOwnPort(peerConnection.localDescription.sdp);
+  return craftPeerCandidate(peerConnection);
 }
 
 export function notePeerAddress(url) {
@@ -267,26 +295,31 @@ export function attemptPair() {
 // a link. A headless check registers its own factory here, which is the whole
 // point of the supply line: no engine file changes to carry a different channel.
 let transportFactory = null;
-let linkInstance = null;
+let pairLinkInstance = null;
 // The command stream the guest's control actions run through on the host page.
 let guestStream = null;
 
-function bindLink(link) {
-  if (link.transport && link.transport.onMessage) link.transport.onMessage((message) => receive(message));
+function bindLink(pairLink) {
+  if (pairLink.transport && pairLink.transport.onMessage) pairLink.transport.onMessage((message) => receive(message));
   // The lobby records the close, tells its peer, and stops counting the pair.
-  link.onClose((reason) => {
+  pairLink.onClose((reason) => {
     lobby.closed = reason;
     lobby.paired = false;
     post('C', reason);
   });
-  for (const handler of closeHandlers) link.onClose(handler);
-  return link;
+  for (const handler of closeHandlers) pairLink.onClose(handler);
+  return pairLink;
 }
+
+  // Tell the peer that this link closed: the other page has no closer of its
+  // own, so it learns the close from the message rather than from its channel
+  // never answering. The lobby clears the pair here so a closed link never
+  // leaves a match pretending to still run.
 
 export function registerTransport(factory) {
   transportFactory = factory;
-  if (linkInstance) linkInstance = bindLink(createLink(factory()));
-  return linkInstance;
+  if (pairLinkInstance) pairLinkInstance = bindLink(createLink(factory()));
+  return pairLinkInstance;
 }
 
 // The page-level fallback the answering side uses when its servers gave it no
@@ -320,12 +353,12 @@ export function setIceOpen(step) {
 }
 
 export function openLink() {
-  if (!linkInstance && transportFactory) linkInstance = bindLink(createLink(transportFactory()));
-  return linkInstance;
+  if (!pairLinkInstance && transportFactory) pairLinkInstance = bindLink(createLink(transportFactory()));
+  return pairLinkInstance;
 }
 
 export function peerLink() {
-  return linkInstance;
+  return pairLinkInstance;
 }
 
 // The same-network flow announces this page's own address and port over the
@@ -357,13 +390,13 @@ export function refreshLink() {
 // The transport carries bytes one way; the game reads its two verbs and never
 // names the channel class behind them.
 export function post(kind, payload) {
-  const transport = linkInstance && linkInstance.transport;
+  const transport = pairLinkInstance && pairLinkInstance.transport;
   if (!transport) return false;
   return transport.send(kind + payload);
 }
 
 export function peerMessage(handler) {
-  const transport = linkInstance && linkInstance.transport;
+  const transport = pairLinkInstance && pairLinkInstance.transport;
   if (!transport) return false;
   return transport.onMessage((message) => receive(message));
 }
@@ -372,6 +405,12 @@ const inbound = { answer: '', addr: '', frames: 0, intents: 0, prep: 0, closed: 
 
 // The guest follows the match the host simulates: it shows the field while a
 // frame says a match is running, and the result once a frame says it ended.
+// The inbound counters the game and its tests read back: they say how many
+// answers, frames, intents, preparations and close messages this page has seen,
+// so a test can assert the other page's traffic arrived rather than only that
+// the match ran. The counters are never reset by a match reset, because they
+// describe the pairing, which survives the reset.
+
 function followSimulation() {
   if (game.screen.state === PAIRING) gotoScreen(PLAYING);
   else if (game.screen.state === PLAYING && game.play.gameOverReason) gotoScreen(GAME_OVER);
@@ -381,32 +420,66 @@ export function inboundReport() {
   return inbound;
 }
 
+// Named handlers for each inbound message kind. Each takes the raw payload
+// string and does one thing: updates the inbound counter, calls the pairing
+// path, applies a frame, queues an intent, mirrors preparation, ends a peer
+// link, or locks a control model. Keeping them separate lets the dispatch below
+// be a table rather than a chain of branches.
+function handleAnswer(payload) {
+  inbound.answer = payload;
+}
+
+// The same-network flow's peer address travels beside the answer, over the
+// channel the pairing already uses: a page learns the other page's address
+// and port from the channel, never from a list of public candidates.
+function handlePeerAnnouncement(payload) {
+  inbound.addr = payload;
+  learnPeerAnnouncement(payload);
+}
+
+// A frame paints only while this page still holds a peer: once the peer
+// leaves, the pages sit on their pairing step and a late frame would start
+// a match nobody is simulating any more.
+function handleFrame(payload) {
+  inbound.frames += 1;
+  if (duelOpen() && applyFrame(payload)) followSimulation();
+}
+
+function handleIntent(payload) {
+  inbound.intents += 1;
+  const sent = decodeIntent(payload);
+  if (sent && guestStream) guestStream.queue(sent.intent, sent.tick);
+}
+
+function handlePreparation(payload) {
+  inbound.prep += 1;
+  mirrorPreparation(payload);
+}
+
+function handlePeerClosed(payload) {
+  inbound.closed = payload;
+  peerClosed(payload);
+}
+
+function handleControlModel(payload) {
+  lockControlModel(2, payload);
+}
+
+const messageHandlers = {
+  A: handleAnswer,
+  a: handlePeerAnnouncement,
+  F: handleFrame,
+  I: handleIntent,
+  P: handlePreparation,
+  C: handlePeerClosed,
+  M: handleControlModel,
+};
+
 function receive(message) {
   if (typeof message !== 'string' || message.length < 2) return;
-  const kind = message[0];
-  const payload = message.slice(1);
-  if (kind === 'A') inbound.answer = payload;
-  // The same-network flow's peer address travels beside the answer, over the
-  // channel the pairing already uses: a page learns the other page's address
-  // and port from the channel, never from a list of public candidates.
-  else if (kind === 'a') { inbound.addr = payload; learnPeerAnnouncement(payload); }
-  else if (kind === 'F') {
-    inbound.frames += 1;
-    // A frame paints only while this page still holds a peer: once the peer
-    // leaves, the pages sit on their pairing step and a late frame would start
-    // a match nobody is simulating any more.
-    if (duelOpen() && applyFrame(payload)) followSimulation();
-  } else if (kind === 'I') {
-    inbound.intents += 1;
-    const sent = decodeIntent(payload);
-    if (sent && guestStream) guestStream.queue(sent.intent, sent.tick);
-  } else if (kind === 'P') {
-    inbound.prep += 1;
-    mirrorPreparation(payload);
-  } else if (kind === 'C') {
-    inbound.closed = payload;
-    peerClosed(payload);
-  } else if (kind === 'M') lockControlModel(2, payload);
+  const handler = messageHandlers[message[0]];
+  if (!handler) return;
+  handler(message.slice(1));
 }
 
 // The seed the pairing carries: both pages hold the same blob, so hashing it
@@ -444,7 +517,7 @@ export function guestPage() {
 }
 
 export function duelOpen() {
-  const link = linkInstance;
+  const link = pairLinkInstance;
   return lobby.paired && link !== null && link.open;
 }
 
@@ -539,23 +612,23 @@ export function carriesRemoteAddress(sdp) {
 export async function answerOffer() {
   const link = openLink();
   if (!link || !lobby.secret) return false;
-  const pc = link.transport && link.transport.connection;
-  if (!pc) {
+  const peerConnection = link.transport && link.transport.connection;
+  if (!peerConnection) {
     post('A', lobby.secret);
     if (!link.open) link.pair({ side: 'host', secret: lobby.secret });
     lobby.paired = true;
     return true;
   }
   try {
-    await pc.setRemoteDescription({ type: 'offer', sdp: lobby.secret });
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    const sdp = pc.localDescription.sdp;
+    await peerConnection.setRemoteDescription({ type: 'offer', sdp: lobby.secret });
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    const sdp = peerConnection.localDescription.sdp;
     // The page reads the port it named in its own answer, then hands the peer a
     // candidate at the address and port it holds: the pair joins on devices a
     // player named rather than on a list of public candidates.
     noteOwnPort(sdp);
-    craftPeerCandidate(pc);
+    craftPeerCandidate(peerConnection);
     post('A', sdp);
     if (!link.open) link.pair({ side: 'host', secret: lobby.secret });
     lobby.paired = true;
@@ -570,10 +643,10 @@ export async function answerOffer() {
 export async function acceptAnswer() {
   const link = openLink();
   if (!link || inbound.answer === '') return false;
-  const pc = link.transport && link.transport.connection;
-  if (pc) {
+  const peerConnection = link.transport && link.transport.connection;
+  if (peerConnection) {
     try {
-      await pc.setRemoteDescription({ type: 'answer', sdp: inbound.answer });
+      await peerConnection.setRemoteDescription({ type: 'answer', sdp: inbound.answer });
     } catch (e) {
       return false;
     }
@@ -581,7 +654,7 @@ export async function acceptAnswer() {
     // port beside its answer, so this page points its candidate at that device
     // rather than at a public list it never reads.
     if (inbound.addr !== '') learnPeerAnnouncement(inbound.addr);
-    link.report('connection', pc.connectionState);
+    link.report('connection', peerConnection.connectionState);
   }
   if (!link.open) link.pair({ side: 'guest', secret: lobby.secret });
   lobby.paired = true;
@@ -592,7 +665,20 @@ export async function acceptAnswer() {
 // player typed, and the port is the one that page read from its own gathered
 // description. The candidate is bound to the media line of the description this
 // page already holds, so the handshake stays on that one section.
-export function craftPeerCandidate(pc) {
+export /**
+ * Hand-craft a peer ICE candidate and add it to the peer connection.
+ * @param {RTCPeerConnection} pc - The peer connection to add the candidate to.
+ * @returns {boolean} True if candidate was added successfully, false otherwise.
+ * 
+ * Derives sdpMid and sdpMLineIndex from the first 'm=' line of the SDP.
+ * Returns false if no peer address/port is held or if pc is invalid.
+ */
+  // The priority 2113937151 is the standard value for a host candidate: a
+  // peer that receives it treats this device's address and port as the
+  // preferred route, which is what the same-network join needs. The '9' and
+  // '1' are the candidate id and the udp priority field, neither of which the
+  // peer reads for a host candidate it is about to use directly.
+function craftPeerCandidate(pc) {
   // Either description names the media line a candidate binds to. A page that
   // only ever made its own offer still names its line, so pointing at a network
   // address is not waiting for an answer that no other device can carry here.
@@ -644,7 +730,7 @@ export function pointAtPeer() {
 // The state a peer connection reports, held by the engine link. The consumer
 // forwards the events its channel raises; the link keeps the list.
 export function reportPeerState(name, value) {
-  const link = linkInstance;
+  const link = pairLinkInstance;
   if (!link) return false;
   link.states[name] = value;
   return true;
@@ -652,7 +738,7 @@ export function reportPeerState(name, value) {
 
 // The state a peer connection reports, held by the engine link.
 export function peerState(name) {
-  const link = linkInstance;
+  const link = pairLinkInstance;
   return link ? link.states[name] : '';
 }
 
@@ -661,7 +747,7 @@ export function peerState(name) {
 const closeHandlers = [];
 
 export function onPeerClose(handler) {
-  if (linkInstance) return linkInstance.onClose(handler);
+  if (pairLinkInstance) return pairLinkInstance.onClose(handler);
   closeHandlers.push(handler);
   return true;
 }

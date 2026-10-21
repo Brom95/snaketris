@@ -1,3 +1,7 @@
+// ui.js — User interface layer
+// Manages all UI elements outside the play field, syncs visibility with game.screen.state
+// Imports: js/constants, js/state, js/copy
+
 // The page interface: everything the game shows outside the play field.
 // Owns the elements declared in snaketris.html and keeps their visibility in
 // step with `game.screen.state`, the single view authority. Imports only constants.js
