@@ -26,7 +26,7 @@ const CONFIGS = [
   { name: 'supplied ICE list', iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] },
 ];
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ headless: process.env.DUAL_HEADED !== "1" });
 const context = await browser.newContext();
 
 // A blank page on the routed origin: the proof needs no game code, only two
