@@ -20,6 +20,7 @@ import {
   peerClosed, peerLeft, inboundReport, reportPeerState, localSeat, openGuestStream,
   guestStreamReport, setIceFallback, setIceOpen, carriesRemoteAddress,
   lobby, notePeerAddress, noteOwnPort, announceOwn, pointAtPeer, refreshLink,
+  noteAddress, isPrivateHostAddress,
 } from './netplay.js';
 import { gameOver } from './state.js';
 import { PEER_LEFT } from './rules.js';
@@ -138,6 +139,11 @@ function iceServersFromUrl(fallback) {
  * Creates an RTCPeerConnection with the provided ICE servers and a negotiated data channel.
  * Returns an object with send(), onMessage(), and connection properties.
  */
+// Whether this page has already auto-detected its own LAN address. Set once the
+// first private-range host candidate arrives, so one page never reports its
+// address twice and a rebuilt channel does not refire the detection.
+let lanDetected = false;
+
 function createTransport(iceServers) {
   if (typeof RTCPeerConnection !== 'function') return null;
   const pc = new RTCPeerConnection({ iceServers });
@@ -146,6 +152,18 @@ function createTransport(iceServers) {
   // so the consumer forwards them and the link keeps the list.
   pc.addEventListener('icecandidate', (event) => reportPeerState('iceCandidate', event.candidates));
   pc.addEventListener('iceconnectionstatechange', () => reportPeerState('connection', pc.connectionState));
+  // The first private-range host candidate the transport gathers is this page's
+  // own LAN address: it fills the pairing field without being typed. A page that
+  // gathers no such candidate keeps the field empty for a hand-typed fallback.
+  if (!lanDetected) {
+    pc.addEventListener('icecandidate', (event) => {
+      const candidate = event && event.candidate;
+      if (candidate && candidate.type === 'host' && isPrivateHostAddress(candidate.address)) {
+        lanDetected = true;
+        noteAddress(candidate.address);
+      }
+    });
+  }
   return {
     send: (message) => {
       try {

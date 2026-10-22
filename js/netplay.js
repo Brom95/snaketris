@@ -81,6 +81,20 @@ function isDottedByteQuad(value) {
   return groups.every((group) => /^\d{1,3}$/.test(group) && Number(group) < 256);
 }
 
+// A host candidate whose address is in a private LAN range (192.168.x.x,
+// 10.0.0.0/8, 172.16.0.0/12) is this page's own network address, so it can fill
+// the pairing field without being typed. A link-local (169.254.x.x) or public
+// address is not reachable on the LAN, so it is not detected.
+export function isPrivateHostAddress(value) {
+  if (!isDottedByteQuad(value)) return false;
+  const groups = value.split('.').map((group) => Number(group));
+  const [first, second] = groups;
+  if (first === 10) return true;
+  if (first === 172 && second >= 16 && second <= 31) return true;
+  if (first === 192 && second === 168) return true;
+  return false;
+}
+
 // The address this page's own player typed. An empty value is no address yet,
 // and the step keeps waiting; a value that is not an address is reported.
 export function noteAddress(text) {

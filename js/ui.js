@@ -254,8 +254,16 @@ function paintPairingScroll() {
   // on screen while the rest scrolls into view.
   pairingViewEl.classList.toggle('tall', over);
 }
+// Whether the PAIRING step has already focused its address field this visit.
+// Reset when the screen leaves PAIRING, so re-entering the step focuses once
+// again rather than on every frame.
+let pairingFocused = false;
+
 function paintPairing(pctx) {
-  if (game.screen.state !== PAIRING) return;
+  if (game.screen.state !== PAIRING) {
+    pairingFocused = false;
+    return;
+  }
   // The network way's address is typed into a real field by the player, so the
   // page reads what they typed each time it paints the step. A page whose field
   // is empty is still waiting: the copy affordance beside it stays hidden, and
@@ -286,7 +294,17 @@ function paintPairing(pctx) {
   // same-network flow's own lines and their affordances are the helper's job.
   show(copyLinkEl, linkForm);
   show(copyCodeEl, codeForm);
- paintLocalPairing(true);
+  paintLocalPairing(true);
+  // The same-network flow's field is the field typing lands in. On a phone the
+  // soft keyboard covers the Pair control while it stays open, so the field is
+  // focused only once, when the step first appears, not on every paint frame,
+  // which would force the keyboard back over the control and make it untappable.
+  if (!pairingFocused && pairingAddressEl) {
+    pairingAddressEl.focus({ preventScroll: true });
+    pairingFocused = true;
+  } else {
+    pairingFocused = false;
+  }
   paintMirrors();
 }
 
@@ -295,9 +313,6 @@ function paintPairing(pctx) {
 // can still select.
 function paintLocalPairing(localFlow) {
   show(pairingAddressEl, localFlow);
-  // The field the flow shows is the field typing goes into: a player who opened
-  // the page types straight away, with no click to land on an empty box first.
-  if (localFlow && pairingAddressEl) pairingAddressEl.focus({ preventScroll: true });
   // The line the other player carries lands in its own field: a channel this
   // page has never joined carries nothing, so the peer's address and port arrive
   // as a pasted value. The page reads it only when the value changes, so a

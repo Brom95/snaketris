@@ -99,3 +99,18 @@ test('no candidate is offered before this page holds a remote description', asyn
 test('an announcement that is not an address is refused', async () => {
   assert.equal(netplay.learnPeerAnnouncement('nonsense'), false, 'a channel message that names no dotted-quad sets nothing');
 });
+
+test('a host candidate in a private LAN range counts as this page address', () => {
+  assert.equal(netplay.isPrivateHostAddress('192.168.4.10'), true, 'a 192.168.x.x host is on the LAN');
+  assert.equal(netplay.isPrivateHostAddress('10.0.0.5'), true, 'a 10.0.0.0/8 host is on the LAN');
+  assert.equal(netplay.isPrivateHostAddress('172.16.0.1'), true, 'a 172.16.0.0/12 host is on the LAN');
+  assert.equal(netplay.isPrivateHostAddress('172.31.255.1'), true, 'the 172.16.0.0/12 range reaches 172.31');
+});
+
+test('a non-LAN address is not detected as this page address', () => {
+  assert.equal(netplay.isPrivateHostAddress('169.254.1.2'), false, 'a link-local address is not a LAN address');
+  assert.equal(netplay.isPrivateHostAddress('100.107.90.10'), false, 'a public address is not on the LAN');
+  assert.equal(netplay.isPrivateHostAddress('172.15.0.1'), false, 'the byte just below the /12 is not on the LAN');
+  assert.equal(netplay.isPrivateHostAddress('172.32.0.1'), false, 'the byte just above the /12 is not on the LAN');
+  assert.equal(netplay.isPrivateHostAddress('nonsense'), false, 'a value that is not an address is not detected');
+});
