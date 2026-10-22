@@ -302,8 +302,6 @@ function paintPairing(pctx) {
   if (!pairingFocused && pairingAddressEl) {
     pairingAddressEl.focus({ preventScroll: true });
     pairingFocused = true;
-  } else {
-    pairingFocused = false;
   }
   paintMirrors();
 }
